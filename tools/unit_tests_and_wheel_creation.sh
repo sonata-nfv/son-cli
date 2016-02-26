@@ -2,7 +2,8 @@
 set -x
 
 # Go to the 'root' directory
-cd "$(dirname "$0")"
+BASE_DIR=$(readlink -f "$(dirname $(readlink -f $0))/..")
+cd ${BASE_DIR}
 
 # Remove the dist directory
 rm -rf dist
