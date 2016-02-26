@@ -5,11 +5,14 @@ set -x
 BASE_DIR=$(readlink -f "$(dirname $(readlink -f $0))/..")
 cd ${BASE_DIR}
 
-# Remove the dist directory
-rm -rf dist
+# Cleaning 'dist' directory
+rm -rf dist/*
 
 # Launch the Python unit tests
 ./bin/test
 
 # Create the wheel package
 python3 setup.py bdist_wheel --plat-name=linux_x86_64
+
+# Fixing the 'dist' directory's permissions
+chmod -R a+rw dist
