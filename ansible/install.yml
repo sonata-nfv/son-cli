@@ -1,0 +1,13 @@
+- hosts: localhost
+  tasks:
+    - name: updates apt
+      apt: update_cache=yes
+
+    - name: install python 3.4
+      apt: pkg={{item}} state=installed
+      with_items:
+        - python3.4
+        - libyaml-dev
+
+    - name: install pip 3.x
+      apt: pkg=python3-pip state=installed
