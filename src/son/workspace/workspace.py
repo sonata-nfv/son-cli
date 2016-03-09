@@ -9,6 +9,9 @@ log = logging.getLogger(__name__)
 
 
 class Workspace:
+
+    __descriptor_name__ = "workspace.yaml"
+
     def __init__(self, ws_root):
         logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ class Workspace:
              'credentials': 'personal'
              }
 
-        ws_file_path = os.path.join(self.ws_root, 'catalogues', 'personal.yml')
+        ws_file_path = os.path.join(self.ws_root, 'catalogues', 'personal.yaml')
         with open(ws_file_path, "w") as ws_file:
             ws_file.write(yaml.dump(d, default_flow_style=False))
 
@@ -40,7 +43,7 @@ class Workspace:
              'platforms_dir': 'platforms'
              }
 
-        ws_file_path = os.path.join(self.ws_root, 'workspace.yml')
+        ws_file_path = os.path.join(self.ws_root, Workspace.__descriptor_name__)
         with open(ws_file_path, "w") as ws_file:
             ws_file.write(yaml.dump(d, default_flow_style=False))
 
@@ -49,7 +52,7 @@ class Workspace:
         self.create_catalog_sample()
 
     def check_ws_exists(self):
-        ws_file = os.path.join(self.ws_root, 'workspace.yml')
+        ws_file = os.path.join(self.ws_root, Workspace.__descriptor_name__)
         return os.path.exists(ws_file) or os.path.exists(self.ws_root)
 
 
@@ -86,4 +89,3 @@ def main():
         prj_root = os.path.expanduser(args.project)
         proj = Project(prj_root, ws_root)
         proj.create_prj()
-
