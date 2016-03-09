@@ -22,7 +22,7 @@ class Packager(object):
         'PD': 'pd-schema.yaml'
     }
 
-    def __init__(self, prj_path, version="0.1"):
+    def __init__(self, prj_path, generate_pd=True, version="0.1"):
         # Log variable
         logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
@@ -31,7 +31,8 @@ class Packager(object):
         self._package_descriptor = None
 
         self._project_path = prj_path
-        self.package_descriptor = self._project_path
+        if generate_pd:
+            self.package_descriptor = self._project_path
 
     @property
     def package_descriptor(self):

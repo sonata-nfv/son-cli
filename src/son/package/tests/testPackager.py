@@ -19,7 +19,7 @@ class PDTester(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(PDTester, self).__init__(*args, **kwargs)
-        self.pck = Packager()
+        self.pck = Packager(prj_path='/', generate_pd=False)
 
     def test_correct_gds(self):
         """ Test the correct general description section """
