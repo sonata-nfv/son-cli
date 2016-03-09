@@ -21,7 +21,7 @@ setup(
         entry_points={
             'console_scripts': [
                 'son-workspace=son.workspace.workspace:main',
-                'son-package=son.package.Sample:main',
+                'son-package=son.package.package:main',
             ],
         },
         test_suite='son'

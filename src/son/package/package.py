@@ -16,22 +16,22 @@ from son.workspace.workspace import Workspace
 log = logging.getLogger(__name__)
 
 
-class Packager:
+class Packager(object):
 
     schemas = {
         'PD': 'pd-schema.yaml'
     }
 
-    def __init__(self, prj_path=None, version="0.1"):
+    def __init__(self, prj_path, version="0.1"):
         # Log variable
         logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
 
         self._version = version
         self._package_descriptor = None
-        if prj_path:
-            self._project_path = prj_path
-            self._package_descriptor = self._project_path
+
+        self._project_path = prj_path
+        self.package_descriptor = self._project_path
 
     @property
     def package_descriptor(self):
@@ -90,7 +90,7 @@ class Packager:
         """
 
         # Validate all needed information
-        if not self.package_descriptor:
+        if not self._package_descriptor:
             self._log.error("Missing package descriptor")
             return
 
