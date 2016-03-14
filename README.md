@@ -1,3 +1,7 @@
+[![Build Status](https://jenkins.sonata-nfv.eu/buildStatus/icon?job=son-cli)](https://jenkins.sonata-nfv.eu/job/son-cli/)
+
+Maintainers: [tsbatista](https://github.com/tsbatista) and [wtaverni](https://github.com/wtaverni)
+
 # son-cli
 SONATA SDK command line interface tools
 
