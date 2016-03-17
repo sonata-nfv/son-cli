@@ -1,15 +1,18 @@
 import logging
 import sys
+import urllib
 import zipfile
 from contextlib import closing
 from pathlib import Path
 
 import os
 import pkg_resources
+import shutil
 import yaml
 from jsonschema import validate
 
 from son.package.decorators import performance
+from son.package.md5 import generate_hash
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
 
@@ -19,10 +22,11 @@ log = logging.getLogger(__name__)
 class Packager(object):
 
     schemas = {
-        'PD': 'pd-schema.yaml'
+        'PD': 'pd-schema.yaml',
+        'VNFD': 'vnfd-schema.yaml'
     }
 
-    def __init__(self, prj_path, generate_pd=True, version="0.1"):
+    def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
         logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
@@ -31,7 +35,13 @@ class Packager(object):
         self._package_descriptor = None
 
         self._project_path = prj_path
+
+        # Clear and create package specific folder
         if generate_pd:
+            self._dst_path = os.path.join(self._project_path, "target") if not dst_path else dst_path
+            if os.path.exists(self._dst_path):
+                shutil.rmtree(self._dst_path)
+                os.makedirs(self._dst_path, exist_ok=False)
             self.package_descriptor = self._project_path
 
     @property
@@ -52,7 +62,15 @@ class Packager(object):
 
         log.info('Create General Description section')
         gds = self.package_gds(prj)
+        pcs = self.generate_pcs()
         self._package_descriptor = gds
+        self._package_descriptor.update(pcs)
+
+        # Create the manifest folder and file
+        meta_inf = os.path.join(self._dst_path, "META-INF")
+        os.makedirs(meta_inf, exist_ok=True)
+        with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
+            manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
         validate(self._package_descriptor, load_schema(Packager.schemas['PD']))
 
@@ -83,7 +101,107 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_package(self, name, dst_path=None):
+    def generate_pcs(self, group=None):
+        """
+        Compile information for the package content section.
+        This function iterates over the different VNF entries
+        :param group: (TBD)
+        :return:
+        """
+        base_path = os.path.join(self._project_path, 'sources', 'vnf')
+        vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
+        pcs = []
+        for vnf in vnf_folders:
+            for pce in self.generate_pcs_entry(os.path.join(base_path, vnf), vnf):
+                pcs.append(pce)
+        return dict(package_content=pcs)
+
+    def generate_pcs_entry(self, base_path, vnf, group=None):
+        """
+        Compile information for a specific VNF.
+        The VNF descriptor is validated and added to the package.
+        VDU image files, referenced in the VNF descriptor, are added to the package.
+        :param base_path: The path where the VNF file is located
+        :param vnf: The VNF reference path
+        :param group: (TBD)
+        :return:
+        """
+        # Locate VNFD
+        vnfd_list = [file for file in os.listdir(base_path)
+                if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml') ]
+
+        # Validate number of Yaml files
+        check = len(vnfd_list)
+        if check == 0:
+            log.error("Missing descriptor file")
+            return
+        elif check > 1:
+            log.error("Only one yaml file per VNF source folder allowed")
+            return
+        else:
+            with open(os.path.join(base_path, vnfd_list[0]), 'r') as _file:
+                vnfd = yaml.load(_file)
+
+        # Validate VNFD
+        validate(vnfd, load_schema(Packager.schemas['VNFD']))
+        if group and vnfd['vnf_group'] != group:
+            self._log.warning(
+                "You are adding a VNF with different group, Project group={} and VNF group={}".format(
+                    group, vnfd['vnf_group']))
+
+        pce = []
+        # Create fd location
+        fd_path = os.path.join(self._dst_path, "function_descriptors")
+        os.makedirs(fd_path, exist_ok=True)
+        # Copy VNFD file
+        fd = os.path.join(fd_path, vnfd_list[0])
+        shutil.copyfile(os.path.join(base_path, vnfd_list[0]), fd)
+        # Generate VNFD Entry
+        pce_fd = dict()
+        pce_fd["content-type"] = "application/sonata.function_descriptor"
+        pce_fd["name"] = "/function_descriptors/{}".format(vnfd_list[0])
+        pce_fd["md5"] = generate_hash(fd)
+        pce.append(pce_fd)
+
+        if 'virtual_deployment_units' in vnfd:
+            vdu_list = [vdu for vdu in vnfd['virtual_deployment_units'] if vdu['vm_image']]
+            for vdu in vdu_list:
+                bd = os.path.join(base_path, vdu['vm_image'])
+                if os.path.exists(bd):
+                    if os.path.isfile(bd):
+                        pce.append(self.__pce_img_gen__(base_path, vnf, vdu, vdu['vm_image'], dir_p='', dir_o=''))
+                    elif os.path.isdir(bd):
+                        img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
+                        bp = os.path.join(base_path, vdu['vm_image'])
+                        for root, dirs, files in os.walk(bp):
+                            dir_o = root[len(bp):]
+                            dir_p = dir_o.replace(os.path.sep, "/")
+                            for f in files:
+                                if dir_o.startswith(os.path.sep):
+                                    dir_o = dir_o[1:]
+                                pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
+
+        return pce
+
+    def __pce_img_gen__(self, bd, vnf, vdu, f, dir_p='', dir_o=''):
+        pce = dict()
+        img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
+        pce["content-type"] = "application/sonata.{}_files".format(img_format)
+        pce["name"] = "/{}_files/{}{}/{}".format(img_format, vnf, dir_p, f)
+        pce["md5"] = self.__pce_img_gen_fc__(pce, img_format, vnf, f, bd, dir_o)
+
+        return pce
+
+    def __pce_img_gen_fc__(self, pce, img_format, vnf, f, root, dir_o=''):
+        fd_path = os.path.join("{}_files".format(img_format), vnf, dir_o)
+        fd_path = os.path.join(self._dst_path, fd_path)
+        os.makedirs(fd_path, exist_ok=True)
+        fd = os.path.join(fd_path, f)
+        shutil.copyfile(os.path.join(root, f), fd)
+        return generate_hash(fd)
+
+
+    def generate_package(self, name):
         """
         Generate the final package version.
         :param dst_path; The path were the package will be generated
@@ -95,23 +213,14 @@ class Packager(object):
             self._log.error("Missing package descriptor")
             return
 
-        # Create package specific folder
-        dst_path = os.path.join(self._project_path, "target") if not dst_path else dst_path
-        os.makedirs(dst_path, exist_ok=True)
-
-        # Create the manifest folder and file
-        meta_inf = os.path.join(dst_path, "META-INF")
-        os.makedirs(meta_inf, exist_ok=True)
-        with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
-            manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
         # Generate package file
-        zip_name = os.path.join(dst_path, name + '.zip')
+        zip_name = os.path.join(self._dst_path, name + '.zip')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
-            for base, dirs, files in os.walk(dst_path):
+            for base, dirs, files in os.walk(self._dst_path):
                 for file_name in files:
                     full_path = os.path.join(base, file_name)
-                    relative_path = full_path[len(dst_path)+len(os.sep):]
+                    relative_path = full_path[len(self._dst_path)+len(os.sep):]
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
 
@@ -168,5 +277,5 @@ def main():
 
     name = Path(prj).name if not args.name else args.name
 
-    pck = Packager(prj)
-    pck.generate_package(dst_path=args.destination, name=name)
+    pck = Packager(prj, dst_path=args.destination)
+    pck.generate_package(name)

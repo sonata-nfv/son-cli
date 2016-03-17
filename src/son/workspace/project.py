@@ -16,8 +16,13 @@ class Project:
         self._create_prj_stub()
 
     def _create_dirs(self):
+        """
+        Creates the directory tree of the project
+        :return:
+        """
+
         directories = {'sources', 'dependencies', 'deployment'}
-        src_subdirs = {'fsm', 'ssm', 'pattern', 'vnf'}
+        src_subdirs = {'ssm', 'pattern', 'vnf'}
 
         os.makedirs(self.prj_root, exist_ok=False)
         for d in directories:
@@ -29,11 +34,28 @@ class Project:
             path = os.path.join(src_path, d, 'sample')
             os.makedirs(path, exist_ok=True)
             self._create_sample(d, path)
+        self._create_vnf_dir()
+
+    def _create_vnf_dir(self, name='sample'):
+        """
+        Function to create a new VNF inside project source.
+        :param name:The VNF name
+        """
+        vnf_subdirs = {'fsm'}
+        vnf_path = os.path.join(self.prj_root, 'sources', 'vnf', name)
+        self._create_sample('vnf', vnf_path)
+        for d in vnf_subdirs:
+            path = os.path.join(vnf_path, d)
+            os.makedirs(path, exist_ok=False)
 
     def _create_prj_stub(self):
+        """
+        Creates the project descriptor (project.yaml)
+        :return:
+        """
         d = {
             'name': 'sonata-project-sample',
-            'group': 'com.sonata.project',
+            'group': 'eu.sonata.project',
             'version': '0.0.1',
             'maintainer': 'Name, Company, Contact',
             'description': 'Project description',
@@ -47,14 +69,14 @@ class Project:
 
     def _create_sample(self, prj_type, path):
         switcher = {
-            'fsm': self._create_sample_fsm,
+            # 'fsm': self._create_sample_fsm,
             'ssm': self._create_sample_ssm,
             'pattern': self._create_sample_pattern,
             'vnf': self._create_sample_vnf
         }
         func = switcher.get(prj_type)
         if func is None:
-            self.log.error("Could not create sample for " + prj_type + ", unknown project type");
+            self.log.error("Could not create sample for " + prj_type + ", unknown project type")
             return
         func(path)
 
@@ -90,10 +112,13 @@ class Project:
 
     def _create_sample_vnf(self, path):
         d = {
-            'name': 'sample vnf',
-            'id': 'com.sonata.vnf.sample',
-            'version': '0.1'
+            'descriptor_version': 'vnfd-schema-01',
+            'vnf_group': 'eu.sonata',
+            'vnf_name': 'vnf-name',
+            'vnf_version': '0.1',
+            'vnf_author': 'Name, Company, Contact',
+            'vnf_description': 'Brief VNF description'
         }
         prj_path = os.path.join(path, 'vnf.yaml')
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(d))
+            prj_file.write(yaml.dump(d, default_flow_style=False))
