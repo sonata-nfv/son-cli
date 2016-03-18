@@ -1,7 +1,8 @@
 import os
 import logging
 import yaml
-
+import shutil
+import pkg_resources
 
 class Project:
 
@@ -111,14 +112,11 @@ class Project:
             prj_file.write(yaml.dump(d))
 
     def _create_sample_vnf(self, path):
-        d = {
-            'descriptor_version': 'vnfd-schema-01',
-            'vnf_group': 'eu.sonata',
-            'vnf_name': 'vnf-name',
-            'vnf_version': '0.1',
-            'vnf_author': 'Name, Company, Contact',
-            'vnf_description': 'Brief VNF description'
-        }
-        prj_path = os.path.join(path, 'vnf.yaml')
-        with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(d, default_flow_style=False))
+        """
+        Create a sample VNF descriptor (to be evoked upon project creation)
+        :param path: The VNF sample directory
+        :return:
+        """
+        src = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'samples', 'vnfd-sample.yaml')
+        dst = os.path.join(os.path.join(path), 'vnfd-sample.yaml')
+        shutil.copyfile(src, dst)
