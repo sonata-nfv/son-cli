@@ -121,4 +121,3 @@ class Project:
         dst = path
         shutil.copyfile(os.path.join(src, 'vnfd-sample.yaml'), os.path.join(dst, 'vnfd-sample.yaml'))
         shutil.copyfile(os.path.join(src, 'sample_docker'), os.path.join(dst, 'sample_docker'))
-        shutil.copyfile(os.path.join(src, 'sample_docker'), os.path.join(dst, 'sample_docker'))
