@@ -20,7 +20,6 @@ log = logging.getLogger(__name__)
 
 
 class Packager(object):
-
     schemas = {
         'PD': 'pd-schema.yaml',
         'VNFD': 'vnfd-schema.yaml'
@@ -92,7 +91,7 @@ class Packager(object):
             if field not in prj_descriptor.keys():
                 errors.append(field)
             else:
-                gds['package_'+field] = prj_descriptor[field]
+                gds['package_' + field] = prj_descriptor[field]
 
         if errors:
             print('Please define {} on {}'.format(', '.join(errors), Project.__descriptor_name__),
@@ -128,7 +127,7 @@ class Packager(object):
         """
         # Locate VNFD
         vnfd_list = [file for file in os.listdir(base_path)
-                if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml') ]
+                     if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
 
         # Validate number of Yaml files
         check = len(vnfd_list)
@@ -167,7 +166,10 @@ class Packager(object):
             vdu_list = [vdu for vdu in vnfd['virtual_deployment_units'] if vdu['vm_image']]
             for vdu in vdu_list:
                 bd = os.path.join(base_path, vdu['vm_image'])
-                if os.path.exists(bd):
+                # vm_image can be a local File, a local Dir or a URL
+
+                if os.path.exists(bd):  # local File or local Dir
+
                     if os.path.isfile(bd):
                         pce.append(self.__pce_img_gen__(base_path, vnf, vdu, vdu['vm_image'], dir_p='', dir_o=''))
                     elif os.path.isdir(bd):
@@ -180,6 +182,16 @@ class Packager(object):
                                 if dir_o.startswith(os.path.sep):
                                     dir_o = dir_o[1:]
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
+
+                elif validate_image_vm_url(bd):  # vm_image is a URL
+                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
+                    # Ignore for now!
+                    continue
+
+                else:  # Invalid vm_image
+                    log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
+                        bd, vnfd_list[0], vdu['id']))
+                    return
 
         return pce
 
@@ -200,7 +212,6 @@ class Packager(object):
         shutil.copyfile(os.path.join(root, f), fd)
         return generate_hash(fd)
 
-
     def generate_package(self, name):
         """
         Generate the final package version.
@@ -213,14 +224,13 @@ class Packager(object):
             self._log.error("Missing package descriptor")
             return
 
-
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.zip')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
             for base, dirs, files in os.walk(self._dst_path):
                 for file_name in files:
                     full_path = os.path.join(base, file_name)
-                    relative_path = full_path[len(self._dst_path)+len(os.sep):]
+                    relative_path = full_path[len(self._dst_path) + len(os.sep):]
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
 
@@ -237,6 +247,12 @@ def load_schema(template):
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
+
+
+def validate_image_vm_url(url):
+    # TODO: define regular expression to validate vm_image url
+
+    return False
 
 
 def __validate_directory__(paths):

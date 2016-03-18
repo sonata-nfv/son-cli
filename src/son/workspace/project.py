@@ -117,6 +117,8 @@ class Project:
         :param path: The VNF sample directory
         :return:
         """
-        src = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'samples', 'vnfd-sample.yaml')
-        dst = os.path.join(os.path.join(path), 'vnfd-sample.yaml')
-        shutil.copyfile(src, dst)
+        src = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'samples')
+        dst = path
+        shutil.copyfile(os.path.join(src, 'vnfd-sample.yaml'), os.path.join(dst, 'vnfd-sample.yaml'))
+        shutil.copyfile(os.path.join(src, 'sample_docker'), os.path.join(dst, 'sample_docker'))
+        shutil.copyfile(os.path.join(src, 'sample_docker'), os.path.join(dst, 'sample_docker'))
