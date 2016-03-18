@@ -183,10 +183,9 @@ class Packager(object):
                                     dir_o = dir_o[1:]
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
 
-                elif validate_image_vm_url(bd):  # vm_image is a URL
+                    # TODO vm_image may be a URL
                     # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
                     # Ignore for now!
-                    continue
 
                 else:  # Invalid vm_image
                     log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
@@ -247,12 +246,6 @@ def load_schema(template):
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
-
-
-def validate_image_vm_url(url):
-    # TODO: define regular expression to validate vm_image url
-
-    return False
 
 
 def __validate_directory__(paths):
