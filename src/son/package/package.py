@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 
 class Packager(object):
+
     schemas = {
         'PD': 'pd-schema.yaml',
         'VNFD': 'vnfd-schema.yaml',
@@ -64,8 +65,9 @@ class Packager(object):
         gds = self.package_gds(prj)
         self._package_descriptor = gds
 
-        pcs = self.generate_nsds()
+        pcs = self.generate_nsd()
         pcs += self.generate_vnfds()
+
         self._package_descriptor.update(dict(package_content=pcs))
 
         # Create the manifest folder and file
@@ -103,48 +105,30 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_nsds(self, group=None):
+    def generate_nsd(self, group=None):
         """
         Compile information for the service descriptor section.
         :param group:
         :return:
         """
+
         base_path = os.path.join(self._project_path, 'sources', 'nsd')
-        nsd_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
-        pcs = []
-        for nsd in nsd_folders:
-            for pce in self.generate_nsd_entry(os.path.join(base_path, nsd), nsd):
-                pcs.append(pce)
-        #return dict(package_content=pcs)
-        return pcs
 
-
-    @performance
-    def generate_nsd_entry(self, base_path, ns, group=None):
-        """
-        Compile information for a specific NSD
-        The network service descriptor is validated and added to the package.
-        VNF descriptors, referenced in this NSD, are checked for existence.
-        :param base_path:
-        :param nsd:
-        :param group:
-        :return:
-        """
-
-        # Locate NSD
+        # Ensure that only one NS descriptor exists
         nsd_list = [file for file in os.listdir(base_path)
-                     if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
+                    if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
 
-        # Verify that only one Yaml exists per NSD
         check = len(nsd_list)
+
         if check == 0:
-            log.error("Missing NS descriptor file")
+            log.error("Missing NS Descriptor file.")
             return
         elif check > 1:
-            log.error("Only one yaml file per NSD is allowed")
+            log.error("Only one NS Descriptor file is allowed.")
             return
         else:
-            with open(os.path.join(base_path, nsd_list[0]), 'r') as _file:
+            nsd_filename = nsd_list[0]
+            with open(os.path.join(base_path, nsd_filename), 'r') as _file:
                 nsd = yaml.load(_file)
 
         # Validate NSD
@@ -154,22 +138,22 @@ class Packager(object):
                 "You are adding a NS with different group, Project group={} and NS group={}".format(
                     group, nsd['ns_group']))
 
-        # Create sd location
-        sd_path = os.path.join(self._dst_path, "service_descriptors")
+        nsd = os.path.join(base_path, nsd_filename)
+
+        # Create SD location
+        sd_path = os.path.join(self._dst_path, "service_descriptor")
         os.makedirs(sd_path, exist_ok=True)
         # Copy NSD file
-        sd = os.path.join(sd_path, nsd_list[0])
-        shutil.copyfile(os.path.join(base_path, nsd_list[0]), sd)
+        sd = os.path.join(sd_path, nsd_filename)
+        shutil.copyfile(nsd, sd)
 
         # Generate NSD package content entry
         pce = []
         pce_sd = dict()
-        pce_sd["content-type"] = "application/sonata.service_descriptor"
-        pce_sd["name"] = "/service_descriptors/{}".format(nsd_list[0])
-        pce_sd["md5"] = generate_hash(sd)
+        pce_sd["content-type"] = "application/sonata.service_descriptors"
+        pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
+        pce_sd["md5"] = generate_hash(nsd)
         pce.append(pce_sd)
-
-        # TODO: Verify if referenced VNF descriptors exist
 
         return pce
 
@@ -189,7 +173,6 @@ class Packager(object):
         for vnf in vnf_folders:
             for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
                 pcs.append(pce)
-        #return dict(package_content=pcs)
         return pcs
 
     def generate_vnfd_entry(self, base_path, vnf, group=None):
