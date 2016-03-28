@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 class Packager(object):
     schemas = {
         'PD': 'pd-schema.yaml',
-        'VNFD': 'vnfd-schema.yaml'
+        'VNFD': 'vnfd-schema.yaml',
+        'NSD': 'nsd-schema.yaml'
     }
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
@@ -61,7 +62,7 @@ class Packager(object):
 
         log.info('Create General Description section')
         gds = self.package_gds(prj)
-        pcs = self.generate_pcs()
+        pcs = self.generate_vnfds()
         self._package_descriptor = gds
         self._package_descriptor.update(pcs)
 
@@ -100,7 +101,7 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_pcs(self, group=None):
+    def generate_vnfds(self, group=None):
         """
         Compile information for the package content section.
         This function iterates over the different VNF entries
@@ -111,11 +112,11 @@ class Packager(object):
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
         pcs = []
         for vnf in vnf_folders:
-            for pce in self.generate_pcs_entry(os.path.join(base_path, vnf), vnf):
+            for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
                 pcs.append(pce)
         return dict(package_content=pcs)
 
-    def generate_pcs_entry(self, base_path, vnf, group=None):
+    def generate_vnfd_entry(self, base_path, vnf, group=None):
         """
         Compile information for a specific VNF.
         The VNF descriptor is validated and added to the package.
