@@ -186,8 +186,6 @@ class Packager(object):
 
         return pce
 
-
-
     @performance
     def generate_vnfds(self, group=None):
         """
@@ -242,7 +240,6 @@ class Packager(object):
             log.warning('VNF with name={} is not referenced in the service descriptor. '
                         'It will be excluded from the package'.format(vnfd['vnf_name']))
             return []
-
 
         pce = []
         # Create fd location
@@ -366,8 +363,6 @@ class Packager(object):
         return u_vnfs
 
 
-
-
 def load_schema(template):
     """
     Search for a given template on the schemas folder inside the current package.
@@ -394,10 +389,6 @@ def __validate_directory__(paths):
             print("{} must be a directory".format(path), file=sys.stderr)
             return False
     return True
-
-
-
-
 
 
 def main():

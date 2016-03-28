@@ -32,10 +32,15 @@ class Project:
 
         src_path = os.path.join(self.prj_root, 'sources')
         for d in src_subdirs:
-            path = os.path.join(src_path, d, 'sample')
+            if d == 'nsd':
+                path = os.path.join(src_path, d)
+            else:
+                path = os.path.join(src_path, d, 'sample')
             os.makedirs(path, exist_ok=True)
             self._create_sample(d, path)
+
         self._create_vnf_dir()
+        self._create_nsd_dir()
 
     def _create_vnf_dir(self, name='sample'):
         """
@@ -49,12 +54,12 @@ class Project:
             path = os.path.join(vnf_path, d)
             os.makedirs(path, exist_ok=False)
 
-    def _create_nsd_dir(self, name='sample'):
+    def _create_nsd_dir(self, name=None):
         """
         Function to create a new NSD inside project source.
         :param name:The NSD name
         """
-        nsd_path = os.path.join(self.prj_root, 'sources', 'nsd', name)
+        nsd_path = os.path.join(self.prj_root, 'sources', 'nsd')
         self._create_sample('nsd', nsd_path)
 
     def _create_prj_stub(self):
@@ -142,10 +147,11 @@ class Project:
 
     def _create_sample_nsd(self, path):
         """
-        Create a sample VNF descriptor (to be evoked upon project creation)
-        :param path: The VNF sample directory
+        Create a sample NS descriptor (to be evoked upon project creation)
+        :param path: The NSD sample directory
         :return:
         """
+        print(path)
         sample_nsd = 'nsd-sample.yaml'
         rp = __name__
 
