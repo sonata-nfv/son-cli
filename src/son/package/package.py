@@ -65,10 +65,8 @@ class Packager(object):
         self._package_descriptor = gds
 
         pcs = self.generate_nsds()
-        self._package_descriptor.update(pcs)
-
-        pcs = self.generate_vnfds()
-        self._package_descriptor.update(pcs)
+        pcs += self.generate_vnfds()
+        self._package_descriptor.update(dict(package_content=pcs))
 
         # Create the manifest folder and file
         meta_inf = os.path.join(self._dst_path, "META-INF")
@@ -117,8 +115,8 @@ class Packager(object):
         for nsd in nsd_folders:
             for pce in self.generate_nsd_entry(os.path.join(base_path, nsd), nsd):
                 pcs.append(pce)
-        return dict(package_content=pcs)
-
+        #return dict(package_content=pcs)
+        return pcs
 
 
     @performance
@@ -157,7 +155,7 @@ class Packager(object):
                     group, nsd['ns_group']))
 
         # Create sd location
-        sd_path = os.path.join(self._dst_path, "service_descriptor")
+        sd_path = os.path.join(self._dst_path, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
         # Copy NSD file
         sd = os.path.join(sd_path, nsd_list[0])
@@ -166,8 +164,8 @@ class Packager(object):
         # Generate NSD package content entry
         pce = []
         pce_sd = dict()
-        pce_sd["content-type"] = "application/sonata.function_descriptor"
-        pce_sd["name"] = "/function_descriptors/{}".format(nsd_list[0])
+        pce_sd["content-type"] = "application/sonata.service_descriptor"
+        pce_sd["name"] = "/service_descriptors/{}".format(nsd_list[0])
         pce_sd["md5"] = generate_hash(sd)
         pce.append(pce_sd)
 
@@ -191,7 +189,8 @@ class Packager(object):
         for vnf in vnf_folders:
             for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
                 pcs.append(pce)
-        return dict(package_content=pcs)
+        #return dict(package_content=pcs)
+        return pcs
 
     def generate_vnfd_entry(self, base_path, vnf, group=None):
         """
