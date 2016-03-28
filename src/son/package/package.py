@@ -62,8 +62,12 @@ class Packager(object):
 
         log.info('Create General Description section')
         gds = self.package_gds(prj)
-        pcs = self.generate_vnfds()
         self._package_descriptor = gds
+
+        pcs = self.generate_nsds()
+        self._package_descriptor.update(pcs)
+
+        pcs = self.generate_vnfds()
         self._package_descriptor.update(pcs)
 
         # Create the manifest folder and file
@@ -101,6 +105,79 @@ class Packager(object):
         return gds
 
     @performance
+    def generate_nsds(self, group=None):
+        """
+        Compile information for the service descriptor section.
+        :param group:
+        :return:
+        """
+        base_path = os.path.join(self._project_path, 'sources', 'nsd')
+        nsd_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
+        pcs = []
+        for nsd in nsd_folders:
+            for pce in self.generate_nsd_entry(os.path.join(base_path, nsd), nsd):
+                pcs.append(pce)
+        return dict(package_content=pcs)
+
+
+
+    @performance
+    def generate_nsd_entry(self, base_path, ns, group=None):
+        """
+        Compile information for a specific NSD
+        The network service descriptor is validated and added to the package.
+        VNF descriptors, referenced in this NSD, are checked for existence.
+        :param base_path:
+        :param nsd:
+        :param group:
+        :return:
+        """
+
+        # Locate NSD
+        nsd_list = [file for file in os.listdir(base_path)
+                     if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
+
+        # Verify that only one Yaml exists per NSD
+        check = len(nsd_list)
+        if check == 0:
+            log.error("Missing NS descriptor file")
+            return
+        elif check > 1:
+            log.error("Only one yaml file per NSD is allowed")
+            return
+        else:
+            with open(os.path.join(base_path, nsd_list[0]), 'r') as _file:
+                nsd = yaml.load(_file)
+
+        # Validate NSD
+        validate(nsd, load_schema(Packager.schemas['NSD']))
+        if group and nsd['ns_group'] != group:
+            self._log.warning(
+                "You are adding a NS with different group, Project group={} and NS group={}".format(
+                    group, nsd['ns_group']))
+
+        # Create sd location
+        sd_path = os.path.join(self._dst_path, "service_descriptor")
+        os.makedirs(sd_path, exist_ok=True)
+        # Copy NSD file
+        sd = os.path.join(sd_path, nsd_list[0])
+        shutil.copyfile(os.path.join(base_path, nsd_list[0]), sd)
+
+        # Generate NSD package content entry
+        pce = []
+        pce_sd = dict()
+        pce_sd["content-type"] = "application/sonata.function_descriptor"
+        pce_sd["name"] = "/function_descriptors/{}".format(nsd_list[0])
+        pce_sd["md5"] = generate_hash(sd)
+        pce.append(pce_sd)
+
+        # TODO: Verify if referenced VNF descriptors exist
+
+        return pce
+
+
+
+    @performance
     def generate_vnfds(self, group=None):
         """
         Compile information for the package content section.
@@ -133,7 +210,7 @@ class Packager(object):
         # Validate number of Yaml files
         check = len(vnfd_list)
         if check == 0:
-            log.error("Missing descriptor file")
+            log.error("Missing VNF descriptor file")
             return
         elif check > 1:
             log.error("Only one yaml file per VNF source folder allowed")
