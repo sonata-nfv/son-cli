@@ -151,7 +151,6 @@ class Project:
         :param path: The NSD sample directory
         :return:
         """
-        print(path)
         sample_nsd = 'nsd-sample.yaml'
         rp = __name__
 
