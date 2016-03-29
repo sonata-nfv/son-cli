@@ -2,7 +2,7 @@ import unittest
 
 import yaml
 
-from son.package.package import Packager, load_schema
+from son.package.package import Packager, load_local_schema
 
 
 class PDTester(unittest.TestCase):
@@ -38,11 +38,11 @@ class LoadSchemaTestes(unittest.TestCase):
 
     def test_load_invalid_template(self):
         """Test if the load schema is loading only available templates"""
-        self.assertRaises(FileNotFoundError, load_schema, "test")
+        self.assertRaises(FileNotFoundError, load_local_schema, "test")
 
     def test_load_valid_schema(self):
         """ Test if the load schema is correctly loading the templates """
-        schema = load_schema(Packager.schemas["PD"])
+        schema = load_local_schema(Packager.schemas["PD"])
         self.assertIsInstance(schema, dict)
 
 if __name__ == '__main__':
