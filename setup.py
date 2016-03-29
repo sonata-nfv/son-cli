@@ -16,12 +16,13 @@ setup(
         packages=find_packages('src'),  # dependency resolution
         namespace_packages=['son',],
         include_package_data=True,
-        install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators'],
+        install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
                 'son-workspace=son.workspace.workspace:main',
                 'son-package=son.package.package:main',
+                'son-push=son.push.push:main'
             ],
         },
         test_suite='son'
