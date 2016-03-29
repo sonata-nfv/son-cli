@@ -21,7 +21,18 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    schemas = {
+    # Master URL location for schemas
+    schemas_master_url = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
+
+    # References to remote schemas
+    remote_schemas = {
+        'PD': schemas_master_url + 'package-descriptor/pd-schema.yml',
+        'NSD': schemas_master_url + 'service-descriptor/nsd-schema.yml',
+        'VNFD': schemas_master_url + 'function-descriptor/vnfd-schema.yml'
+    }
+
+    # References to local file schemas
+    local_schemas = {
         'PD': 'pd-schema.yaml',
         'NSD': 'nsd-schema.yaml',
         'VNFD': 'vnfd-schema.yaml'
@@ -97,7 +108,7 @@ class Packager(object):
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
-        validate(self._package_descriptor, load_schema(Packager.schemas['PD']))
+        validate(self._package_descriptor, load_remote_schema(Packager.remote_schemas['PD']))
 
     @performance
     def package_gds(self, prj_descriptor):
@@ -156,7 +167,7 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        validate(nsd, load_schema(Packager.schemas['NSD']))
+        validate(nsd, load_remote_schema(Packager.remote_schemas['NSD']))
         if group and nsd['ns_group'] != group:
             self._log.warning(
                 "You are adding a NS with different group, Project group={} and NS group={}".format(
@@ -229,7 +240,7 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        validate(vnfd, load_schema(Packager.schemas['VNFD']))
+        validate(vnfd, load_remote_schema(Packager.remote_schemas['VNFD']))
         if group and vnfd['vnf_group'] != group:
             self._log.warning(
                 "You are adding a VNF with different group, Project group={} and VNF group={}".format(
@@ -363,7 +374,7 @@ class Packager(object):
         return u_vnfs
 
 
-def load_schema(template):
+def load_local_schema(template):
     """
     Search for a given template on the schemas folder inside the current package.
     :param template: The name of the template to look for
@@ -372,6 +383,20 @@ def load_schema(template):
     rp = __name__
     path = os.path.join('templates', template)
     tf = pkg_resources.resource_string(rp, path)
+    print(type(tf))
+    schema = yaml.load(tf)
+    assert isinstance(schema, dict)
+    return schema
+
+
+def load_remote_schema(template_url):
+    """
+    Retrieve a remote schema from the provided URL
+    :param template_url: The URL of the required schema
+    :return: The loaded schema as a dictionary
+    """
+    with urllib.request.urlopen(template_url) as response:
+        tf = response.read().decode(response.headers.get_content_charset())
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
