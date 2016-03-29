@@ -23,7 +23,7 @@ class Project:
         """
 
         directories = {'sources', 'dependencies', 'deployment'}
-        src_subdirs = {'ssm', 'pattern', 'vnf'}
+        src_subdirs = {'ssm', 'pattern', 'vnf', 'nsd'}
 
         os.makedirs(self.prj_root, exist_ok=False)
         for d in directories:
@@ -32,10 +32,15 @@ class Project:
 
         src_path = os.path.join(self.prj_root, 'sources')
         for d in src_subdirs:
-            path = os.path.join(src_path, d, 'sample')
+            if d == 'nsd':
+                path = os.path.join(src_path, d)
+            else:
+                path = os.path.join(src_path, d, 'sample')
             os.makedirs(path, exist_ok=True)
             self._create_sample(d, path)
+
         self._create_vnf_dir()
+        self._create_nsd_dir()
 
     def _create_vnf_dir(self, name='sample'):
         """
@@ -48,6 +53,14 @@ class Project:
         for d in vnf_subdirs:
             path = os.path.join(vnf_path, d)
             os.makedirs(path, exist_ok=False)
+
+    def _create_nsd_dir(self, name=None):
+        """
+        Function to create a new NSD inside project source.
+        :param name:The NSD name
+        """
+        nsd_path = os.path.join(self.prj_root, 'sources', 'nsd')
+        self._create_sample('nsd', nsd_path)
 
     def _create_prj_stub(self):
         """
@@ -73,7 +86,8 @@ class Project:
             # 'fsm': self._create_sample_fsm,
             'ssm': self._create_sample_ssm,
             'pattern': self._create_sample_pattern,
-            'vnf': self._create_sample_vnf
+            'vnf': self._create_sample_vnf,
+            'nsd': self._create_sample_nsd
         }
         func = switcher.get(prj_type)
         if func is None:
@@ -130,3 +144,18 @@ class Project:
         src_path = os.path.join('samples', sample_image)
         srcfile = pkg_resources.resource_filename(rp, src_path)
         shutil.copyfile(srcfile, os.path.join(path, sample_image))
+
+    def _create_sample_nsd(self, path):
+        """
+        Create a sample NS descriptor (to be evoked upon project creation)
+        :param path: The NSD sample directory
+        :return:
+        """
+        print(path)
+        sample_nsd = 'nsd-sample.yaml'
+        rp = __name__
+
+        # Copy sample NS descriptor
+        src_path = os.path.join('samples', sample_nsd)
+        srcfile = pkg_resources.resource_filename(rp, src_path)
+        shutil.copyfile(srcfile, os.path.join(path, sample_nsd))

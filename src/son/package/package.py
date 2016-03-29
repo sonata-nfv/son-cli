@@ -20,8 +20,10 @@ log = logging.getLogger(__name__)
 
 
 class Packager(object):
+
     schemas = {
         'PD': 'pd-schema.yaml',
+        'NSD': 'nsd-schema.yaml',
         'VNFD': 'vnfd-schema.yaml'
     }
 
@@ -34,6 +36,9 @@ class Packager(object):
         self._package_descriptor = None
 
         self._project_path = prj_path
+
+        # Keep track of VNF packaging referenced in NS
+        self._ns_vnf_registry = {}
 
         # Clear and create package specific folder
         if generate_pd:
@@ -61,9 +66,30 @@ class Packager(object):
 
         log.info('Create General Description section')
         gds = self.package_gds(prj)
-        pcs = self.generate_pcs()
+
+        package_content_section = []
+
+        # Add service descriptor
+        pcs = self.generate_nsd()
+        if pcs is None:
+            return
+        package_content_section += pcs
+
+        # Add function descriptors
+        pcs = self.generate_vnfds()
+        if pcs is None:
+            return
+        package_content_section += pcs
+
+        # Verify that all VNFs from NSD were packaged
+        unpack_vnfs = self.get_unpackaged_sd_vnfs()
+        if len(unpack_vnfs) > 0:
+            log.error("Failed to package the following VNFs={}".format(unpack_vnfs))
+            return
+
+        # Set the package descriptor
         self._package_descriptor = gds
-        self._package_descriptor.update(pcs)
+        self._package_descriptor.update(dict(package_content=package_content_section))
 
         # Create the manifest folder and file
         meta_inf = os.path.join(self._dst_path, "META-INF")
@@ -100,9 +126,70 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_pcs(self, group=None):
+    def generate_nsd(self, group=None):
         """
-        Compile information for the package content section.
+        Compile information for the service descriptor section.
+        :param group:
+        :return:
+        """
+
+        base_path = os.path.join(self._project_path, 'sources', 'nsd')
+        if not os.path.isdir(base_path):
+            log.error("Missing NS directory '{}'".format(base_path))
+            return
+
+        # Ensure that only one NS descriptor exists
+        nsd_list = [file for file in os.listdir(base_path)
+                    if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
+
+        check = len(nsd_list)
+
+        if check == 0:
+            log.error("Missing NS Descriptor file.")
+            return
+        elif check > 1:
+            log.error("Only one NS Descriptor file is allowed.")
+            return
+        else:
+            nsd_filename = nsd_list[0]
+            with open(os.path.join(base_path, nsd_filename), 'r') as _file:
+                nsd = yaml.load(_file)
+
+        # Validate NSD
+        validate(nsd, load_schema(Packager.schemas['NSD']))
+        if group and nsd['ns_group'] != group:
+            self._log.warning(
+                "You are adding a NS with different group, Project group={} and NS group={}".format(
+                    group, nsd['ns_group']))
+
+        # Cycle through VNFs and register their names for later verification
+        if 'network_functions' in nsd:
+            vnf_list = [vnf for vnf in nsd['network_functions'] if vnf['vnf_name']]
+            for vnf in vnf_list:
+                self.register_sd_vnf(vnf['vnf_name'])
+
+        # Create SD location
+        nsd = os.path.join(base_path, nsd_filename)
+        sd_path = os.path.join(self._dst_path, "service_descriptor")
+        os.makedirs(sd_path, exist_ok=True)
+        # Copy NSD file
+        sd = os.path.join(sd_path, nsd_filename)
+        shutil.copyfile(nsd, sd)
+
+        # Generate NSD package content entry
+        pce = []
+        pce_sd = dict()
+        pce_sd["content-type"] = "application/sonata.service_descriptors"
+        pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
+        pce_sd["md5"] = generate_hash(nsd)
+        pce.append(pce_sd)
+
+        return pce
+
+    @performance
+    def generate_vnfds(self, group=None):
+        """
+        Compile information for the list of VNFs
         This function iterates over the different VNF entries
         :param group: (TBD)
         :return:
@@ -111,11 +198,11 @@ class Packager(object):
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
         pcs = []
         for vnf in vnf_folders:
-            for pce in self.generate_pcs_entry(os.path.join(base_path, vnf), vnf):
+            for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
                 pcs.append(pce)
-        return dict(package_content=pcs)
+        return pcs
 
-    def generate_pcs_entry(self, base_path, vnf, group=None):
+    def generate_vnfd_entry(self, base_path, vnf, group=None):
         """
         Compile information for a specific VNF.
         The VNF descriptor is validated and added to the package.
@@ -132,7 +219,7 @@ class Packager(object):
         # Validate number of Yaml files
         check = len(vnfd_list)
         if check == 0:
-            log.error("Missing descriptor file")
+            log.error("Missing VNF descriptor file")
             return
         elif check > 1:
             log.error("Only one yaml file per VNF source folder allowed")
@@ -147,6 +234,12 @@ class Packager(object):
             self._log.warning(
                 "You are adding a VNF with different group, Project group={} and VNF group={}".format(
                     group, vnfd['vnf_group']))
+
+        # Check if this VNF exists in the SD VNF registry. If does not, cancel its packaging
+        if not self.check_in_sd_vnf(vnfd['vnf_name']):
+            log.warning('VNF with name={} is not referenced in the service descriptor. '
+                        'It will be excluded from the package'.format(vnfd['vnf_name']))
+            return []
 
         pce = []
         # Create fd location
@@ -232,6 +325,42 @@ class Packager(object):
                     relative_path = full_path[len(self._dst_path) + len(os.sep):]
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
+
+    def register_sd_vnf(self, vnf_name):
+        """
+        Add a vnf to the SD VNF registry.
+        :param vnf_name:
+        :return: True for successful registry. False if the VNF already exists in the registry.
+        """
+        if vnf_name in self._ns_vnf_registry:
+            return False
+
+        self._ns_vnf_registry[vnf_name] = False
+        return True
+
+    def check_in_sd_vnf(self, vnf_name):
+        """
+        Marks a VNF as packaged in the SD VNF registry
+        :param vnf_name:
+        :return:
+        """
+        if vnf_name not in self._ns_vnf_registry:
+            return False
+
+        self._ns_vnf_registry[vnf_name] = True
+        return True
+
+    def get_unpackaged_sd_vnfs(self):
+        """
+        Obtain the a list of VNFs that were referenced by NS but weren't packaged
+        :return:
+        """
+        u_vnfs = []
+        for vnf in self._ns_vnf_registry:
+            if not self._ns_vnf_registry[vnf]:
+                u_vnfs.append(vnf)
+
+        return u_vnfs
 
 
 def load_schema(template):
