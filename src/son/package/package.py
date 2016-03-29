@@ -10,6 +10,7 @@ import pkg_resources
 import shutil
 import yaml
 from jsonschema import validate
+import validators
 
 from son.package.decorators import performance
 from son.package.md5 import generate_hash
@@ -50,6 +51,9 @@ class Packager(object):
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
+
+        # Keep a library of loaded schemas to avoid re-loading
+        self._schemas_library = dict()
 
         # Clear and create package specific folder
         if generate_pd:
@@ -108,7 +112,7 @@ class Packager(object):
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
-        validate(self._package_descriptor, load_remote_schema(Packager.remote_schemas['PD']))
+        validate(self._package_descriptor, self.load_schema(Packager.remote_schemas['PD']))
 
     @performance
     def package_gds(self, prj_descriptor):
@@ -167,7 +171,7 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        validate(nsd, load_remote_schema(Packager.remote_schemas['NSD']))
+        validate(nsd, self.load_schema(Packager.remote_schemas['NSD']))
         if group and nsd['ns_group'] != group:
             self._log.warning(
                 "You are adding a NS with different group, Project group={} and NS group={}".format(
@@ -240,7 +244,7 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        validate(vnfd, load_remote_schema(Packager.remote_schemas['VNFD']))
+        validate(vnfd, self.load_schema(Packager.remote_schemas['VNFD']))
         if group and vnfd['vnf_group'] != group:
             self._log.warning(
                 "You are adding a VNF with different group, Project group={} and VNF group={}".format(
@@ -373,6 +377,32 @@ class Packager(object):
 
         return u_vnfs
 
+    def load_schema(self, template, reload=False):
+        """
+        Load schema from a local file or a remote URL.
+        If the same schema was previously loaded and reload=False it will return the schema stored in cache. If
+        reload=True it will force the reload of the schema.
+        :param template: Name of local file or URL to remote schema
+        :param reload: Force the reload, even if it was previously loaded
+        :return: The loaded schema as a dictionary
+        """
+        # Check if template is already loaded and present in _schemas_library
+        if template in self._schemas_library and not reload:
+            return self._schemas_library[template]                           # return previously loaded schema
+
+        # Check if template is a link to remote URL or local file schema
+        if validators.url(template):
+            self._schemas_library[template] = load_remote_schema(template)   # load remote schema
+
+        elif pkg_resources.resource_exists(__name__, os.path.join('templates', template)):
+            self._schemas_library[template] = load_local_schema(template)    # load local schema
+
+        else:
+            log.error("Failed to load schema={}. Invalid schema file or address.".format(template))
+            return
+
+        return self._schemas_library[template]
+
 
 def load_local_schema(template):
     """
@@ -383,7 +413,6 @@ def load_local_schema(template):
     rp = __name__
     path = os.path.join('templates', template)
     tf = pkg_resources.resource_string(rp, path)
-    print(type(tf))
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
