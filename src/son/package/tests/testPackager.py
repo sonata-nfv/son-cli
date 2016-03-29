@@ -42,7 +42,7 @@ class LoadSchemaTestes(unittest.TestCase):
 
     def test_load_valid_schema(self):
         """ Test if the load schema is correctly loading the templates """
-        schema = load_local_schema(Packager.schemas["PD"])
+        schema = load_local_schema(Packager.local_schemas["PD"])
         self.assertIsInstance(schema, dict)
 
 if __name__ == '__main__':
