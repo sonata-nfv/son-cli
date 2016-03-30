@@ -41,7 +41,7 @@ class LoadSchemaTests(unittest.TestCase):
 
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """
-        schema = load_local_schema(Packager.local_schemas["PD"])
+        schema = load_local_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['local'])
         self.assertIsInstance(schema, dict)
 
     def test_load_invalid_remote_template_unavailable(self):
@@ -54,7 +54,7 @@ class LoadSchemaTests(unittest.TestCase):
 
     def test_load_valid_remote_schema(self):
         """ Test if the load_remote_schema is retrieving and loading the templates correctly """
-        schema = load_remote_schema(Packager.remote_schemas["PD"])
+        schema = load_remote_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['remote'])
         self.assertIsInstance(schema, dict)
 
 

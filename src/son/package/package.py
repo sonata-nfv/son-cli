@@ -11,6 +11,7 @@ import shutil
 import yaml
 from jsonschema import validate
 import validators
+from urllib.request import URLError
 
 from son.package.decorators import performance
 from son.package.md5 import generate_hash
@@ -22,26 +23,25 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    # Master URL location for schemas
-    schemas_master_url = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
+    # ID of schema templates
+    SCHEMA_PACKAGE_DESCRIPTOR = 'PD'
+    SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
+    SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
+
+    # Master remote location for schemas
+    SCHEMAS_MASTER_URL = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
 
     # References to remote schemas
-    remote_schemas = {
-        'PD': schemas_master_url + 'package-descriptor/pd-schema.yml',
-        'NSD': schemas_master_url + 'service-descriptor/nsd-schema.yml',
-        'VNFD': schemas_master_url + 'function-descriptor/vnfd-schema.yml'
-    }
-
-    # References to local file schemas
-    local_schemas = {
-        'PD': 'pd-schema.yaml',
-        'NSD': 'nsd-schema.yaml',
-        'VNFD': 'vnfd-schema.yaml'
-    }
+    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': 'pd-schema.yaml',
+                                           'remote': SCHEMAS_MASTER_URL + 'package-descriptor/pd-schema.yml'},
+               SCHEMA_SERVICE_DESCRIPTOR: {'local': 'nsd-schema.yaml',
+                                           'remote': SCHEMAS_MASTER_URL + 'service-descriptor/nsd-schema.yml'},
+               SCHEMA_FUNCTION_DESCRIPTOR: {'local': 'vnfd-schema.yaml',
+                                            'remote': SCHEMAS_MASTER_URL + 'function-descriptor/vnfd-schema.yml'}}
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
         self._log = logging.getLogger(__name__)
 
         self._version = version
@@ -54,7 +54,6 @@ class Packager(object):
 
         # Keep a library of loaded schemas to avoid re-loading
         self._schemas_library = dict()
-
         # Clear and create package specific folder
         if generate_pd:
             self._dst_path = os.path.join(self._project_path, "target") if not dst_path else dst_path
@@ -112,7 +111,7 @@ class Packager(object):
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
-        validate(self._package_descriptor, self.load_schema(Packager.remote_schemas['PD']))
+        validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
 
     @performance
     def package_gds(self, prj_descriptor):
@@ -171,7 +170,7 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        validate(nsd, self.load_schema(Packager.remote_schemas['NSD']))
+        validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
         if group and nsd['ns_group'] != group:
             self._log.warning(
                 "You are adding a NS with different group, Project group={} and NS group={}".format(
@@ -244,7 +243,7 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        validate(vnfd, self.load_schema(Packager.remote_schemas['VNFD']))
+        validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
         if group and vnfd['vnf_group'] != group:
             self._log.warning(
                 "You are adding a VNF with different group, Project group={} and VNF group={}".format(
@@ -388,30 +387,65 @@ class Packager(object):
         """
         # Check if template is already loaded and present in _schemas_library
         if template in self._schemas_library and not reload:
+            log.debug("Loading previous stored schema={}".format(template))
             return self._schemas_library[template]                           # return previously loaded schema
 
-        # Check if template is a link to remote URL or local file schema
-        if validators.url(template):
-            self._schemas_library[template] = load_remote_schema(template)   # load remote schema
+        # Load Online Schema
+        schema_addr = Packager.schemas[template]['remote']
+        if validators.url(schema_addr):
+            try:
+                log.debug("Loading schema={} from remote location={}".format(template, schema_addr))
+                # Load schema from remote source
+                self._schemas_library[template] = load_remote_schema(schema_addr)
 
-        elif pkg_resources.resource_exists(__name__, os.path.join('templates', template)):
-            self._schemas_library[template] = load_local_schema(template)    # load local schema
+                # Update the corresponding local schema file
+                write_local_schema(Packager.schemas[template]['local'], self._schemas_library[template])
 
+                return self._schemas_library
+
+            except URLError:
+                log.warning("Could not load schema={} from remote location={}".format(template, schema_addr))
         else:
-            log.error("Failed to load schema={}. Invalid schema file or address.".format(template))
-            return
+            log.warning("Invalid schema URL={}".format(schema_addr))
 
-        return self._schemas_library[template]
+        # Load Offline Schema
+        schema_addr = Packager.schemas[template]['local']
+        if pkg_resources.resource_exists(__name__, os.path.join('templates', schema_addr)):
+            try:
+                log.debug("Loading schema={} from local file={}".format(template, schema_addr))
+                self._schemas_library[template] = load_local_schema(schema_addr)
+                return self._schemas_library[template]
+            except FileNotFoundError:
+                log.warning("Could not load schema={} from local file={}".format(template, schema_addr))
+        else:
+            log.warning("Schema file={} not found.".format(schema_addr))
+
+        log.error("Failed to load schema={}".format(template))
 
 
-def load_local_schema(template):
+def write_local_schema(filename, schema):
+    """
+    Writes a schema to a local file.
+    :param filename: The name of the schema file to be written.
+    :param schema: The schema content as a dictionary.
+    :return:
+    """
+    rp = __name__
+    path = os.path.join('templates', filename)
+    fn = pkg_resources.resource_filename(rp, path)
+    schema_f = open(fn, 'w')
+    yaml.dump(schema, schema_f)
+    schema_f.close()
+
+
+def load_local_schema(filename):
     """
     Search for a given template on the schemas folder inside the current package.
-    :param template: The name of the template to look for
+    :param filename: The name of the schema file to look for
     :return: The loaded schema as a dictionary
     """
     rp = __name__
-    path = os.path.join('templates', template)
+    path = os.path.join('templates', filename)
     tf = pkg_resources.resource_string(rp, path)
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
