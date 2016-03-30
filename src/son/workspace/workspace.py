@@ -31,7 +31,7 @@ class Workspace:
              'credentials': 'personal'
              }
 
-        ws_file_path = os.path.join(self.ws_root, 'catalogues', 'personal.yaml')
+        ws_file_path = os.path.join(self.ws_root, 'catalogues', 'personal.yml')
         with open(ws_file_path, "w") as ws_file:
             ws_file.write(yaml.dump(d, default_flow_style=False))
 
@@ -75,7 +75,7 @@ def main():
             print("A workspace already exists at the specified location, exiting", file=sys.stderr)
             return
         log.debug("Attempting to create a new workspace")
-        cwd = os.getcwd()globals()
+        cwd = os.getcwd()
         ws.create_dirs()
         ws.create_files()
         os.chdir(cwd)
