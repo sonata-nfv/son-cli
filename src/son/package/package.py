@@ -41,8 +41,7 @@ class Packager(object):
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.DEBUG)
-        # logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.INFO)
         self._log = logging.getLogger(__name__)
 
         self._version = version
