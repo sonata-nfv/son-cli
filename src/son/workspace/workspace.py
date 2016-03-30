@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 class Workspace:
 
-    __descriptor_name__ = "workspace.yaml"
+    __descriptor_name__ = "workspace.yml"
 
     def __init__(self, ws_root):
         logging.basicConfig(level=logging.DEBUG)
@@ -75,7 +75,7 @@ def main():
             print("A workspace already exists at the specified location, exiting", file=sys.stderr)
             return
         log.debug("Attempting to create a new workspace")
-        cwd = os.getcwd()
+        cwd = os.getcwd()globals()
         ws.create_dirs()
         ws.create_files()
         os.chdir(cwd)
