@@ -396,7 +396,12 @@ class Packager(object):
         if validators.url(schema_addr):
             try:
                 log.debug("Loading schema={} from remote location={}".format(template, schema_addr))
+                # Load schema from remote source
                 self._schemas_library[template] = load_remote_schema(schema_addr)
+
+                # Update the corresponding local schema file
+                write_local_schema(Packager.schemas[template]['local'], self._schemas_library[template])
+
                 return self._schemas_library
 
             except URLError:
@@ -419,14 +424,29 @@ class Packager(object):
         log.error("Failed to load schema={}".format(template))
 
 
-def load_local_schema(template):
+def write_local_schema(filename, schema):
+    """
+    Writes a schema to a local file.
+    :param filename: The name of the schema file to be written.
+    :param schema: The schema content as a dictionary.
+    :return:
+    """
+    rp = __name__
+    path = os.path.join('templates', filename)
+    fn = pkg_resources.resource_filename(rp, path)
+    schema_f = open(fn, 'w')
+    yaml.dump(schema, schema_f)
+    schema_f.close()
+
+
+def load_local_schema(filename):
     """
     Search for a given template on the schemas folder inside the current package.
-    :param template: The name of the template to look for
+    :param filename: The name of the schema file to look for
     :return: The loaded schema as a dictionary
     """
     rp = __name__
-    path = os.path.join('templates', template)
+    path = os.path.join('templates', filename)
     tf = pkg_resources.resource_string(rp, path)
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
