@@ -56,7 +56,22 @@ class Packager(object):
         self._schemas_library = dict()
         # Clear and create package specific folder
         if generate_pd:
-            self._dst_path = os.path.join(self._project_path, "target") if not dst_path else dst_path
+
+            if not dst_path:
+                self._dst_path = os.path.join(self._project_path, "target")
+
+            elif os.path.isdir(dst_path):   # dir exists?
+
+                if len(os.listdir(dst_path)) > 0: # dir not empty?
+                    log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
+                    sys.stderr.write("ERROR:Destination directory '{}' is not empty\n".format(os.path.abspath(dst_path)))
+                    exit(1)
+
+                self._dst_path = os.path.abspath(dst_path)
+
+            else:
+                self._dst_path = os.path.abspath(dst_path)
+
             if os.path.exists(self._dst_path):
                 shutil.rmtree(self._dst_path)
                 os.makedirs(self._dst_path, exist_ok=False)
