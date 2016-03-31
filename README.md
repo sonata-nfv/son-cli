@@ -36,3 +36,7 @@ If you are using pycharm, the IDE has support both for buildout and for virtuale
 please read their fine documentation on the subject before proceeding
 
 
+### Generated binaries
+
+The buildout generates the binaries for the tools son-workspace and son-package. Information on how to use the tools is provided in the README file at src/son/workspace and src/son/package, respectively.
+
