@@ -64,6 +64,7 @@ class Packager(object):
 
                 if len(os.listdir(dst_path)) > 0: # dir not empty?
                     log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
+                    sys.stderr.write("ERROR:Destination directory '{}' is not empty\n".format(os.path.abspath(dst_path)))
                     exit(1)
 
                 self._dst_path = os.path.abspath(dst_path)
