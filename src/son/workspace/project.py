@@ -6,7 +6,7 @@ import pkg_resources
 
 class Project:
 
-    __descriptor_name__ = 'project.yaml'
+    __descriptor_name__ = 'project.yml'
 
     def __init__(self, prj_root, workspace):
         self.prj_root = prj_root
@@ -64,7 +64,7 @@ class Project:
 
     def _create_prj_stub(self):
         """
-        Creates the project descriptor (project.yaml)
+        Creates the project descriptor (project.yml)
         :return:
         """
         d = {
@@ -101,7 +101,7 @@ class Project:
             'id': 'com.sonata.fsm.sample',
             'version': '0.1'
         }
-        prj_path = os.path.join(path, 'fsm.yaml')
+        prj_path = os.path.join(path, 'fsm.yml')
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
@@ -111,7 +111,7 @@ class Project:
             'id': 'com.sonata.ssm.sample',
             'version': '0.1'
         }
-        prj_path = os.path.join(path, 'ssm.yaml')
+        prj_path = os.path.join(path, 'ssm.yml')
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
@@ -121,7 +121,7 @@ class Project:
             'id': 'com.sonata.pattern.sample',
             'version': '0.1'
         }
-        prj_path = os.path.join(path, 'patterm.yaml')
+        prj_path = os.path.join(path, 'patterm.yml')
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
@@ -131,7 +131,7 @@ class Project:
         :param path: The VNF sample directory
         :return:
         """
-        sample_vnfd = 'vnfd-sample.yaml'
+        sample_vnfd = 'vnfd-sample.yml'
         sample_image = 'sample_docker'
         rp = __name__
 
@@ -151,7 +151,7 @@ class Project:
         :param path: The NSD sample directory
         :return:
         """
-        sample_nsd = 'nsd-sample.yaml'
+        sample_nsd = 'nsd-sample.yml'
         rp = __name__
 
         # Copy sample NS descriptor

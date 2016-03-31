@@ -79,6 +79,7 @@ def main():
         ws.create_dirs()
         ws.create_files()
         os.chdir(cwd)
+        log.debug("Workspace created.")
     else:
         if not ws.check_ws_exists():
             print("Could not find a SONATA workspace at the specified location", file=sys.stderr)
@@ -89,3 +90,4 @@ def main():
         prj_root = os.path.expanduser(args.project)
         proj = Project(prj_root, ws_root)
         proj.create_prj()
+        log.debug("Project created.")
