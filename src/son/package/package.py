@@ -212,8 +212,8 @@ class Packager(object):
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
         pcs = []
         for vnf in vnf_folders:
-            for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
-                pcs.append(pce)
+            pce = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
+            #    pcs.append(pce)
         return pcs
 
     def generate_vnfd_entry(self, base_path, vnf, group=None):
@@ -236,7 +236,7 @@ class Packager(object):
             log.error("Missing VNF descriptor file")
             return
         elif check > 1:
-            log.error("Only one yaml file per VNF source folder allowed")
+            log.error("Only one yml file per VNF source folder allowed")
             return
         else:
             with open(os.path.join(base_path, vnfd_list[0]), 'r') as _file:
