@@ -32,11 +32,11 @@ class Packager(object):
     SCHEMAS_MASTER_URL = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
 
     # References to remote schemas
-    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': 'pd-schema.yaml',
+    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': 'pd-schema.yml',
                                            'remote': SCHEMAS_MASTER_URL + 'package-descriptor/pd-schema.yml'},
-               SCHEMA_SERVICE_DESCRIPTOR: {'local': 'nsd-schema.yaml',
+               SCHEMA_SERVICE_DESCRIPTOR: {'local': 'nsd-schema.yml',
                                            'remote': SCHEMAS_MASTER_URL + 'service-descriptor/nsd-schema.yml'},
-               SCHEMA_FUNCTION_DESCRIPTOR: {'local': 'vnfd-schema.yaml',
+               SCHEMA_FUNCTION_DESCRIPTOR: {'local': 'vnfd-schema.yml',
                                             'remote': SCHEMAS_MASTER_URL + 'function-descriptor/vnfd-schema.yml'}}
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
