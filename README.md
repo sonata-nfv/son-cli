@@ -17,7 +17,7 @@ Prerequisites:
 1. Install virtualenvwrapper using your distribution repositories or the pip package.
 https://virtualenvwrapper.readthedocs.org/en/latest/
 1. Create a virtualenv for this project 
-`virtualenv -p /usr/bin/python34 sonata`
+`mkvirtualenv -p /usr/bin/python34 sonata`
 
 ### working on the project
 
