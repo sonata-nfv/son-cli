@@ -1,21 +1,31 @@
 from setuptools import setup, find_packages
+import codecs
+import os.path as path
+
 # buildout build system 
 # http://www.buildout.org/en/latest/docs/tutorial.html
 
 # setup() documentation: 
 # http://python-packaging-user-guide.readthedocs.org/en/latest/distributing/#setup-py
 
+cwd = path.dirname(__file__)
+longdesc = codecs.open(path.join(cwd, 'README.md'), 'r', 'ascii').read()
+
 name = 'son'
 setup(
         name=name,
         license='To be determined',
         version='0.0.1',
-        url='http://github.com/sonata-nfv',
+        url='https://github.com/sonata-nfv/son-cli',
         author_email='sonata-dev@sonata-nfv.eu',
+        long_description=longdesc,
         package_dir={'': 'src'},
         packages=find_packages('src'),  # dependency resolution
         namespace_packages=['son',],
         include_package_data=True,
+        package_data= {
+            'son': ['workspace/samples/*']
+        },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests'],
         zip_safe=False,
         entry_points={
