@@ -169,10 +169,10 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_nsd(self, group=None):
+    def generate_nsd(self, vendor=None):
         """
         Compile information for the service descriptor section.
-        :param group:
+        :param vendor:
         :return:
         """
 
@@ -212,10 +212,10 @@ class Packager(object):
             log.debug(e)
             return
 
-        if group and nsd['ns_group'] != group:
+        if vendor and nsd['vendor'] != vendor:
             self._log.warning(
-                "You are adding a NS with different group, Project group={} and NS group={}".format(
-                    group, nsd['ns_group']))
+                "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
+                    vendor, nsd['vendor']))
 
         # Cycle through VNFs and register their names for later verification
         if 'network_functions' in nsd:
@@ -257,7 +257,7 @@ class Packager(object):
                 pcs.append(pce)
         return pcs
 
-    def generate_vnfd_entry(self, base_path, vnf, group=None):
+    def generate_vnfd_entry(self, base_path, vnf, vendor=None):
         """
         Compile information for a specific VNF.
         The VNF descriptor is validated and added to the package.
@@ -284,12 +284,12 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        log.debug("Validating Function Descriptor VNFD={}".format(vnfd_list[0]))
+        log.debug("Validating Function Descriptor VNFD='{}'".format(vnfd_list[0]))
         try:
             validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
 
         except ValidationError as e:
-            log.error("Failed to validate Function Descriptor VNFD={}.".format(vnfd_list[0]))
+            log.error("Failed to validate Function Descriptor VNFD='{}'.".format(vnfd_list[0]))
             log.debug(e)
             return
         except SchemaError as e:
@@ -297,15 +297,15 @@ class Packager(object):
             log.debug(e)
             return
 
-        if group and vnfd['vnf_group'] != group:
+        if vendor and vnfd['vendor'] != vendor:
             self._log.warning(
-                "You are adding a VNF with different group, Project group={} and VNF group={}".format(
-                    group, vnfd['vnf_group']))
+                "You are adding a VNF with different group, Project vendor={} and VNF vendor={}".format(
+                    vendor, vnfd['vendor']))
 
         # Check if this VNF exists in the SD VNF registry. If does not, cancel its packaging
-        if not self.check_in_sd_vnf(vnfd['vnf_name']):
+        if not self.check_in_sd_vnf(vnfd['name']):
             log.warning('VNF with name={} is not referenced in the service descriptor. '
-                        'It will be excluded from the package'.format(vnfd['vnf_name']))
+                        'It will be excluded from the package'.format(vnfd['name']))
             return []
 
         pce = []
