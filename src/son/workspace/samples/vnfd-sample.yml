@@ -5,11 +5,11 @@
 ## VNF descriptor.
 ##
 descriptor_version: "vnfd-schema-01"
-vnf_group: "eu.sonata-nfv"
-vnf_name: "vnf-sample"
-vnf_version: "0.1"
-vnf_author: "Name, Company, Contact"
-vnf_description: "A sample VNF"
+vendor: "eu.sonata-nfv"
+name: "vnf-sample"
+version: "0.2"
+author: "Name, Company, Contact"
+description: "A sample VNF"
 ##
 ## The virtual deployment unit.
 ##

@@ -5,11 +5,11 @@
 
 descriptor_version: "1.0"
 
-ns_group: "eu.sonata-nfv.service-descriptor"
-ns_name: "sample-nsd"
-ns_version: "0.1"
-ns_author: "Name, Company, Contact"
-ns_description: "A sample NSD"
+vendor: "eu.sonata-nfv.service-descriptor"
+name: "sample-nsd"
+version: "0.2"
+author: "Name, Company, Contact"
+description: "A sample NSD"
 
 ##
 ## The various network functions this service
@@ -17,7 +17,7 @@ ns_description: "A sample NSD"
 ##
 network_functions:
   - vnf_id: "sample_vnf"
-    vnf_group: "eu.sonata-nfv"
+    vnf_vendor: "eu.sonata-nfv"
     vnf_name: "vnf-sample"
     vnf_version: "0.1"
 

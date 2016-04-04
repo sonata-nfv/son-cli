@@ -9,7 +9,10 @@ import os
 import pkg_resources
 import shutil
 import yaml
+import pathlib
 from jsonschema import validate
+from jsonschema import ValidationError
+from jsonschema import SchemaError
 import validators
 from urllib.request import URLError
 
@@ -41,7 +44,7 @@ class Packager(object):
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
 
         self._version = version
@@ -126,7 +129,19 @@ class Packager(object):
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
-        validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
+        # Validate PD
+        log.debug("Validating Package Descriptor")
+        try:
+            validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Package Descriptor. Aborting package creation.")
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Package Descriptor Schema.")
+            log.debug(e)
+            return
 
     @performance
     def package_gds(self, prj_descriptor):
@@ -155,10 +170,10 @@ class Packager(object):
         return gds
 
     @performance
-    def generate_nsd(self, group=None):
+    def generate_nsd(self, vendor=None):
         """
         Compile information for the service descriptor section.
-        :param group:
+        :param vendor:
         :return:
         """
 
@@ -185,11 +200,23 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
-        if group and nsd['ns_group'] != group:
+        log.debug("Validating Service Descriptor NSD='{}'".format(nsd_filename))
+        try:
+            validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Service Descriptor NSD='{}'. Aborting package creation.".format(nsd_filename))
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Service Descriptor Schema.")
+            log.debug(e)
+            return
+
+        if vendor and nsd['vendor'] != vendor:
             self._log.warning(
-                "You are adding a NS with different group, Project group={} and NS group={}".format(
-                    group, nsd['ns_group']))
+                "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
+                    vendor, nsd['vendor']))
 
         # Cycle through VNFs and register their names for later verification
         if 'network_functions' in nsd:
@@ -216,11 +243,11 @@ class Packager(object):
         return pce
 
     @performance
-    def generate_vnfds(self, group=None):
+    def generate_vnfds(self, vendor=None):
         """
         Compile information for the list of VNFs
         This function iterates over the different VNF entries
-        :param group: (TBD)
+        :param vendor: (TBD)
         :return:
         """
         base_path = os.path.join(self._project_path, 'sources', 'vnf')
@@ -231,14 +258,14 @@ class Packager(object):
                 pcs.append(pce)
         return pcs
 
-    def generate_vnfd_entry(self, base_path, vnf, group=None):
+    def generate_vnfd_entry(self, base_path, vnf, vendor=None):
         """
         Compile information for a specific VNF.
         The VNF descriptor is validated and added to the package.
         VDU image files, referenced in the VNF descriptor, are added to the package.
         :param base_path: The path where the VNF file is located
         :param vnf: The VNF reference path
-        :param group: (TBD)
+        :param vendor: (TBD)
         :return:
         """
         # Locate VNFD
@@ -258,25 +285,39 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
-        if group and vnfd['vnf_group'] != group:
+        log.debug("Validating Function Descriptor VNFD='{}'".format(vnfd_list[0]))
+        try:
+            validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Function Descriptor VNFD='{}'.".format(vnfd_list[0]))
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Function Descriptor Schema.")
+            log.debug(e)
+            return
+
+        if vendor and vnfd['vendor'] != vendor:
             self._log.warning(
-                "You are adding a VNF with different group, Project group={} and VNF group={}".format(
-                    group, vnfd['vnf_group']))
+                "You are adding a VNF with different group, Project vendor={} and VNF vendor={}".format(
+                    vendor, vnfd['vendor']))
 
         # Check if this VNF exists in the SD VNF registry. If does not, cancel its packaging
-        if not self.check_in_sd_vnf(vnfd['vnf_name']):
+        if not self.check_in_sd_vnf(vnfd['name']):
             log.warning('VNF with name={} is not referenced in the service descriptor. '
-                        'It will be excluded from the package'.format(vnfd['vnf_name']))
+                        'It will be excluded from the package'.format(vnfd['name']))
             return []
 
         pce = []
         # Create fd location
         fd_path = os.path.join(self._dst_path, "function_descriptors")
         os.makedirs(fd_path, exist_ok=True)
+
         # Copy VNFD file
         fd = os.path.join(fd_path, vnfd_list[0])
         shutil.copyfile(os.path.join(base_path, vnfd_list[0]), fd)
+
         # Generate VNFD Entry
         pce_fd = dict()
         pce_fd["content-type"] = "application/sonata.function_descriptor"
@@ -287,27 +328,38 @@ class Packager(object):
         if 'virtual_deployment_units' in vnfd:
             vdu_list = [vdu for vdu in vnfd['virtual_deployment_units'] if vdu['vm_image']]
             for vdu in vdu_list:
-                bd = os.path.join(base_path, vdu['vm_image'])
-                # vm_image can be a local File, a local Dir or a URL
+
+                # vm_image can be a local File, a local Dir, a URL or a URI
+                vdu_image_path = vdu['vm_image']
+
+                if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
+                    # TODO vm_image may be a URL
+                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
+                    # Ignore for now!
+                    return
+
+                else:  # Check for URL local (e.g. file:///...)
+                    ptokens = pathlib.Path(vdu_image_path).parts
+                    if ptokens[0] == 'file:':  # URL to local file
+                        bd = os.path.join(base_path, ptokens[1])
+
+                    else:  # regular filename/path
+                        bd = os.path.join(base_path, vdu['vm_image'])
 
                 if os.path.exists(bd):  # local File or local Dir
 
                     if os.path.isfile(bd):
                         pce.append(self.__pce_img_gen__(base_path, vnf, vdu, vdu['vm_image'], dir_p='', dir_o=''))
+
                     elif os.path.isdir(bd):
                         img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
-                        bp = os.path.join(base_path, vdu['vm_image'])
-                        for root, dirs, files in os.walk(bp):
-                            dir_o = root[len(bp):]
+                        for root, dirs, files in os.walk(bd):
+                            dir_o = root[len(bd):]
                             dir_p = dir_o.replace(os.path.sep, "/")
                             for f in files:
                                 if dir_o.startswith(os.path.sep):
                                     dir_o = dir_o[1:]
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
-
-                    # TODO vm_image may be a URL
-                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
-                    # Ignore for now!
 
                 else:  # Invalid vm_image
                     log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
@@ -416,7 +468,7 @@ class Packager(object):
                 # Update the corresponding local schema file
                 write_local_schema(Packager.schemas[template]['local'], self._schemas_library[template])
 
-                return self._schemas_library
+                return self._schemas_library[template]
 
             except URLError:
                 log.warning("Could not load schema={} from remote location={}".format(template, schema_addr))
