@@ -3,12 +3,35 @@ additionalProperties: false
 definitions:
   bandwidth_units:
     enum: [bps, kbps, Mbps, Gbps, Tbps]
+  frequency_units:
+    enum: [Hz, kHz, MHz, GHz, THz]
+  general_units:
+    enum: [Percentage]
   images_formats:
     enum: [raw, vhd, vmdk, vdi, iso, qcow2, docker, ova, ovf, bare]
   interfaces:
     enum: [interface]
   memory_units:
     enum: [B, kB, KiB, MB, MiB, GB, GiB, TB, TiB, PT, PiT]
+  monitoring:
+    additionalProperties: false
+    properties:
+      frequency: {description: The sample rate of the monitoring parameter., exclusiveMinimum: true,
+        minimum: 0, type: number}
+      frequency_unit: {$ref: '#/definitions/frequency_units', default: Hz, description: The
+          unit of the sample frequency.}
+      name: {description: The name of the parameter to monitor. The name has to be
+          supported by the service platform or the FSM., pattern: '^[A-Za-z-_]+$',
+        type: string}
+      unit:
+        description: The unit used to monitor (or represent) the parameter.
+        oneOf:
+        - {$ref: '#/definitions/general_units'}
+        - {$ref: '#/definitions/memory_units'}
+        - {$ref: '#/definitions/bandwidth_units'}
+        - {$ref: '#/definitions/frequency_units'}
+    required: [name, unit]
+    type: object
 description: The core schema for SONATA network function descriptors.
 properties:
   author: {description: The person or organization that created the VNF descriptor.,
@@ -162,7 +185,8 @@ properties:
             VNF descriptor., type: string}
         monitoring_parameters:
           description: The various metrics and parameters to monitor.
-          items: {description: A specific monitoring metric or parameter., type: string}
+          items: {$ref: '#/definitions/monitoring', description: A specific monitoring
+              metric or parameter.}
           type: array
         resource_requirements:
           additionalProperties: false
@@ -250,7 +274,7 @@ properties:
           description: The scale-in/scale-out parameters.
           properties:
             maximum: {default: 1, description: The maximum number of VDUs instantiated
-                at any time., minimum: 1, type: integer}
+                at any time. 0 means unlimited., minimum: 0, type: integer}
             minimum: {default: 1, description: The minimum number of VDUs instantiated
                 at any time., minimum: 0, type: integer}
           type: object

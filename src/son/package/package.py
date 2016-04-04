@@ -9,6 +9,7 @@ import os
 import pkg_resources
 import shutil
 import yaml
+import pathlib
 from jsonschema import validate
 from jsonschema import ValidationError
 from jsonschema import SchemaError
@@ -199,12 +200,12 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        log.debug("Validating Service Descriptor")
+        log.debug("Validating Service Descriptor NSD='{}'".format(nsd_filename))
         try:
             validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
 
         except ValidationError as e:
-            log.error("Failed to validate Service Descriptor. Aborting package creation.")
+            log.error("Failed to validate Service Descriptor NSD='{}'. Aborting package creation.".format(nsd_filename))
             log.debug(e)
             return
         except SchemaError as e:
@@ -242,11 +243,11 @@ class Packager(object):
         return pce
 
     @performance
-    def generate_vnfds(self, group=None):
+    def generate_vnfds(self, vendor=None):
         """
         Compile information for the list of VNFs
         This function iterates over the different VNF entries
-        :param group: (TBD)
+        :param vendor: (TBD)
         :return:
         """
         base_path = os.path.join(self._project_path, 'sources', 'vnf')
@@ -264,7 +265,7 @@ class Packager(object):
         VDU image files, referenced in the VNF descriptor, are added to the package.
         :param base_path: The path where the VNF file is located
         :param vnf: The VNF reference path
-        :param group: (TBD)
+        :param vendor: (TBD)
         :return:
         """
         # Locate VNFD
@@ -312,9 +313,11 @@ class Packager(object):
         # Create fd location
         fd_path = os.path.join(self._dst_path, "function_descriptors")
         os.makedirs(fd_path, exist_ok=True)
+
         # Copy VNFD file
         fd = os.path.join(fd_path, vnfd_list[0])
         shutil.copyfile(os.path.join(base_path, vnfd_list[0]), fd)
+
         # Generate VNFD Entry
         pce_fd = dict()
         pce_fd["content-type"] = "application/sonata.function_descriptor"
@@ -325,27 +328,38 @@ class Packager(object):
         if 'virtual_deployment_units' in vnfd:
             vdu_list = [vdu for vdu in vnfd['virtual_deployment_units'] if vdu['vm_image']]
             for vdu in vdu_list:
-                bd = os.path.join(base_path, vdu['vm_image'])
-                # vm_image can be a local File, a local Dir or a URL
+
+                # vm_image can be a local File, a local Dir, a URL or a URI
+                vdu_image_path = vdu['vm_image']
+
+                if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
+                    # TODO vm_image may be a URL
+                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
+                    # Ignore for now!
+                    return
+
+                else:  # Check for URL local (e.g. file:///...)
+                    ptokens = pathlib.Path(vdu_image_path).parts
+                    if ptokens[0] == 'file:':  # URL to local file
+                        bd = os.path.join(base_path, ptokens[1])
+
+                    else:  # regular filename/path
+                        bd = os.path.join(base_path, vdu['vm_image'])
 
                 if os.path.exists(bd):  # local File or local Dir
 
                     if os.path.isfile(bd):
                         pce.append(self.__pce_img_gen__(base_path, vnf, vdu, vdu['vm_image'], dir_p='', dir_o=''))
+
                     elif os.path.isdir(bd):
                         img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
-                        bp = os.path.join(base_path, vdu['vm_image'])
-                        for root, dirs, files in os.walk(bp):
-                            dir_o = root[len(bp):]
+                        for root, dirs, files in os.walk(bd):
+                            dir_o = root[len(bd):]
                             dir_p = dir_o.replace(os.path.sep, "/")
                             for f in files:
                                 if dir_o.startswith(os.path.sep):
                                     dir_o = dir_o[1:]
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
-
-                    # TODO vm_image may be a URL
-                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
-                    # Ignore for now!
 
                 else:  # Invalid vm_image
                     log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
