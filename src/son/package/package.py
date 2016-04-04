@@ -41,7 +41,7 @@ class Packager(object):
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(__name__)
 
         self._version = version
@@ -416,7 +416,7 @@ class Packager(object):
                 # Update the corresponding local schema file
                 write_local_schema(Packager.schemas[template]['local'], self._schemas_library[template])
 
-                return self._schemas_library
+                return self._schemas_library[template]
 
             except URLError:
                 log.warning("Could not load schema={} from remote location={}".format(template, schema_addr))

@@ -6,6 +6,8 @@ definitions:
 description: The core scheme for RECUSRIVE service descriptors (many details left
   out)
 properties:
+  author: {description: The person or organization that created the NS descriptor.,
+    type: string}
   auto_scale_policy:
     properties:
       action: {type: string}
@@ -34,6 +36,7 @@ properties:
     minItems: 1
     type: array
     uniqueItems: true
+  description: {description: A longer description of the network service., type: string}
   descriptor_version: {description: The version of the description definition used
       to describe the network descriptor., pattern: '^[A-Za-z0-9\-_.]+$', type: string}
   forwarding_graphs:
@@ -119,6 +122,8 @@ properties:
         unit: {type: string}
       type: object
     type: array
+  name: {description: The name of the network service description., pattern: '^[a-z0-9\-_.]+$',
+    type: string}
   network_functions:
     description: The VNFs (their descriptors), that are part of this network service.
     items:
@@ -126,15 +131,15 @@ properties:
       properties:
         description: {description: A longer description of the network function.,
           type: string}
-        vnf_group: {description: The group id identifies the VNF descriptor uniquely
-            across all function descriptors., pattern: '^[a-z0-9\-_.]+$', type: string}
         vnf_id: {description: A unique identifier of this network function within
             the scope of this NS descriptor., type: string}
         vnf_name: {description: The name of the function description., pattern: '^[a-z0-9\-_.]+$',
           type: string}
+        vnf_vendor: {description: The vendor id identifies the VNF descriptor uniquely
+            across all function descriptors., pattern: '^[a-z0-9\-_.]+$', type: string}
         vnf_version: {description: The version of the function descriptor., pattern: '^(==
             |>= |<= |!= )?[0-9\-_.]+$', type: string}
-      required: [vnf_id, vnf_group, vnf_name, vnf_version]
+      required: [vnf_id, vnf_vendor, vnf_name, vnf_version]
       type: object
     minItems: 1
     type: array
@@ -146,20 +151,15 @@ properties:
     minItems: 0
     type: array
     uniqueItems: true
-  ns_author: {description: The person or organization that created the NS descriptor.,
-    type: string}
-  ns_description: {description: A longer description of the network service., type: string}
-  ns_group: {description: The group id identifies the NS descriptor uniquely across
-      all network descriptors., pattern: '^[a-z0-9\-_.]+$', type: string}
-  ns_name: {description: The name of the network service description., pattern: '^[a-z0-9\-_.]+$',
-    type: string}
-  ns_version: {description: The version of the service descriptor., pattern: '^[0-9\-_.]+$',
-    type: string}
   services_depedency:
     items: {type: string}
     minItems: 0
     type: array
     uniqueItems: true
+  vendor: {description: The vendor id allows to identify a VNF descriptor uniquely
+      across all function descriptor vendors., pattern: '^[a-z0-9\-_.]+$', type: string}
+  version: {description: The version of the service descriptor., pattern: '^[0-9\-_.]+$',
+    type: string}
   virtual_links:
     items:
       oneOf:
@@ -196,5 +196,5 @@ properties:
     minItems: 0
     type: array
     uniqueItems: true
-required: [descriptor_version, ns_group, ns_name, ns_version]
+required: [descriptor_version, vendor, name, version]
 type: object
