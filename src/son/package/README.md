@@ -6,11 +6,10 @@ This tool delivers a ZIP file compiling all the required descriptors of specifie
 
 The generated file struture follows the format defined in the package-descritor of the son-schema repository (https://github.com/sonata-nfv/son-schema/tree/master/package-descriptor). Please check folder examples for a demo package.
 
-
+```sh
 Usage: son-package [-h] --workspace WORKSPACE [--project PROJECT]
                    [-d DESTINATION] [-n NAME]
 
-Generate new sonata package
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -21,6 +20,7 @@ optional arguments:
   -d DESTINATION, --destination DESTINATION
                         create the package on the specified location
   -n NAME, --name NAME  create the package with the specific name
+```
 
 son-package will create a package inside the DESTINATION directory. If DESTINATION is not specified, the package will be deployed at <project root/target>.
 
