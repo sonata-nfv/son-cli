@@ -10,6 +10,8 @@ import pkg_resources
 import shutil
 import yaml
 from jsonschema import validate
+from jsonschema import ValidationError
+from jsonschema import SchemaError
 import validators
 from urllib.request import URLError
 
@@ -126,7 +128,19 @@ class Packager(object):
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor, default_flow_style=False))
 
-        validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
+        # Validate PD
+        log.debug("Validating Package Descriptor")
+        try:
+            validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Package Descriptor. Aborting package creation.")
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Package Descriptor Schema.")
+            log.debug(e)
+            return
 
     @performance
     def package_gds(self, prj_descriptor):
@@ -185,7 +199,19 @@ class Packager(object):
                 nsd = yaml.load(_file)
 
         # Validate NSD
-        validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
+        log.debug("Validating Service Descriptor")
+        try:
+            validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Service Descriptor. Aborting package creation.")
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Service Descriptor Schema.")
+            log.debug(e)
+            return
+
         if group and nsd['ns_group'] != group:
             self._log.warning(
                 "You are adding a NS with different group, Project group={} and NS group={}".format(
@@ -258,7 +284,19 @@ class Packager(object):
                 vnfd = yaml.load(_file)
 
         # Validate VNFD
-        validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
+        log.debug("Validating Function Descriptor VNFD={}".format(vnfd_list[0]))
+        try:
+            validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
+
+        except ValidationError as e:
+            log.error("Failed to validate Function Descriptor VNFD={}.".format(vnfd_list[0]))
+            log.debug(e)
+            return
+        except SchemaError as e:
+            log.error("Invalid Function Descriptor Schema.")
+            log.debug(e)
+            return
+
         if group and vnfd['vnf_group'] != group:
             self._log.warning(
                 "You are adding a VNF with different group, Project group={} and VNF group={}".format(
