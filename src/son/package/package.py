@@ -31,17 +31,17 @@ class Packager(object):
     SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
     SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
 
-    # Master remote location for schemas
-    SCHEMAS_MASTER_URL = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
+    # Master local and remote location for schemas
     SCHEMAS_MASTER_LOCAL = os.path.join(os.path.expanduser("~"), ".son-schema")
+    SCHEMAS_MASTER_REMOTE = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
 
     # References to remote schemas
     schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'pd-schema.yml'),
-                                           'remote': SCHEMAS_MASTER_URL + 'package-descriptor/pd-schema.yml'},
+                                           'remote': SCHEMAS_MASTER_REMOTE + 'package-descriptor/pd-schema.yml'},
                SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'nsd-schema.yml'),
-                                           'remote': SCHEMAS_MASTER_URL + 'service-descriptor/nsd-schema.yml'},
+                                           'remote': SCHEMAS_MASTER_REMOTE + 'service-descriptor/nsd-schema.yml'},
                SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'vnfd-schema.yml'),
-                                            'remote': SCHEMAS_MASTER_URL + 'function-descriptor/vnfd-schema.yml'}}
+                                            'remote': SCHEMAS_MASTER_REMOTE + 'function-descriptor/vnfd-schema.yml'}}
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
