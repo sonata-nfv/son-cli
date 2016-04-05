@@ -522,7 +522,7 @@ def load_local_schema(filename):
     # Confirm that schema file exists
     if not os.path.isfile(filename):
         log.warning("Schema file '{}' does not exist.".format(filename))
-        return
+        raise FileNotFoundError
 
     # Read schema file and return the schema as a dictionary
     schema_f = open(filename, 'r')
