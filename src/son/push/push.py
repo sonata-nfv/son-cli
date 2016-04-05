@@ -33,14 +33,14 @@ def upload_package(platform_url, package_file_name):
         return(package_file_name, "is not a file.")
 
     # TODO: fix potential simple typo issues like double slashes in url
-    url = platform_url+"/api/packages" 
+    url = platform_url+"/packages" 
 
     if not validators.url(url):
         return(url, "is not a valid url.")
 
     try:
         with open(package_file_name, 'rb') as pkg_file:
-            r = requests.post(url, files={'file': pkg_file})
+            r = requests.post(url, files={'package': pkg_file})
             return(r.text)
     except Exception as e:
         return("Service package upload failed. "+e)
@@ -64,7 +64,7 @@ def instantiate_package(platform_url, service_uuid=""):
         if not service_uuid in package_list(platform_url):
             return("Given service uuid does not exist on the platform.")
 
-        url = platform_url+"/api/instantiations" 
+        url = platform_url+"/instantiations" 
 
         r = requests.post(url, json = {"service_uuid":service_uuid})
         return(r.text)
@@ -89,8 +89,8 @@ def _get_from_url(url):
         raise Exception("Content cannot be downloaded from "+url)
 
 
-get_packages = lambda url:_get_from_url(url+"/api/packages")
-get_instances = lambda url:_get_from_url(url+"/api/instantiations")
+get_packages = lambda url:_get_from_url(url+"/packages")
+get_instances = lambda url:_get_from_url(url+"/instantiations")
 package_list = lambda url:loads(get_packages(url))["service_uuid_list"]
 instance_list = lambda url:loads(get_instances(url))["service_instantiations_list"]
 
@@ -103,10 +103,10 @@ def main():
     """
     examples = """Example usage:
 
-    son-push http://127.0.0.1:8000 -U sonata-demo.son
-    son-push http://127.0.0.1:8000 --list-packages
-    son-push http://127.0.0.1:8000 --deploy-package <uuid>
-    son-push http://127.0.0.1:8000 -I
+    son-push http://127.0.0.1:5000 -U sonata-demo.son
+    son-push http://127.0.0.1:5000 --list-packages
+    son-push http://127.0.0.1:5000 --deploy-package <uuid>
+    son-push http://127.0.0.1:5000 -I
     """
     parser = ArgumentParser(description=description, 
                             formatter_class=RawDescriptionHelpFormatter,
