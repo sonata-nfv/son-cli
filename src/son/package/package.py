@@ -31,16 +31,17 @@ class Packager(object):
     SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
     SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
 
-    # Master remote location for schemas
-    SCHEMAS_MASTER_URL = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
+    # Master local and remote location for schemas
+    SCHEMAS_MASTER_LOCAL = os.path.join(os.path.expanduser("~"), ".son-schema")
+    SCHEMAS_MASTER_REMOTE = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
 
     # References to remote schemas
-    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': 'pd-schema.yml',
-                                           'remote': SCHEMAS_MASTER_URL + 'package-descriptor/pd-schema.yml'},
-               SCHEMA_SERVICE_DESCRIPTOR: {'local': 'nsd-schema.yml',
-                                           'remote': SCHEMAS_MASTER_URL + 'service-descriptor/nsd-schema.yml'},
-               SCHEMA_FUNCTION_DESCRIPTOR: {'local': 'vnfd-schema.yml',
-                                            'remote': SCHEMAS_MASTER_URL + 'function-descriptor/vnfd-schema.yml'}}
+    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'pd-schema.yml'),
+                                           'remote': SCHEMAS_MASTER_REMOTE + 'package-descriptor/pd-schema.yml'},
+               SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'nsd-schema.yml'),
+                                           'remote': SCHEMAS_MASTER_REMOTE + 'service-descriptor/nsd-schema.yml'},
+               SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'vnfd-schema.yml'),
+                                            'remote': SCHEMAS_MASTER_REMOTE + 'function-descriptor/vnfd-schema.yml'}}
 
     def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
@@ -461,7 +462,7 @@ class Packager(object):
         schema_addr = Packager.schemas[template]['remote']
         if validators.url(schema_addr):
             try:
-                log.debug("Loading schema={} from remote location={}".format(template, schema_addr))
+                log.debug("Loading schema '{}' from remote location '{}'".format(template, schema_addr))
                 # Load schema from remote source
                 self._schemas_library[template] = load_remote_schema(schema_addr)
 
@@ -471,23 +472,23 @@ class Packager(object):
                 return self._schemas_library[template]
 
             except URLError:
-                log.warning("Could not load schema={} from remote location={}".format(template, schema_addr))
+                log.warning("Could not load schema '{}' from remote location '{}'".format(template, schema_addr))
         else:
-            log.warning("Invalid schema URL={}".format(schema_addr))
+            log.warning("Invalid schema URL '{}'".format(schema_addr))
 
         # Load Offline Schema
         schema_addr = Packager.schemas[template]['local']
-        if pkg_resources.resource_exists(__name__, os.path.join('templates', schema_addr)):
+        if os.path.isfile(schema_addr):
             try:
-                log.debug("Loading schema={} from local file={}".format(template, schema_addr))
+                log.debug("Loading schema '{}' from local file '{}'".format(template, schema_addr))
                 self._schemas_library[template] = load_local_schema(schema_addr)
                 return self._schemas_library[template]
             except FileNotFoundError:
-                log.warning("Could not load schema={} from local file={}".format(template, schema_addr))
+                log.warning("Could not load schema '{}' from local file '{}'".format(template, schema_addr))
         else:
-            log.warning("Schema file={} not found.".format(schema_addr))
+            log.warning("Schema file '{}' not found.".format(schema_addr))
 
-        log.error("Failed to load schema={}".format(template))
+        log.error("Failed to load schema '{}'".format(template))
 
 
 def write_local_schema(filename, schema):
@@ -497,10 +498,17 @@ def write_local_schema(filename, schema):
     :param schema: The schema content as a dictionary.
     :return:
     """
-    rp = __name__
-    path = os.path.join('templates', filename)
-    fn = pkg_resources.resource_filename(rp, path)
-    schema_f = open(fn, 'w')
+    # Verify if local dir structure already exists! If not, create it.
+    if not os.path.isdir(Packager.SCHEMAS_MASTER_LOCAL):
+        log.debug("Schema directory '{}' not found. Creating it.".format(Packager.SCHEMAS_MASTER_LOCAL))
+        os.mkdir(Packager.SCHEMAS_MASTER_LOCAL)
+
+    if os.path.isfile(filename):
+        log.debug("Replacing schema file '{}'".format(filename))
+    else:
+        log.debug("Writing schema file '{}'".format(filename))
+
+    schema_f = open(filename, 'w')
     yaml.dump(schema, schema_f)
     schema_f.close()
 
@@ -511,10 +519,14 @@ def load_local_schema(filename):
     :param filename: The name of the schema file to look for
     :return: The loaded schema as a dictionary
     """
-    rp = __name__
-    path = os.path.join('templates', filename)
-    tf = pkg_resources.resource_string(rp, path)
-    schema = yaml.load(tf)
+    # Confirm that schema file exists
+    if not os.path.isfile(filename):
+        log.warning("Schema file '{}' does not exist.".format(filename))
+        raise FileNotFoundError
+
+    # Read schema file and return the schema as a dictionary
+    schema_f = open(filename, 'r')
+    schema = yaml.load(schema_f)
     assert isinstance(schema, dict)
     return schema
 
