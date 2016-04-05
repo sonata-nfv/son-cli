@@ -1,8 +1,8 @@
 import unittest
-
+import pkg_resources
+import os
 from urllib.error import HTTPError
 from son.package.package import Packager, load_local_schema, load_remote_schema
-
 
 class PDTester(unittest.TestCase):
 
@@ -41,7 +41,17 @@ class LoadSchemaTests(unittest.TestCase):
 
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """
-        schema = load_local_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['local'])
+        # Access to local stored schemas for this test
+        schema_f = pkg_resources.resource_filename(__name__, os.path.join(".son-schema", 'pd-schema.yml'))
+        schema = load_local_schema(schema_f)
+        self.assertIsInstance(schema, dict)
+
+        schema_f = pkg_resources.resource_filename(__name__, os.path.join(".son-schema", 'nsd-schema.yml'))
+        schema = load_local_schema(schema_f)
+        self.assertIsInstance(schema, dict)
+
+        schema_f = pkg_resources.resource_filename(__name__, os.path.join(".son-schema", 'vnfd-schema.yml'))
+        schema = load_local_schema(schema_f)
         self.assertIsInstance(schema, dict)
 
     def test_load_invalid_remote_template_unavailable(self):
