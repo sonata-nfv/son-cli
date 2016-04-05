@@ -66,7 +66,3 @@ class LoadSchemaTests(unittest.TestCase):
         """ Test if the load_remote_schema is retrieving and loading the templates correctly """
         schema = load_remote_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['remote'])
         self.assertIsInstance(schema, dict)
-
-
-if __name__ == '__main__':
-    unittest.main()
