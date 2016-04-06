@@ -1,8 +1,10 @@
 import unittest
+from unittest import mock
 import pkg_resources
 import os
 from urllib.error import HTTPError
-from son.package.package import Packager, load_local_schema, load_remote_schema
+from son.package.package import Packager, load_local_schema, load_remote_schema, simple_function
+from unittest.mock import patch, mock_open
 
 class PDTester(unittest.TestCase):
 
@@ -22,22 +24,75 @@ class PDTester(unittest.TestCase):
 
     def test_correct_gds(self):
         """ Test the correct general description section """
+        print("test_correct_gds")
         gsd = self.pck.package_gds(PDTester.__pfd__)
         self.assertNotEqual(gsd, False)
+        print("END test_correct_gds")
 
     def test_incomplete_gds(self):
         """ Test the returning message when the provided project has incomplete information."""
+        print("test_incomplete_gds")
         pfd = PDTester.__pfd__
         pfd.pop('name')
         gsd = self.pck.package_gds(pfd)
         self.assertEqual(gsd, False)
+        print("END test_incomplete_gds")
 
 
 class LoadSchemaTests(unittest.TestCase):
 
     def test_load_invalid_local_template(self):
         """Test if the load schema is loading only available templates"""
+        print("test_load_invalid_local_template")
         self.assertRaises(FileNotFoundError, load_local_schema, "test")
+        print("END test_load_invalid_local_template")
+
+    @patch("son.package.package.yaml")
+    @patch("builtins.open")
+    @patch("son.package.package.os.path")
+    def test_load_local_schema(self, m_os_path, m_open, m_yaml):
+        # Ensure that a FileNotFoundError is raised when the file does not exist
+        m_os_path.isfile.return_value = False
+        self.assertRaises(FileNotFoundError, load_local_schema, "/some/file/path")
+
+        # Ensure a correct schema format and a correct opening of the schema file
+        m_os_path.isfile.return_value = True
+        m_open.return_value = None
+        m_yaml.load.return_value = "not a dict"
+        self.assertRaises(AssertionError, load_local_schema, "/some/file/path")
+        self.assertEqual(m_open.call_args, mock.call('/some/file/path', 'r'))
+
+
+        # Ensure that a dictionary is allowed to be returned
+        sample_dict = {'dict_key': 'this is a dict'}
+        m_os_path.isfile.return_value = True
+        m_open.return_value = None
+        m_yaml.load.return_value = sample_dict
+        return_dict = load_local_schema("/some/file/path")
+        self.assertEqual(sample_dict, return_dict)
+
+    @patch("son.package.package.yaml")
+    @patch("son.package.package.urllib.request.urlopen")
+    def test_load_remote_schema(self, m_urlopen, m_yaml):
+        
+
+
+
+        # # Ensure that a
+        # retrieved = "response"
+        #
+        # m_urlopen.read.decode.return_value = retrieved
+        # m_yaml.load.return_value = {'dict_key': 'dict_content'}
+        #
+        # load_remote_schema("some url")
+        #
+        # print(m_yaml.load.call_args)
+        # print(m_urlopen.read.call_args)
+
+        #self.assertEqual(m_yaml.load.call_args, retrieved)
+
+
+
 
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """
@@ -66,3 +121,6 @@ class LoadSchemaTests(unittest.TestCase):
         """ Test if the load_remote_schema is retrieving and loading the templates correctly """
         schema = load_remote_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['remote'])
         self.assertIsInstance(schema, dict)
+
+
+

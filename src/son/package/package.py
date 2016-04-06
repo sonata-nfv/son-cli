@@ -527,7 +527,7 @@ def load_local_schema(filename):
     # Read schema file and return the schema as a dictionary
     schema_f = open(filename, 'r')
     schema = yaml.load(schema_f)
-    assert isinstance(schema, dict)
+    assert isinstance(schema, dict), "Failed to load schema file '{}'. Not a dictionary.".format(filename)
     return schema
 
 
@@ -556,6 +556,14 @@ def __validate_directory__(paths):
             print("{} must be a directory".format(path), file=sys.stderr)
             return False
     return True
+
+
+def simple_function():
+
+    f = open("/home/lconceicao/test", 'r')
+    content = f.readline()
+    f.close()
+    return content
 
 
 def main():
