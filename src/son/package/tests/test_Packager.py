@@ -62,7 +62,6 @@ class LoadSchemaTests(unittest.TestCase):
         self.assertRaises(AssertionError, load_local_schema, "/some/file/path")
         self.assertEqual(m_open.call_args, mock.call('/some/file/path', 'r'))
 
-
         # Ensure that a dictionary is allowed to be returned
         sample_dict = {'dict_key': 'this is a dict'}
         m_os_path.isfile.return_value = True
@@ -72,27 +71,28 @@ class LoadSchemaTests(unittest.TestCase):
         self.assertEqual(sample_dict, return_dict)
 
     @patch("son.package.package.yaml")
+    @patch("son.package.package.urllib.request.urlopen.headers.get_content_charset")
+    @patch("son.package.package.urllib.request.urlopen.read.decode")
     @patch("son.package.package.urllib.request.urlopen")
-    def test_load_remote_schema(self, m_urlopen, m_yaml):
-        
+    def test_load_remote_schema(self, m_urlopen, m_decode, m_cs, m_yaml):
 
+        sample_dict = {"key": "content"}
+        m_decode.return_value = ""
+        m_cs.return_value = ""
+        m_yaml.load.return_value = sample_dict
 
+        # Ensure that urlopen is accessing the same address of the argument
+        load_remote_schema("url")
+        self.assertEqual(m_urlopen.call_args, mock.call("url"))
 
-        # # Ensure that a
-        # retrieved = "response"
-        #
-        # m_urlopen.read.decode.return_value = retrieved
-        # m_yaml.load.return_value = {'dict_key': 'dict_content'}
-        #
-        # load_remote_schema("some url")
-        #
-        # print(m_yaml.load.call_args)
-        # print(m_urlopen.read.call_args)
+        # Ensure it raises error on loading an invalid schema
+        m_yaml.load.return_value = "not a dict"
+        self.assertRaises(AssertionError, load_remote_schema, "url")
 
-        #self.assertEqual(m_yaml.load.call_args, retrieved)
-
-
-
+        # Ensure that a dictionary is allowed to be returned
+        m_yaml.load.return_value = sample_dict
+        return_dict = load_remote_schema("url")
+        self.assertEqual(sample_dict, return_dict)
 
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """

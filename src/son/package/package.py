@@ -537,8 +537,8 @@ def load_remote_schema(template_url):
     :param template_url: The URL of the required schema
     :return: The loaded schema as a dictionary
     """
-    with urllib.request.urlopen(template_url) as response:
-        tf = response.read().decode(response.headers.get_content_charset())
+    response = urllib.request.urlopen(template_url)
+    tf = response.read().decode(response.headers.get_content_charset())
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
