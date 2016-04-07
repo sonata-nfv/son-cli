@@ -6,7 +6,6 @@ from contextlib import closing
 from pathlib import Path
 
 import os
-import pkg_resources
 import shutil
 import yaml
 import pathlib
@@ -527,7 +526,7 @@ def load_local_schema(filename):
     # Read schema file and return the schema as a dictionary
     schema_f = open(filename, 'r')
     schema = yaml.load(schema_f)
-    assert isinstance(schema, dict)
+    assert isinstance(schema, dict), "Failed to load schema file '{}'. Not a dictionary.".format(filename)
     return schema
 
 
@@ -537,8 +536,8 @@ def load_remote_schema(template_url):
     :param template_url: The URL of the required schema
     :return: The loaded schema as a dictionary
     """
-    with urllib.request.urlopen(template_url) as response:
-        tf = response.read().decode(response.headers.get_content_charset())
+    response = urllib.request.urlopen(template_url)
+    tf = response.read().decode(response.headers.get_content_charset())
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
