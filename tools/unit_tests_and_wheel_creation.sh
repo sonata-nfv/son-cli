@@ -9,7 +9,7 @@ cd ${BASE_DIR}
 rm -rf dist/*
 
 # Launch the Python unit tests
-./bin/test
+./bin/py.test -s -v --junit-xml junit/testreport.xml
 
 # Create the wheel package
 python3 setup.py bdist_wheel --plat-name=linux_x86_64
