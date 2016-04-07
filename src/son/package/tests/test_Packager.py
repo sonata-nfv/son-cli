@@ -3,8 +3,9 @@ from unittest import mock
 import pkg_resources
 import os
 from urllib.error import HTTPError
-from son.package.package import Packager, load_local_schema, load_remote_schema, simple_function
-from unittest.mock import patch, mock_open
+from son.package.package import Packager, load_local_schema, load_remote_schema
+from unittest.mock import patch
+
 
 class PDTester(unittest.TestCase):
 
@@ -40,12 +41,6 @@ class PDTester(unittest.TestCase):
 
 
 class LoadSchemaTests(unittest.TestCase):
-
-    def test_load_invalid_local_template(self):
-        """Test if the load schema is loading only available templates"""
-        print("test_load_invalid_local_template")
-        self.assertRaises(FileNotFoundError, load_local_schema, "test")
-        print("END test_load_invalid_local_template")
 
     @patch("son.package.package.yaml")
     @patch("builtins.open")
@@ -94,6 +89,12 @@ class LoadSchemaTests(unittest.TestCase):
         return_dict = load_remote_schema("url")
         self.assertEqual(sample_dict, return_dict)
 
+    def test_load_invalid_local_template(self):
+        """Test if the load schema is loading only available templates"""
+        print("test_load_invalid_local_template")
+        self.assertRaises(FileNotFoundError, load_local_schema, "test")
+        print("END test_load_invalid_local_template")
+
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """
         # Access to local stored schemas for this test
@@ -121,6 +122,3 @@ class LoadSchemaTests(unittest.TestCase):
         """ Test if the load_remote_schema is retrieving and loading the templates correctly """
         schema = load_remote_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['remote'])
         self.assertIsInstance(schema, dict)
-
-
-

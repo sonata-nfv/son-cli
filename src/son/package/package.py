@@ -6,7 +6,6 @@ from contextlib import closing
 from pathlib import Path
 
 import os
-import pkg_resources
 import shutil
 import yaml
 import pathlib
@@ -556,14 +555,6 @@ def __validate_directory__(paths):
             print("{} must be a directory".format(path), file=sys.stderr)
             return False
     return True
-
-
-def simple_function():
-
-    f = open("/home/lconceicao/test", 'r')
-    content = f.readline()
-    f.close()
-    return content
 
 
 def main():
