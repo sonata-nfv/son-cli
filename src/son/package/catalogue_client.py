@@ -2,8 +2,7 @@ import logging
 import requests
 import yaml
 import sys
-from requests import codes
-
+from requests import exceptions
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class CatalogueClient(object):
     CAT_URI_VNF_NAME = "/vnfs/name"                   # GET VNF list by name
 
     def __init__(self, base_url, auth=('', '')):
-        self._base_url = base_url
+        self.base_url = base_url
         self._auth = auth   # Just basic auth for now
         self._headers = {'Content-Type': 'application/x-yaml'}
 
@@ -30,8 +29,16 @@ class CatalogueClient(object):
         Checks if the catalogue API server is alive and responding to requests
         :return: True=server OK, False=server unavailable
         """
-        url = self._base_url + CatalogueClient.CAT_URI_BASE
-        r = requests.get(url, auth=self._auth, headers=self._headers)
+        url = self.base_url + CatalogueClient.CAT_URI_BASE
+        try:
+            r = requests.get(url, auth=self._auth, headers=self._headers)
+        except requests.exceptions.ConnectionError:
+            log.warning("Connection Error while contacting '{}'. Error message: '{}'".format(url, sys.exc_info()))
+            return False
+        except:
+            log.warning("Unexpected Error connecting to '{}'. Error message: '{}'".format(url, sys.exc_info()[0]))
+            raise
+
         return r.status_code == requests.codes.ok
 
     def get_list_all_ns(self):
@@ -67,10 +74,15 @@ class CatalogueClient(object):
         :param vnf_id:
         :return:
         """
+
         r = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_ID, vnf_id)
+        if not r:
+            return
         if not isinstance(r, str) and len(r) > 1:
             log.error("Obtained multiple VNFs using the ID '{}'".format(vnf_id))
             return
+        print(r)
+
         return yaml.load(r)
 
     def get_vnf_by_name(self, vnf_name):
@@ -83,7 +95,7 @@ class CatalogueClient(object):
         return r
 
     def __get_cat_object__(self, cat_uri, obj_id):
-        url = self._base_url + cat_uri + "/" + obj_id
+        url = self.base_url + cat_uri + "/" + obj_id
         r = requests.get(url, auth=self._auth, headers=self._headers)
         assert r.status_code == requests.codes.ok, \
             "Failed to retrieve object '{}'. Error code={}".format(obj_id, r.status_code)

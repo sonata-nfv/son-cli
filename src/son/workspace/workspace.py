@@ -17,25 +17,29 @@ class Workspace:
     CONFIG_STR_CATALOGUE_VNF_DIR = "vnf_catalogue"
     CONFIG_STR_CONFIG_DIR = "configuration_dir"
     CONFIG_STR_PLATFORMS_DIR = "platforms_dir"
+    CONFIG_STR_PROJECTS_DIR = "projects_dir"
 
     __descriptor_name__ = "workspace.yml"
 
     def __init__(self, ws_root, ws_name='SONATA workspace', catalogues_dir='catalogues',
                  config_dir='configuration', platform_dir='platforms'):
-        logging.basicConfig(level=logging.DEBUG)
+        #logging.basicConfig(level=logging.INFO)
         self._log = logging.getLogger(__name__)
         self.ws_root = ws_root
-        self._ws_name = ws_name
-        self._dirs = dict()
-        self._dirs[self.CONFIG_STR_CATALOGUES_DIR] = catalogues_dir
-        self._dirs[self.CONFIG_STR_CONFIG_DIR] = config_dir
-        self._dirs[self.CONFIG_STR_PLATFORMS_DIR] = platform_dir
+        self.ws_name = ws_name
+        self.dirs = dict()
+        self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = catalogues_dir
+        self.dirs[self.CONFIG_STR_CONFIG_DIR] = config_dir
+        self.dirs[self.CONFIG_STR_PLATFORMS_DIR] = platform_dir
 
         # Sub-directories of catalogues
-        self._dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
-            os.path.join(self._dirs[self.CONFIG_STR_CATALOGUES_DIR], self.CONFIG_STR_CATALOGUE_NS_DIR)
-        self._dirs[self.CONFIG_STR_CATALOGUE_VNF_DIR] = \
-            os.path.join(self._dirs[self.CONFIG_STR_CATALOGUES_DIR], self.CONFIG_STR_CATALOGUE_VNF_DIR)
+        self.dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
+            os.path.join(self.dirs[self.CONFIG_STR_CATALOGUES_DIR], self.CONFIG_STR_CATALOGUE_NS_DIR)
+        self.dirs[self.CONFIG_STR_CATALOGUE_VNF_DIR] = \
+            os.path.join(self.dirs[self.CONFIG_STR_CATALOGUES_DIR], self.CONFIG_STR_CATALOGUE_VNF_DIR)
+
+        # Projects dir (optional)
+        self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
 
     def create_dirs(self):
         """
@@ -46,8 +50,8 @@ class Workspace:
 
         self._log.info('Creating workspace at %s', self.ws_root)
         os.makedirs(self.ws_root, exist_ok=False)
-        for d in self._dirs:
-            path = os.path.join(self.ws_root, self._dirs[d])
+        for d in self.dirs:
+            path = os.path.join(self.ws_root, self.dirs[d])
             os.makedirs(path, exist_ok=True)
 
     def create_catalog_sample(self):
@@ -55,7 +59,7 @@ class Workspace:
              'credentials': 'personal'
              }
 
-        ws_file_path = os.path.join(self.ws_root, self._dirs[self.CONFIG_STR_CATALOGUES_DIR], 'personal.yml')
+        ws_file_path = os.path.join(self.ws_root, self.dirs[self.CONFIG_STR_CATALOGUES_DIR], 'personal.yml')
         with open(ws_file_path, 'w') as ws_file:
             ws_file.write(yaml.dump(d, default_flow_style=False))
 
@@ -66,10 +70,10 @@ class Workspace:
         :return:
         """
         d = {'version': '0.01',  # should we version the workspace
-             self.CONFIG_STR_NAME: self._ws_name,
-             self.CONFIG_STR_CATALOGUES_DIR: self._dirs[self.CONFIG_STR_CATALOGUES_DIR],
-             self.CONFIG_STR_CONFIG_DIR: self._dirs[self.CONFIG_STR_CONFIG_DIR],
-             self.CONFIG_STR_PLATFORMS_DIR: self._dirs[self.CONFIG_STR_PLATFORMS_DIR]
+             self.CONFIG_STR_NAME: self.ws_name,
+             self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
+             self.CONFIG_STR_CONFIG_DIR: self.dirs[self.CONFIG_STR_CONFIG_DIR],
+             self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR]
              }
 
         ws_file_path = os.path.join(self.ws_root, Workspace.__descriptor_name__)
