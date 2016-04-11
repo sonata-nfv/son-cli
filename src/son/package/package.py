@@ -1,4 +1,5 @@
 import logging
+import coloredlogs
 import sys
 import urllib
 import zipfile
@@ -23,7 +24,6 @@ from son.package.catalogue_client import CatalogueClient
 
 log = logging.getLogger(__name__)
 
-
 class Packager(object):
 
     # ID of schema templates
@@ -45,7 +45,8 @@ class Packager(object):
 
     def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.DEBUG)
+        #logging.basicConfig(level=logging.DEBUG)
+        coloredlogs.install(level="DEBUG")
         self._log = logging.getLogger(__name__)
         self._version = version
         self._package_descriptor = None
@@ -244,7 +245,8 @@ class Packager(object):
 
     def generate_vnfds(self):
         """
-
+        Compile information for the function descriptors.
+        This function
         :return:
         """
         # Add VNFs from project source
@@ -257,18 +259,18 @@ class Packager(object):
             # Load function descriptors (VNFDs) from external sources
             log.info("Solving dependencies for VNF descriptors...")
             if not self.load_external_vnfds(unpack_vnfs):
-                log.error("Failed to package the following VNFs={}".format(unpack_vnfs))
                 log.error("Unable to solve all dependencies required by the service descriptor.")
                 return
 
             log.info("Packaging VNF descriptors from external source...")
-            pcs = self.generate_external_vnfds(os.path.join(
+            pcs_ext = self.generate_external_vnfds(os.path.join(
                 self._workspace.ws_root, self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR]), unpack_vnfs)
 
-            if not pcs or len(pcs) == 0:
+            if not pcs_ext or len(pcs_ext) == 0:
                 return
 
-            pcs += pcs
+            pcs += pcs_ext
+
         return pcs
 
     def load_external_vnfds(self, vnf_id_list):
@@ -281,7 +283,7 @@ class Packager(object):
         log.debug("Loading the following VNF descriptors: {}".format(vnf_id_list))
 
         # Iterate through the VNFs required by the NS
-        for vnf_id in self._ns_vnf_registry:
+        for vnf_id in vnf_id_list:
 
             log.debug("Probing workspace catalogue for VNF id='{}'...".format(vnf_id))
 
@@ -337,7 +339,6 @@ class Packager(object):
         pcs = []
         for vnf in vnf_folders:
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
-            print(not pc_entries)
             if not pc_entries:
                 continue
             for pce in pc_entries:
@@ -661,9 +662,6 @@ def load_remote_schema(template_url):
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
-
-
-
 
 
 def __validate_directory__(paths):

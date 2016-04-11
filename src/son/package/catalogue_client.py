@@ -97,8 +97,8 @@ class CatalogueClient(object):
     def __get_cat_object__(self, cat_uri, obj_id):
         url = self.base_url + cat_uri + "/" + obj_id
         r = requests.get(url, auth=self._auth, headers=self._headers)
-        assert r.status_code == requests.codes.ok, \
-            "Failed to retrieve object '{}'. Error code={}".format(obj_id, r.status_code)
+        if not r.status_code == requests.codes.ok:
+            return
         return r.text
 
 
