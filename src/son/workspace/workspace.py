@@ -1,4 +1,5 @@
 import logging
+import coloredlogs
 import sys
 import os
 import yaml
@@ -24,6 +25,7 @@ class Workspace:
     def __init__(self, ws_root, ws_name='SONATA workspace', catalogues_dir='catalogues',
                  config_dir='configuration', platform_dir='platforms'):
         #logging.basicConfig(level=logging.INFO)
+        coloredlogs.install(level="DEBUG")
         self._log = logging.getLogger(__name__)
         self.ws_root = ws_root
         self.ws_name = ws_name

@@ -1,5 +1,6 @@
 import os
 import logging
+import coloredlogs
 import yaml
 import shutil
 import pkg_resources
@@ -11,6 +12,7 @@ class Project:
     def __init__(self, prj_root, workspace):
         self.prj_root = prj_root
         self.log = logging.getLogger(__name__)
+        coloredlogs.install(level="DEBUG")
 
     def create_prj(self):
         self._create_dirs()
