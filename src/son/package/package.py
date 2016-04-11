@@ -271,6 +271,12 @@ class Packager(object):
 
             pcs += pcs_ext
 
+            # Verify again if all VNFs were correctly packaged (if not, validation failed)
+            unpack_vnfs = self.get_unpackaged_ns_vnfs()
+            if len(unpack_vnfs) > 0:
+                log.error("Unable to validate all VNFs required by the service descriptor.")
+                return
+
         return pcs
 
     def load_external_vnfds(self, vnf_id_list):
@@ -325,7 +331,7 @@ class Packager(object):
         pcs = []
         for vnf in vnf_folders:
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
-            if not pc_entries:
+            if not pc_entries or len(pc_entries) == 0:
                 continue
             for pce in pc_entries:
                 pcs.append(pce)
@@ -339,7 +345,7 @@ class Packager(object):
         pcs = []
         for vnf in vnf_folders:
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
-            if not pc_entries:
+            if not pc_entries or len(pc_entries) == 0:
                 continue
             for pce in pc_entries:
                 pcs.append(pce)
@@ -379,14 +385,12 @@ class Packager(object):
         try:
             validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
 
-        except ValidationError as e:
-            log.error("Failed to validate VNF descriptor file '{}'.".format(vnfd_path))
-            log.debug(e)
+        except ValidationError:
+            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
             return
 
-        except SchemaError as e:
-            log.error("Invalid VNF Schema.")
-            log.debug(e)
+        except SchemaError:
+            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
             return
 
         if vendor and vnfd['vendor'] != vendor:
@@ -498,8 +502,6 @@ class Packager(object):
                         pck.write(full_path, relative_path)
 
         log.info("Package generated successfully ({})".format(zip_name))
-
-
 
     def register_ns_vnf(self, vnf_id):
         """
