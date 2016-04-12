@@ -45,18 +45,17 @@ class Packager(object):
 
     def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        #logging.basicConfig(level=logging.DEBUG)
-        coloredlogs.install(level="DEBUG")
         self._log = logging.getLogger(__name__)
+        coloredlogs.install(level=workspace.log_level)
         self._version = version
         self._package_descriptor = None
         self._project_path = prj_path
         self._workspace = workspace
         self._catalogueClients = []
 
-
-        # Temporally hardcoded. This must go into a config file or argument
-        self._catalogueClients.append(CatalogueClient("http://10.10.201.48:4011"))
+        # Read catalogue servers from workspace config file and create clients
+        for cat_address in workspace.catalogue_servers:
+            self._catalogueClients.append(CatalogueClient(cat_address))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
@@ -541,6 +540,12 @@ class Packager(object):
         return u_vnfs
 
     def load_vnf_from_catalogue_server(self, vnf_id):
+
+        # Check if there are catalogue clients available
+        if not len(self._catalogueClients) > 0:
+            log.warning("No catalogue servers available! Please check the workspace configuration.")
+            return
+
         # For now, perform sequential requests.
         # In the future, this should be parallel -> the first to arrive, the first to be consumed!
         for client in self._catalogueClients:
