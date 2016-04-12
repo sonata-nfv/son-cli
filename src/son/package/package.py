@@ -54,6 +54,7 @@ class Packager(object):
         self._workspace = workspace
         self._catalogueClients = []
 
+
         # Temporally hardcoded. This must go into a config file or argument
         self._catalogueClients.append(CatalogueClient("http://10.10.201.48:4011"))
 

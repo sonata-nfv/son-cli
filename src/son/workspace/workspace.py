@@ -2,6 +2,7 @@ import logging
 import coloredlogs
 import sys
 import os
+from os.path import expanduser
 import yaml
 
 from son.workspace.project import Project
@@ -19,20 +20,29 @@ class Workspace:
     CONFIG_STR_CONFIG_DIR = "configuration_dir"
     CONFIG_STR_PLATFORMS_DIR = "platforms_dir"
     CONFIG_STR_PROJECTS_DIR = "projects_dir"
+    CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
+    CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
+    CONFIG_STR_CATALOGUE_SERVERS = "catalogue_servers"
+    CONFIG_STR_LOGGING_LEVEL = "logging_level"
 
     __descriptor_name__ = "workspace.yml"
 
-    def __init__(self, ws_root, ws_name='SONATA workspace', catalogues_dir='catalogues',
-                 config_dir='configuration', platform_dir='platforms'):
-        #logging.basicConfig(level=logging.INFO)
-        coloredlogs.install(level="DEBUG")
+    def __init__(self, ws_root, ws_name='SONATA workspace', log_level='INFO'):
         self._log = logging.getLogger(__name__)
+        self._log_level = log_level
+        coloredlogs.install(level=log_level)
         self.ws_root = ws_root
         self.ws_name = ws_name
         self.dirs = dict()
-        self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = catalogues_dir
-        self.dirs[self.CONFIG_STR_CONFIG_DIR] = config_dir
-        self.dirs[self.CONFIG_STR_PLATFORMS_DIR] = platform_dir
+        self.load_default_config()
+
+    def load_default_config(self):
+        self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
+        self.dirs[self.CONFIG_STR_CONFIG_DIR] = 'configuration'
+        self.dirs[self.CONFIG_STR_PLATFORMS_DIR] = 'platforms'
+        self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = os.path.join(expanduser("~"), ".son-schema")
+        self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
+            "https://raw.githubusercontent.com/sonata-nfv/son-schema/master/"
 
         # Sub-directories of catalogues
         self.dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
@@ -42,6 +52,10 @@ class Workspace:
 
         # Projects dir (optional)
         self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
+
+        # Catalogue servers
+        catalogue_servers = []
+
 
     def create_dirs(self):
         """
@@ -75,7 +89,9 @@ class Workspace:
              self.CONFIG_STR_NAME: self.ws_name,
              self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
              self.CONFIG_STR_CONFIG_DIR: self.dirs[self.CONFIG_STR_CONFIG_DIR],
-             self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR]
+             self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR],
+             self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
+             self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
              }
 
         ws_file_path = os.path.join(self.ws_root, Workspace.__descriptor_name__)
@@ -105,11 +121,10 @@ class Workspace:
         ws_file = open(ws_filename)
         ws_config = yaml.load(ws_file)
 
-        return Workspace(ws_root,
-                         ws_name=ws_config[Workspace.CONFIG_STR_NAME],
-                         catalogues_dir=ws_config[Workspace.CONFIG_STR_CATALOGUES_DIR],
-                         config_dir=ws_config[Workspace.CONFIG_STR_CONFIG_DIR],
-                         platform_dir=ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR])
+        ws = Workspace(ws_root, ws_name=ws_config[Workspace.CONFIG_STR_NAME], log_level='DEBUG')
+        ws._log_level = ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL]
+
+        return ws
 
 
 def main():
@@ -117,13 +132,25 @@ def main():
 
     parser = argparse.ArgumentParser(description="Generate new sonata workspaces and project layouts")
     parser.add_argument("--init", help="Create a new sonata workspace on the specified location", action="store_true")
-    parser.add_argument("--workspace", help="location of existing (or new) workspace", required=True)
+    parser.add_argument("--workspace", help="location of existing (or new) workspace", required=False)
     parser.add_argument("--project",
                         help="create a new project at the specified location", required=False)
 
     log.debug("parsing arguments")
     args = parser.parse_args()
-    ws_root = os.path.expanduser(args.workspace)
+
+    # If workspace arg is not given, create a workspace in user home
+    if args.workspace is None:
+        ws_root = os.path.join(expanduser("~"), ".son-workspace")
+
+        # If a workspace already exists at user home, throw an error and quit
+        if os.path.isdir(ws_root):
+            sys.stderr.write("ERROR: A workspace already exists in" + ws_root + ". Please specify a different location.\n")
+            exit(1)
+
+    else:
+        ws_root = expanduser(args.workspace)
+
     ws = Workspace(ws_root)
 
     if args.init:
