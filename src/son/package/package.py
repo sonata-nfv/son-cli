@@ -55,7 +55,7 @@ class Packager(object):
         self._catalogueClients = []
 
         # Temporally hardcoded. This must go into a config file or argument
-        self._catalogueClients.append(CatalogueClient("http://10.10.201.24:4011"))
+        self._catalogueClients.append(CatalogueClient("http://10.10.201.48:4011"))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
