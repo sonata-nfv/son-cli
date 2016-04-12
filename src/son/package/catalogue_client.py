@@ -100,23 +100,3 @@ class CatalogueClient(object):
         if not r.status_code == requests.codes.ok:
             return
         return r.text
-
-
-
-
-
-
-
-if __name__ == "__main__":  # Temporary! only for testing purposes
-    client = CatalogueClient("http://10.10.201.24:4011")
-
-    print(client.alive())
-    #print(len(client.get_vnf_by_name("firewall-vnf")))
-
-    # ns_list = client.get_vnf_by_name("firewall-vnf")
-    # for ns in ns_list:
-    #     print(ns)
-    ns = client.get_vnf("eu.sonata-nfv.firewall-vnf.0.2")
-
-    yaml.dump(ns, sys.stdout)
-
