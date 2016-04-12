@@ -31,7 +31,8 @@ class CatalogueClient(object):
         """
         url = self.base_url + CatalogueClient.CAT_URI_BASE
         try:
-            r = requests.get(url, auth=self._auth, headers=self._headers)
+            response = requests.get(url, auth=self._auth, headers=self._headers)
+
         except requests.exceptions.ConnectionError:
             log.warning("Connection Error while contacting '{}'. Error message: '{}'".format(url, sys.exc_info()))
             return False
@@ -39,11 +40,10 @@ class CatalogueClient(object):
             log.warning("Unexpected Error connecting to '{}'. Error message: '{}'".format(url, sys.exc_info()[0]))
             raise
 
-        return r.status_code == requests.codes.ok
+        return response.status_code == requests.codes.ok
 
     def get_list_all_ns(self):
-        r = self.__get_cat_object__(CatalogueClient.CAT_URI_NS, "")
-        return r
+        return self.__get_cat_object__(CatalogueClient.CAT_URI_NS, "")
 
     def get_ns(self, ns_id):
         """
@@ -51,11 +51,11 @@ class CatalogueClient(object):
         :param ns_id: ID of NS in the form 'vendor.ns_name.version'
         :return: yaml object containing NS
         """
-        r = self.__get_cat_object__(CatalogueClient.CAT_URI_NS_ID, ns_id)
-        if not isinstance(r, str) and len(r) > 1:
+        cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_NS_ID, ns_id)
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple network services using the ID '{}'".format(ns_id))
             return
-        return yaml.load(r)
+        return yaml.load(cat_obj)
 
     def get_ns_by_name(self, ns_name):
         """
@@ -63,8 +63,7 @@ class CatalogueClient(object):
         :param ns_name: name of network service
         :return: (str) list of network services
         """
-        r = self.__get_cat_object__(CatalogueClient.CAT_URI_NS_NAME, ns_name)
-        return r
+        return self.__get_cat_object__(CatalogueClient.CAT_URI_NS_NAME, ns_name)
 
     def get_vnf(self, vnf_id):
         """
@@ -75,15 +74,15 @@ class CatalogueClient(object):
         :return:
         """
 
-        r = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_ID, vnf_id)
-        if not r:
+        cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_ID, vnf_id)
+        if not cat_obj:
             return
-        if not isinstance(r, str) and len(r) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple VNFs using the ID '{}'".format(vnf_id))
             return
-        print(r)
+        print(cat_obj)
 
-        return yaml.load(r)
+        return yaml.load(cat_obj)
 
     def get_vnf_by_name(self, vnf_name):
         """
@@ -91,12 +90,11 @@ class CatalogueClient(object):
         :param vnf_name: name of network service
         :return: (str) list of VNFs
         """
-        r = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
-        return r
+        return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
 
     def __get_cat_object__(self, cat_uri, obj_id):
         url = self.base_url + cat_uri + "/" + obj_id
-        r = requests.get(url, auth=self._auth, headers=self._headers)
-        if not r.status_code == requests.codes.ok:
+        response = requests.get(url, auth=self._auth, headers=self._headers)
+        if not response.status_code == requests.codes.ok:
             return
-        return r.text
+        return response.text

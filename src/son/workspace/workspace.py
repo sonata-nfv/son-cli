@@ -27,7 +27,7 @@ class Workspace:
     CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
     CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
     CONFIG_STR_CATALOGUE_SERVERS = "catalogue_servers"
-    CONFIG_STR_LOGGING_LEVEL = "logging_level"
+    CONFIG_STR_LOGGING_LEVEL = "log_level"
 
     __descriptor_name__ = "workspace.yml"
 
