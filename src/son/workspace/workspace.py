@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 class Workspace:
 
     # Parameter strings for the configuration descriptor.
+
     CONFIG_STR_NAME = "name"
     CONFIG_STR_CATALOGUES_DIR = "catalogues_dir"
     CONFIG_STR_CATALOGUE_NS_DIR = "ns_catalogue"
@@ -29,12 +30,14 @@ class Workspace:
 
     def __init__(self, ws_root, ws_name='SONATA workspace', log_level='INFO'):
         self._log = logging.getLogger(__name__)
-        self._log_level = log_level
+        self.log_level = log_level
         coloredlogs.install(level=log_level)
         self.ws_root = ws_root
         self.ws_name = ws_name
         self.dirs = dict()
         self.load_default_config()
+        # Catalogue servers
+        self.catalogue_servers = []
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
@@ -52,10 +55,6 @@ class Workspace:
 
         # Projects dir (optional)
         self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
-
-        # Catalogue servers
-        catalogue_servers = []
-
 
     def create_dirs(self):
         """
@@ -91,7 +90,9 @@ class Workspace:
              self.CONFIG_STR_CONFIG_DIR: self.dirs[self.CONFIG_STR_CONFIG_DIR],
              self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR],
              self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
-             self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+             self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
+             self.CONFIG_STR_CATALOGUE_SERVERS: self.catalogue_servers,
+             self.CONFIG_STR_LOGGING_LEVEL: self.log_level
              }
 
         ws_file_path = os.path.join(self.ws_root, Workspace.__descriptor_name__)
@@ -122,7 +123,14 @@ class Workspace:
         ws_config = yaml.load(ws_file)
 
         ws = Workspace(ws_root, ws_name=ws_config[Workspace.CONFIG_STR_NAME], log_level='DEBUG')
-        ws._log_level = ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL]
+        ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CATALOGUES_DIR]
+        ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
+        ws.dirs[Workspace.CONFIG_STR_CONFIG_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
+        ws.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR] = ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR]
+        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
+        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        ws.catalogue_servers = ws_config[Workspace.CONFIG_STR_CATALOGUE_SERVERS]
+        ws.log_level = ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL]
 
         return ws
 
@@ -145,7 +153,8 @@ def main():
 
         # If a workspace already exists at user home, throw an error and quit
         if os.path.isdir(ws_root):
-            sys.stderr.write("ERROR: A workspace already exists in" + ws_root + ". Please specify a different location.\n")
+            print("A workspace already exists in {}. Please specify a different location.\n"
+                  .format(ws_root), file=sys.stderr)
             exit(1)
 
     else:
@@ -156,7 +165,8 @@ def main():
     if args.init:
         if ws.check_ws_exists():
             print("A workspace already exists at the specified location, exiting", file=sys.stderr)
-            return
+            exit(1)
+
         log.debug("Attempting to create a new workspace")
         cwd = os.getcwd()
         ws.create_dirs()
@@ -166,11 +176,21 @@ def main():
     else:
         if not ws.check_ws_exists():
             print("Could not find a SONATA workspace at the specified location", file=sys.stderr)
-            return
+            exit(1)
 
     if args.project is not None:
         log.debug("Attempting to create a new project")
+
+        # Verify that --workspace was given and its valid
+        if args.workspace is None:
+            print("The '--workspace' argument is required to create a project", file=sys.stderr)
+            exit(2)
+
+        # Obtain the workspace for this project
+        ws_root = expanduser(args.workspace)
+        ws = Workspace.__create_from_descriptor__(ws_root)
+
         prj_root = os.path.expanduser(args.project)
-        proj = Project(prj_root, ws_root)
+        proj = Project(prj_root, ws)
         proj.create_prj()
         log.debug("Project created.")

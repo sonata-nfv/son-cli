@@ -12,7 +12,7 @@ class Project:
     def __init__(self, prj_root, workspace):
         self.prj_root = prj_root
         self.log = logging.getLogger(__name__)
-        coloredlogs.install(level="DEBUG")
+        coloredlogs.install(level=workspace.log_level)
 
     def create_prj(self):
         self._create_dirs()
@@ -23,7 +23,6 @@ class Project:
         Creates the directory tree of the project
         :return:
         """
-
         directories = {'sources', 'dependencies', 'deployment'}
         src_subdirs = {'ssm', 'pattern', 'vnf', 'nsd'}
 
