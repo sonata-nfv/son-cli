@@ -1,4 +1,5 @@
 import logging
+import coloredlogs
 import sys
 import urllib
 import zipfile
@@ -19,9 +20,9 @@ from son.package.decorators import performance
 from son.package.md5 import generate_hash
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
+from son.package.catalogue_client import CatalogueClient
 
 log = logging.getLogger(__name__)
-
 
 class Packager(object):
 
@@ -42,15 +43,19 @@ class Packager(object):
                SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'vnfd-schema.yml'),
                                             'remote': SCHEMAS_MASTER_REMOTE + 'function-descriptor/vnfd-schema.yml'}}
 
-    def __init__(self, prj_path, dst_path=None, generate_pd=True, version="0.1"):
+    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        logging.basicConfig(level=logging.DEBUG)
+        #logging.basicConfig(level=logging.DEBUG)
+        coloredlogs.install(level="DEBUG")
         self._log = logging.getLogger(__name__)
-
         self._version = version
         self._package_descriptor = None
-
         self._project_path = prj_path
+        self._workspace = workspace
+        self._catalogueClients = []
+
+        # Temporally hardcoded. This must go into a config file or argument
+        self._catalogueClients.append(CatalogueClient("http://10.10.201.48:4011"))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
@@ -67,7 +72,8 @@ class Packager(object):
 
                 if len(os.listdir(dst_path)) > 0: # dir not empty?
                     log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
-                    sys.stderr.write("ERROR:Destination directory '{}' is not empty\n".format(os.path.abspath(dst_path)))
+                    sys.stderr.write("ERROR: Destination directory '{}' is not empty\n"
+                                     .format(os.path.abspath(dst_path)))
                     exit(1)
 
                 self._dst_path = os.path.abspath(dst_path)
@@ -101,23 +107,19 @@ class Packager(object):
 
         package_content_section = []
 
-        # Add service descriptor
+        # Load and add service descriptor
         pcs = self.generate_nsd()
-        if pcs is None:
+        if not pcs or len(pcs) == 0:
+            log.error("Failed to package service descriptor")
             return
         package_content_section += pcs
 
-        # Add function descriptors
+        # Load and add the function descriptors
         pcs = self.generate_vnfds()
-        if pcs is None:
+        if not pcs or len(pcs) == 0:
+            log.error("Failed to package function descriptors")
             return
         package_content_section += pcs
-
-        # Verify that all VNFs from NSD were packaged
-        unpack_vnfs = self.get_unpackaged_sd_vnfs()
-        if len(unpack_vnfs) > 0:
-            log.error("Failed to package the following VNFs={}".format(unpack_vnfs))
-            return
 
         # Set the package descriptor
         self._package_descriptor = gds
@@ -176,7 +178,6 @@ class Packager(object):
         :param vendor:
         :return:
         """
-
         base_path = os.path.join(self._project_path, 'sources', 'nsd')
         if not os.path.isdir(base_path):
             log.error("Missing NS directory '{}'".format(base_path))
@@ -218,11 +219,11 @@ class Packager(object):
                 "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
                     vendor, nsd['vendor']))
 
-        # Cycle through VNFs and register their names for later verification
+        # Cycle through VNFs and register their names later dependency check
         if 'network_functions' in nsd:
             vnf_list = [vnf for vnf in nsd['network_functions'] if vnf['vnf_name']]
             for vnf in vnf_list:
-                self.register_sd_vnf(vnf['vnf_name'])
+                self.register_ns_vnf(get_vnf_id_full(vnf['vnf_vendor'], vnf['vnf_name'], vnf['vnf_version']))
 
         # Create SD location
         nsd = os.path.join(base_path, nsd_filename)
@@ -242,20 +243,113 @@ class Packager(object):
 
         return pce
 
+    def generate_vnfds(self):
+        """
+        Compile information for the function descriptors.
+        This function
+        :return:
+        """
+        # Add VNFs from project source
+        log.info("Packaging VNF descriptors from project source...")
+        pcs = self.generate_project_source_vnfds(os.path.join(self._project_path, 'sources', 'vnf'))
+
+        # Verify that all VNFs from NSD were packaged
+        unpack_vnfs = self.get_unpackaged_ns_vnfs()
+        if len(unpack_vnfs) > 0:
+            # Load function descriptors (VNFDs) from external sources
+            log.info("Solving dependencies for VNF descriptors...")
+            if not self.load_external_vnfds(unpack_vnfs):
+                log.error("Unable to solve all dependencies required by the service descriptor.")
+                return
+
+            log.info("Packaging VNF descriptors from external source...")
+            pcs_ext = self.generate_external_vnfds(os.path.join(
+                self._workspace.ws_root, self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR]), unpack_vnfs)
+
+            if not pcs_ext or len(pcs_ext) == 0:
+                return
+
+            pcs += pcs_ext
+
+            # Verify again if all VNFs were correctly packaged (if not, validation failed)
+            unpack_vnfs = self.get_unpackaged_ns_vnfs()
+            if len(unpack_vnfs) > 0:
+                log.error("Unable to validate all VNFs required by the service descriptor.")
+                return
+
+        return pcs
+
+    def load_external_vnfds(self, vnf_id_list):
+        """
+        This method is responsible to load all VNFs, required by the NS, that are not part of project source.
+        VNFs can be loaded from the Workspace catalog or/and from the catalogue servers.
+        :param vnf_id_list: List of VNF ID to solve
+        :return: True for success, False for failure
+        """
+        log.debug("Loading the following VNF descriptors: {}".format(vnf_id_list))
+
+        # Iterate through the VNFs required by the NS
+        for vnf_id in vnf_id_list:
+
+            log.debug("Probing workspace catalogue for VNF id='{}'...".format(vnf_id))
+
+            # >> First, check if this VNF is in the workspace catalogue
+            catalogue_path = os.path.join(self._workspace.ws_root,
+                                          self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
+                                          vnf_id)
+            if os.path.isdir(catalogue_path):
+                # Exists! Save catalogue path of this vnf for later packaging
+                log.debug("Found VNF id='{}' in workspace catalogue '{}'".format(vnf_id, catalogue_path))
+                continue
+
+            log.debug("VNF id='{}' is not present in workspace catalogue. "
+                      "Contacting catalogue servers...".format(vnf_id))
+            # >> If not in WS catalogue, get the VNF from the catalogue servers!
+            vnfd = self.load_vnf_from_catalogue_server(vnf_id)
+
+            if not vnfd:
+                log.warning("VNF id='{}' is not present in catalogue servers.".format(vnf_id))
+                return False
+
+            # Create dir to hold the retrieved VNF in workspace catalogue
+            log.debug("VNF id='{}' retrieved from the catalogue servers. Loading to workspace cache.".format(vnf_id))
+            os.mkdir(catalogue_path)
+            vnfd_f = open(os.path.join(catalogue_path, vnfd['name'] + ".yml"), 'w')
+            yaml.dump(vnfd, vnfd_f, default_flow_style=False)
+
+        return True
+
     @performance
-    def generate_vnfds(self, vendor=None):
+    def generate_project_source_vnfds(self, base_path, vendor=None):
         """
         Compile information for the list of VNFs
         This function iterates over the different VNF entries
         :param vendor: (TBD)
         :return:
         """
-        base_path = os.path.join(self._project_path, 'sources', 'vnf')
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
         pcs = []
         for vnf in vnf_folders:
-            for pce in self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf):
+            pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
+            if not pc_entries or len(pc_entries) == 0:
+                continue
+            for pce in pc_entries:
                 pcs.append(pce)
+
+        return pcs
+
+    @performance
+    def generate_external_vnfds(self, base_path, vnf_ids, vendor=None):
+        vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)) and
+                             file in vnf_ids, os.listdir(base_path))
+        pcs = []
+        for vnf in vnf_folders:
+            pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
+            if not pc_entries or len(pc_entries) == 0:
+                continue
+            for pce in pc_entries:
+                pcs.append(pce)
+
         return pcs
 
     def generate_vnfd_entry(self, base_path, vnf, vendor=None):
@@ -266,7 +360,7 @@ class Packager(object):
         :param base_path: The path where the VNF file is located
         :param vnf: The VNF reference path
         :param vendor: (TBD)
-        :return:
+        :return: The package content entries. One VNFD can have multiple entries (e.g. VDU images)
         """
         # Locate VNFD
         vnfd_list = [file for file in os.listdir(base_path)
@@ -278,36 +372,36 @@ class Packager(object):
             log.error("Missing VNF descriptor file")
             return
         elif check > 1:
-            log.error("Only one yaml file per VNF source folder allowed")
+            log.warning("Multiple YAML descriptors found in '{}'. Ignoring path.".format(os.path.basename(base_path)))
             return
         else:
             with open(os.path.join(base_path, vnfd_list[0]), 'r') as _file:
                 vnfd = yaml.load(_file)
 
+        vnfd_path = os.path.join(os.path.basename(base_path), vnfd_list[0])
+
         # Validate VNFD
-        log.debug("Validating Function Descriptor VNFD='{}'".format(vnfd_list[0]))
+        log.debug("Validating VNF descriptor file='{}'".format(vnfd_path))
         try:
             validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
 
-        except ValidationError as e:
-            log.error("Failed to validate Function Descriptor VNFD='{}'.".format(vnfd_list[0]))
-            log.debug(e)
+        except ValidationError:
+            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
             return
-        except SchemaError as e:
-            log.error("Invalid Function Descriptor Schema.")
-            log.debug(e)
+
+        except SchemaError:
+            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
             return
 
         if vendor and vnfd['vendor'] != vendor:
-            self._log.warning(
-                "You are adding a VNF with different group, Project vendor={} and VNF vendor={}".format(
-                    vendor, vnfd['vendor']))
+            self._log.warning("You are adding a VNF with different group, Project vendor={} and VNF vendor={}"
+                              .format(vendor, vnfd['vendor']))
 
-        # Check if this VNF exists in the SD VNF registry. If does not, cancel its packaging
-        if not self.check_in_sd_vnf(vnfd['name']):
-            log.warning('VNF with name={} is not referenced in the service descriptor. '
-                        'It will be excluded from the package'.format(vnfd['name']))
-            return []
+        # Check if this VNF exists in the ns_vnf registry. If does not, cancel its packaging
+        if not self.check_in_ns_vnf(get_vnf_id(vnfd)):
+            log.warning("VNF id='{}' file='{}' is not referenced in the service descriptor."
+                        "It will be excluded from the package".format(get_vnf_id(vnfd), vnfd_path))
+            return
 
         pce = []
         # Create fd location
@@ -394,11 +488,11 @@ class Packager(object):
 
         # Validate all needed information
         if not self._package_descriptor:
-            self._log.error("Missing package descriptor")
+            self._log.error("Missing package descriptor. Failed to generate package.")
             return
 
         # Generate package file
-        zip_name = os.path.join(self._dst_path, name + '.zip')
+        zip_name = os.path.join(self._dst_path, name + '.son')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
             for base, dirs, files in os.walk(self._dst_path):
                 for file_name in files:
@@ -407,31 +501,33 @@ class Packager(object):
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
 
-    def register_sd_vnf(self, vnf_name):
+        log.info("Package generated successfully ({})".format(zip_name))
+
+    def register_ns_vnf(self, vnf_id):
         """
-        Add a vnf to the SD VNF registry.
-        :param vnf_name:
+        Add a vnf to the NS VNF registry.
+        :param vnf_id:
         :return: True for successful registry. False if the VNF already exists in the registry.
         """
-        if vnf_name in self._ns_vnf_registry:
+        if vnf_id in self._ns_vnf_registry:
             return False
 
-        self._ns_vnf_registry[vnf_name] = False
+        self._ns_vnf_registry[vnf_id] = False
         return True
 
-    def check_in_sd_vnf(self, vnf_name):
+    def check_in_ns_vnf(self, vnf_id):
         """
         Marks a VNF as packaged in the SD VNF registry
-        :param vnf_name:
+        :param vnf_id:
         :return:
         """
-        if vnf_name not in self._ns_vnf_registry:
+        if vnf_id not in self._ns_vnf_registry:
             return False
 
-        self._ns_vnf_registry[vnf_name] = True
+        self._ns_vnf_registry[vnf_id] = True
         return True
 
-    def get_unpackaged_sd_vnfs(self):
+    def get_unpackaged_ns_vnfs(self):
         """
         Obtain the a list of VNFs that were referenced by NS but weren't packaged
         :return:
@@ -442,6 +538,25 @@ class Packager(object):
                 u_vnfs.append(vnf)
 
         return u_vnfs
+
+    def load_vnf_from_catalogue_server(self, vnf_id):
+        # For now, perform sequential requests.
+        # In the future, this should be parallel -> the first to arrive, the first to be consumed!
+        for client in self._catalogueClients:
+
+            log.debug("Contacting catalogue server '{}'...".format(client.base_url))
+            # Check if catalogue server is alive!
+            if not client.alive():
+                log.warning("Catalogue server '{}' is not available.".format(client.base_url))
+                continue
+
+            vnfd = client.get_vnf(vnf_id)
+            if not vnfd:
+                continue
+            return vnfd
+
+        return
+
 
     def load_schema(self, template, reload=False):
         """
@@ -488,6 +603,14 @@ class Packager(object):
             log.warning("Schema file '{}' not found.".format(schema_addr))
 
         log.error("Failed to load schema '{}'".format(template))
+
+
+def get_vnf_id(vnfd):
+    return get_vnf_id_full(vnfd['vendor'], vnfd['name'], vnfd['version'])
+
+
+def get_vnf_id_full(vnf_vendor, vnf_name, vnf_version):
+    return vnf_vendor + '.' + vnf_name + '.' + vnf_version
 
 
 def write_local_schema(filename, schema):
@@ -579,7 +702,10 @@ def main():
     if not __validate_directory__(paths=path_ids):
         return
 
+    # Obtain Workspace object
+    workspace = Workspace.__create_from_descriptor__(ws)
+
     name = Path(prj).name if not args.name else args.name
 
-    pck = Packager(prj, dst_path=args.destination)
+    pck = Packager(prj, workspace, dst_path=args.destination)
     pck.generate_package(name)

@@ -4,6 +4,7 @@ import pkg_resources
 import os
 from urllib.error import HTTPError
 from son.package.package import Packager, load_local_schema, load_remote_schema
+from son.workspace.workspace import Workspace
 from unittest.mock import patch
 
 
@@ -21,7 +22,8 @@ class IntPDTester(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(IntPDTester, self).__init__(*args, **kwargs)
-        self.pck = Packager(prj_path='/', generate_pd=False)
+        ws = Workspace("")
+        self.pck = Packager(workspace=ws, prj_path='/', generate_pd=False)
 
     def test_correct_gds(self):
         """ Test the correct general description section """
