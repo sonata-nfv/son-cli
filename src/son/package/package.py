@@ -219,7 +219,7 @@ class Packager(object):
             return
 
         if vendor and nsd['vendor'] != vendor:
-            self._log.warning(
+            log.warning(
                 "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
                     vendor, nsd['vendor']))
 
@@ -398,7 +398,7 @@ class Packager(object):
             return
 
         if vendor and vnfd['vendor'] != vendor:
-            self._log.warning("You are adding a VNF with different group, Project vendor={} and VNF vendor={}"
+            log.warning("You are adding a VNF with different group, Project vendor={} and VNF vendor={}"
                               .format(vendor, vnfd['vendor']))
 
         # Check if this VNF exists in the ns_vnf registry. If does not, cancel its packaging
@@ -492,7 +492,7 @@ class Packager(object):
 
         # Validate all needed information
         if not self._package_descriptor:
-            self._log.error("Missing package descriptor. Failed to generate package.")
+            log.error("Missing package descriptor. Failed to generate package.")
             return
 
         # Generate package file

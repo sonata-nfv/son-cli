@@ -64,7 +64,7 @@ class Workspace:
         :return:
         """
 
-        self._log.info('Creating workspace at %s', self.ws_root)
+        log.info('Creating workspace at %s', self.ws_root)
         os.makedirs(self.ws_root, exist_ok=False)
         for d in self.dirs:
             path = os.path.join(self.ws_root, self.dirs[d])
