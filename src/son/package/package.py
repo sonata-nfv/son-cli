@@ -376,8 +376,8 @@ class Packager(object):
         # Validate number of Yaml files
         check = len(vnfd_list)
         if check == 0:
-            log.warning("Missing VNF descriptor file in path '{}'. Only accepting descriptors with extension '{}'"
-                        .format(base_path, self._workspace.descriptor_extension))
+            log.warning("Missing VNF descriptor file in path '{}'. A descriptor with '{}' "
+                        "extension should be in this path".format(base_path, self._workspace.descriptor_extension))
             return
         elif check > 1:
             log.warning("Multiple YAML descriptors found in '{}'. Ignoring path.".format(os.path.basename(base_path)))
@@ -464,9 +464,8 @@ class Packager(object):
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
 
                 else:  # Invalid vm_image
-                    log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
+                    log.warning("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
                         bd, vnfd_list[0], vdu['id']))
-                    return
 
         return pce
 
