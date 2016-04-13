@@ -75,5 +75,6 @@ class IntLoadSchemaTests(unittest.TestCase):
 
     def test_load_valid_remote_schema(self):
         """ Test if the load_remote_schema is retrieving and loading the templates correctly """
-        schema = load_remote_schema(Packager.schemas[Packager.SCHEMA_PACKAGE_DESCRIPTOR]['remote'])
+        schema = load_remote_schema(
+            "https://raw.githubusercontent.com/sonata-nfv/son-schema/master/package-descriptor/pd-schema.yml")
         self.assertIsInstance(schema, dict)

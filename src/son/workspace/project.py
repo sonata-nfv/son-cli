@@ -1,3 +1,4 @@
+import sys
 import os
 import logging
 import coloredlogs
@@ -5,16 +6,19 @@ import yaml
 import shutil
 import pkg_resources
 
+log = logging.getLogger(__name__)
+
 class Project:
 
     __descriptor_name__ = 'project.yml'
 
     def __init__(self, prj_root, workspace):
-        self.prj_root = prj_root
-        self.log = logging.getLogger(__name__)
-        coloredlogs.install(level="DEBUG")
+        self._prj_root = prj_root
+        coloredlogs.install(level=workspace.log_level)
 
     def create_prj(self):
+        log.info('Creating project at {}'.format(self._prj_root))
+
         self._create_dirs()
         self._create_prj_stub()
 
@@ -23,16 +27,20 @@ class Project:
         Creates the directory tree of the project
         :return:
         """
-
         directories = {'sources', 'dependencies', 'deployment'}
         src_subdirs = {'ssm', 'pattern', 'vnf', 'nsd'}
 
-        os.makedirs(self.prj_root, exist_ok=False)
+        # Check if dir exists
+        if os.path.isdir(self._prj_root):
+            print("Unable to create project at '{}'. Directory already exists.".format(self._prj_root), file=sys.stderr)
+            exit(1)
+
+        os.makedirs(self._prj_root, exist_ok=False)
         for d in directories:
-            path = os.path.join(self.prj_root, d)
+            path = os.path.join(self._prj_root, d)
             os.makedirs(path, exist_ok=True)
 
-        src_path = os.path.join(self.prj_root, 'sources')
+        src_path = os.path.join(self._prj_root, 'sources')
         for d in src_subdirs:
             if d == 'nsd':
                 path = os.path.join(src_path, d)
@@ -50,7 +58,7 @@ class Project:
         :param name:The VNF name
         """
         vnf_subdirs = {'fsm'}
-        vnf_path = os.path.join(self.prj_root, 'sources', 'vnf', name)
+        vnf_path = os.path.join(self._prj_root, 'sources', 'vnf', name)
         self._create_sample('vnf', vnf_path)
         for d in vnf_subdirs:
             path = os.path.join(vnf_path, d)
@@ -61,7 +69,7 @@ class Project:
         Function to create a new NSD inside project source.
         :param name:The NSD name
         """
-        nsd_path = os.path.join(self.prj_root, 'sources', 'nsd')
+        nsd_path = os.path.join(self._prj_root, 'sources', 'nsd')
         self._create_sample('nsd', nsd_path)
 
     def _create_prj_stub(self):
@@ -79,7 +87,7 @@ class Project:
             'publish_to': ['personal']
         }
 
-        prj_path = os.path.join(self.prj_root, Project.__descriptor_name__)
+        prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
@@ -93,7 +101,7 @@ class Project:
         }
         func = switcher.get(prj_type)
         if func is None:
-            self.log.error("Could not create sample for " + prj_type + ", unknown project type")
+            log.error("Could not create sample for " + prj_type + ", unknown project type")
             return
         func(path)
 

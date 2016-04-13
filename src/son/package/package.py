@@ -31,31 +31,23 @@ class Packager(object):
     SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
     SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
 
-    # Master local and remote location for schemas
-    SCHEMAS_MASTER_LOCAL = os.path.join(os.path.expanduser("~"), ".son-schema")
-    SCHEMAS_MASTER_REMOTE = 'https://raw.githubusercontent.com/sonata-nfv/son-schema/master/'
-
-    # References to remote schemas
-    schemas = {SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'pd-schema.yml'),
-                                           'remote': SCHEMAS_MASTER_REMOTE + 'package-descriptor/pd-schema.yml'},
-               SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'nsd-schema.yml'),
-                                           'remote': SCHEMAS_MASTER_REMOTE + 'service-descriptor/nsd-schema.yml'},
-               SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(SCHEMAS_MASTER_LOCAL, 'vnfd-schema.yml'),
-                                            'remote': SCHEMAS_MASTER_REMOTE + 'function-descriptor/vnfd-schema.yml'}}
-
     def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        #logging.basicConfig(level=logging.DEBUG)
-        coloredlogs.install(level="DEBUG")
-        self._log = logging.getLogger(__name__)
+        coloredlogs.install(level=workspace.log_level)
         self._version = version
         self._package_descriptor = None
         self._project_path = prj_path
         self._workspace = workspace
         self._catalogueClients = []
+        self.schemas_local_master = workspace.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
+        self.schemas_remote_master = workspace.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
 
-        # Temporally hardcoded. This must go into a config file or argument
-        self._catalogueClients.append(CatalogueClient("http://10.10.201.48:4011"))
+        self.schemas = {}
+        self.config_schema_locations()
+
+        # Read catalogue servers from workspace config file and create clients
+        for cat_address in workspace.catalogue_servers:
+            self._catalogueClients.append(CatalogueClient(cat_address))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
@@ -85,6 +77,18 @@ class Packager(object):
                 shutil.rmtree(self._dst_path)
                 os.makedirs(self._dst_path, exist_ok=False)
             self.package_descriptor = self._project_path
+
+    def config_schema_locations(self):
+        self.schemas = \
+            {self.SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'pd-schema.yml'),
+                                              'remote': self.schemas_remote_master +
+                                              'package-descriptor/pd-schema.yml'},
+             self.SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'nsd-schema.yml'),
+                                              'remote': self.schemas_remote_master +
+                                              'service-descriptor/nsd-schema.yml'},
+             self.SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'vnfd-schema.yml'),
+                                               'remote': self.schemas_remote_master +
+                                               'function-descriptor/vnfd-schema.yml'}}
 
     @property
     def package_descriptor(self):
@@ -540,6 +544,12 @@ class Packager(object):
         return u_vnfs
 
     def load_vnf_from_catalogue_server(self, vnf_id):
+
+        # Check if there are catalogue clients available
+        if not len(self._catalogueClients) > 0:
+            log.warning("No catalogue servers available! Please check the workspace configuration.")
+            return
+
         # For now, perform sequential requests.
         # In the future, this should be parallel -> the first to arrive, the first to be consumed!
         for client in self._catalogueClients:
@@ -573,7 +583,7 @@ class Packager(object):
             return self._schemas_library[template]                           # return previously loaded schema
 
         # Load Online Schema
-        schema_addr = Packager.schemas[template]['remote']
+        schema_addr = self.schemas[template]['remote']
         if validators.url(schema_addr):
             try:
                 log.debug("Loading schema '{}' from remote location '{}'".format(template, schema_addr))
@@ -581,7 +591,8 @@ class Packager(object):
                 self._schemas_library[template] = load_remote_schema(schema_addr)
 
                 # Update the corresponding local schema file
-                write_local_schema(Packager.schemas[template]['local'], self._schemas_library[template])
+                write_local_schema(self.schemas_local_master, self.schemas[template]['local'],
+                                   self._schemas_library[template])
 
                 return self._schemas_library[template]
 
@@ -591,7 +602,7 @@ class Packager(object):
             log.warning("Invalid schema URL '{}'".format(schema_addr))
 
         # Load Offline Schema
-        schema_addr = Packager.schemas[template]['local']
+        schema_addr = self.schemas[template]['local']
         if os.path.isfile(schema_addr):
             try:
                 log.debug("Loading schema '{}' from local file '{}'".format(template, schema_addr))
@@ -613,17 +624,18 @@ def get_vnf_id_full(vnf_vendor, vnf_name, vnf_version):
     return vnf_vendor + '.' + vnf_name + '.' + vnf_version
 
 
-def write_local_schema(filename, schema):
+def write_local_schema(schemas_root, filename, schema):
     """
     Writes a schema to a local file.
+    :param schemas_root: The location of schema descriptor
     :param filename: The name of the schema file to be written.
     :param schema: The schema content as a dictionary.
     :return:
     """
     # Verify if local dir structure already exists! If not, create it.
-    if not os.path.isdir(Packager.SCHEMAS_MASTER_LOCAL):
-        log.debug("Schema directory '{}' not found. Creating it.".format(Packager.SCHEMAS_MASTER_LOCAL))
-        os.mkdir(Packager.SCHEMAS_MASTER_LOCAL)
+    if not os.path.isdir(schemas_root):
+        log.debug("Schema directory '{}' not found. Creating it.".format(schemas_root))
+        os.mkdir(schemas_root)
 
     if os.path.isfile(filename):
         log.debug("Replacing schema file '{}'".format(filename))
@@ -675,7 +687,7 @@ def __validate_directory__(paths):
     """
     for path, file in paths.items():
         if not os.path.isdir(path) or file and not os.path.isfile(os.path.join(path, file)):
-            print("{} must be a directory".format(path), file=sys.stderr)
+            print("'{}' is not a valid project directory".format(path), file=sys.stderr)
             return False
     return True
 
@@ -684,26 +696,33 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate new sonata package")
-    parser.add_argument("--workspace", help="Specify workspace to generate the package", required=True)
+    parser.add_argument("--workspace", help="Specify workspace to generate the package. If not specified "
+                        "will assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
+                        required=False)
     parser.add_argument("--project",
-                        help="create a new package based on the project at the specified location", required=False)
+                        help="create a new package based on the project at the specified location. If not specified "
+                        "will assume the current directory '{}'".format(os.getcwd()), required=False)
     parser.add_argument("-d", "--destination", help="create the package on the specified location", required=False)
     parser.add_argument("-n", "--name", help="create the package with the specific name", required=False)
 
-    log.debug("parsing arguments")
     args = parser.parse_args()
-    ws = args.workspace
+
+    if args.workspace:
+        ws_root = args.workspace
+    else:
+        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+
     prj = args.project if args.project else os.getcwd()
 
     # Validate given arguments
     path_ids = dict()
-    path_ids[ws] = Workspace.__descriptor_name__
+    path_ids[ws_root] = Workspace.__descriptor_name__
     path_ids[prj] = Project.__descriptor_name__
     if not __validate_directory__(paths=path_ids):
         return
 
     # Obtain Workspace object
-    workspace = Workspace.__create_from_descriptor__(ws)
+    workspace = Workspace.__create_from_descriptor__(ws_root)
 
     name = Path(prj).name if not args.name else args.name
 
