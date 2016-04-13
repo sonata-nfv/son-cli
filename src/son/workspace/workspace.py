@@ -25,6 +25,7 @@ class Workspace:
     CONFIG_STR_PROJECTS_DIR = "projects_dir"
     CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
     CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
+    CONFIG_STR_DESCRIPTOR_EXTENSION = "descriptor_extension"
     CONFIG_STR_CATALOGUE_SERVERS = "catalogue_servers"
     CONFIG_STR_LOGGING_LEVEL = "log_level"
 
@@ -36,6 +37,7 @@ class Workspace:
         self.ws_root = ws_root
         self.ws_name = ws_name
         self.dirs = dict()
+        self.descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
         self.catalogue_servers = []
@@ -56,6 +58,9 @@ class Workspace:
 
         # Projects dir (optional)
         self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
+
+        # Extension for YAML - schema/descriptor files
+        self.descriptor_extension = "yml"
 
     def create_dirs(self):
         """
@@ -93,7 +98,8 @@ class Workspace:
              self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
              self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
              self.CONFIG_STR_CATALOGUE_SERVERS: self.catalogue_servers,
-             self.CONFIG_STR_LOGGING_LEVEL: self.log_level
+             self.CONFIG_STR_LOGGING_LEVEL: self.log_level,
+             self.CONFIG_STR_DESCRIPTOR_EXTENSION: self.descriptor_extension
              }
 
         ws_file_path = os.path.join(self.ws_root, Workspace.__descriptor_name__)
@@ -132,7 +138,7 @@ class Workspace:
         ws.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
         ws.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
         ws.catalogue_servers = ws_config[Workspace.CONFIG_STR_CATALOGUE_SERVERS]
-
+        ws.descriptor_extension = ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
 
         return ws
 
