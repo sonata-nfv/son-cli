@@ -376,7 +376,8 @@ class Packager(object):
         # Validate number of Yaml files
         check = len(vnfd_list)
         if check == 0:
-            log.error("Missing VNF descriptor file")
+            log.warning("Missing VNF descriptor file in path '{}'. Only accepting descriptors with extension '{}'"
+                        .format(base_path, self._workspace.descriptor_extension))
             return
         elif check > 1:
             log.warning("Multiple YAML descriptors found in '{}'. Ignoring path.".format(os.path.basename(base_path)))
