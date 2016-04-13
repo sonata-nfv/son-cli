@@ -24,6 +24,7 @@ from son.package.catalogue_client import CatalogueClient
 
 log = logging.getLogger(__name__)
 
+
 class Packager(object):
 
     # ID of schema templates
@@ -189,7 +190,8 @@ class Packager(object):
 
         # Ensure that only one NS descriptor exists
         nsd_list = [file for file in os.listdir(base_path)
-                    if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
+                    if os.path.isfile(os.path.join(base_path, file)) and
+                    file.endswith(self._workspace.descriptor_extension)]
 
         check = len(nsd_list)
 
@@ -318,7 +320,7 @@ class Packager(object):
             # Create dir to hold the retrieved VNF in workspace catalogue
             log.debug("VNF id='{}' retrieved from the catalogue servers. Loading to workspace cache.".format(vnf_id))
             os.mkdir(catalogue_path)
-            vnfd_f = open(os.path.join(catalogue_path, vnfd['name'] + ".yml"), 'w')
+            vnfd_f = open(os.path.join(catalogue_path, vnfd['name'] + "." + self._workspace.descriptor_extension), 'w')
             yaml.dump(vnfd, vnfd_f, default_flow_style=False)
 
         return True
@@ -368,12 +370,14 @@ class Packager(object):
         """
         # Locate VNFD
         vnfd_list = [file for file in os.listdir(base_path)
-                     if os.path.isfile(os.path.join(base_path, file)) and file.endswith('yml') or file.endswith('yaml')]
+                     if os.path.isfile(os.path.join(base_path, file)) and
+                     file.endswith(self._workspace.descriptor_extension)]
 
         # Validate number of Yaml files
         check = len(vnfd_list)
         if check == 0:
-            log.error("Missing VNF descriptor file")
+            log.warning("Missing VNF descriptor file in path '{}'. A descriptor with '{}' "
+                        "extension should be in this path".format(base_path, self._workspace.descriptor_extension))
             return
         elif check > 1:
             log.warning("Multiple YAML descriptors found in '{}'. Ignoring path.".format(os.path.basename(base_path)))
@@ -460,9 +464,8 @@ class Packager(object):
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
 
                 else:  # Invalid vm_image
-                    log.error("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
+                    log.warning("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
                         bd, vnfd_list[0], vdu['id']))
-                    return
 
         return pce
 
