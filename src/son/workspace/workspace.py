@@ -10,7 +10,6 @@ from son.workspace.project import Project
 log = logging.getLogger(__name__)
 
 
-
 class Workspace:
 
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
@@ -32,7 +31,6 @@ class Workspace:
     __descriptor_name__ = "workspace.yml"
 
     def __init__(self, ws_root, ws_name='SONATA workspace', log_level='INFO'):
-        self._log = logging.getLogger(__name__)
         self.log_level = log_level
         coloredlogs.install(level=log_level)
         self.ws_root = ws_root

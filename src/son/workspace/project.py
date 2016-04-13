@@ -14,7 +14,6 @@ class Project:
 
     def __init__(self, prj_root, workspace):
         self._prj_root = prj_root
-        self._log = logging.getLogger(__name__)
         coloredlogs.install(level=workspace.log_level)
 
     def create_prj(self):

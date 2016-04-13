@@ -33,7 +33,6 @@ class Packager(object):
 
     def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
         # Log variable
-        self._log = logging.getLogger(__name__)
         coloredlogs.install(level=workspace.log_level)
         self._version = version
         self._package_descriptor = None
