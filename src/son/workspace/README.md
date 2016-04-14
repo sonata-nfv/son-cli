@@ -5,16 +5,23 @@ Create workspaces and projects
 This tool is responsible to create workspaces and generate project layouts.
 
 ```sh
-usage: son-workspace [-h] [--init] --workspace WORKSPACE [--project PROJECT]
+usage: son-workspace [-h] [--init] [--workspace WORKSPACE] [--project PROJECT]
+                     [--debug]
 
+Generate new sonata workspaces and project layouts
 
 optional arguments:
   -h, --help            show this help message and exit
-  --init                Create a new sonata workspace on the specified
-                        location
+  
+  --init                Create a new sonata workspace
+  
   --workspace WORKSPACE
-                        location of existing (or new) workspace
+                        location of existing (or new) workspace. If not
+                        specified will assume '$HOME/.son-workspace'
+                        
   --project PROJECT     create a new project at the specified location
+  
+  --debug               increases logging level to debug
 ```
 
 Example on how to create an workspace and a project:
