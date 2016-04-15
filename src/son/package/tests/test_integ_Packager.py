@@ -27,28 +27,22 @@ class IntPDTester(unittest.TestCase):
 
     def test_correct_gds(self):
         """ Test the correct general description section """
-        print("test_correct_gds")
         gsd = self.pck.package_gds(IntPDTester.__pfd__)
         self.assertNotEqual(gsd, False)
-        print("END test_correct_gds")
 
     def test_incomplete_gds(self):
         """ Test the returning message when the provided project has incomplete information."""
-        print("test_incomplete_gds")
         pfd = IntPDTester.__pfd__
         pfd.pop('name')
         gsd = self.pck.package_gds(pfd)
         self.assertEqual(gsd, False)
-        print("END test_incomplete_gds")
 
 
 class IntLoadSchemaTests(unittest.TestCase):
 
     def test_load_invalid_local_template(self):
         """Test if the load schema is loading only available templates"""
-        print("test_load_invalid_local_template")
         self.assertRaises(FileNotFoundError, load_local_schema, "test")
-        print("END test_load_invalid_local_template")
 
     def test_load_valid_local_schema(self):
         """ Test if the load schema is correctly loading the templates """
