@@ -101,8 +101,8 @@ class Workspace:
              self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
              self.CONFIG_STR_CONFIG_DIR: self.dirs[self.CONFIG_STR_CONFIG_DIR],
              self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR],
-             self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
-             self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
+             self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
+             self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
              self.CONFIG_STR_CATALOGUE_SERVERS: self.catalogue_servers,
              self.CONFIG_STR_LOGGING_LEVEL: self.log_level,
              self.CONFIG_STR_DESCRIPTOR_EXTENSION: self.descriptor_extension
@@ -144,9 +144,9 @@ class Workspace:
         ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_CONFIG_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR] = ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR]
-        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
+        ws.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
             expanduser(ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER])
-        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        ws.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
         ws.catalogue_servers = ws_config[Workspace.CONFIG_STR_CATALOGUE_SERVERS]
         ws.descriptor_extension = ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
 
@@ -154,9 +154,6 @@ class Workspace:
 
 
 def main():
-
-    print(str(sys.argv))
-
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate new sonata workspaces and project layouts")
