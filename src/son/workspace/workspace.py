@@ -132,7 +132,7 @@ class Workspace:
         ws_file = open(ws_filename)
         ws_config = yaml.load(ws_file)
 
-        if ws_config[Workspace.CONFIG_STR_VERSION] is not Workspace.WORKSPACE_VERSION:
+        if not ws_config[Workspace.CONFIG_STR_VERSION] == Workspace.WORKSPACE_VERSION:
             log.warning("Reading a workspace configuration with a different version")
 
         ws = Workspace(ws_root, ws_name=ws_config[Workspace.CONFIG_STR_NAME],
