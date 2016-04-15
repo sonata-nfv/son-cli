@@ -40,8 +40,8 @@ class Packager(object):
         self._project_path = prj_path
         self._workspace = workspace
         self._catalogueClients = []
-        self.schemas_local_master = workspace.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
-        self.schemas_remote_master = workspace.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        self.schemas_local_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
+        self.schemas_remote_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
 
         self.schemas = {}
         self.config_schema_locations()

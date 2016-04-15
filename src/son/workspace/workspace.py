@@ -40,6 +40,7 @@ class Workspace:
         self.ws_root = ws_root
         self.ws_name = ws_name
         self.dirs = dict()
+        self.schemas = dict()
         self.descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
@@ -49,9 +50,11 @@ class Workspace:
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
         self.dirs[self.CONFIG_STR_CONFIG_DIR] = 'configuration'
         self.dirs[self.CONFIG_STR_PLATFORMS_DIR] = 'platforms'
-        self.dirs[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = Workspace.DEFAULT_SCHEMAS_DIR
-        self.dirs[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
+
+        self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = Workspace.DEFAULT_SCHEMAS_DIR
+        self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
             "https://raw.githubusercontent.com/sonata-nfv/son-schema/master/"
+
 
         # Sub-directories of catalogues
         self.dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
@@ -151,6 +154,9 @@ class Workspace:
 
 
 def main():
+
+    print(str(sys.argv))
+
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate new sonata workspaces and project layouts")
