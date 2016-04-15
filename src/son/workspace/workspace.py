@@ -12,11 +12,14 @@ log = logging.getLogger(__name__)
 
 class Workspace:
 
+    WORKSPACE_VERSION = "0.01"
+
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
 
     # Parameter strings for the configuration descriptor.
     CONFIG_STR_NAME = "name"
+    CONFIG_STR_VERSION = "version"
     CONFIG_STR_CATALOGUES_DIR = "catalogues_dir"
     CONFIG_STR_CATALOGUE_NS_DIR = "ns_catalogue"
     CONFIG_STR_CATALOGUE_VNF_DIR = "vnf_catalogue"
@@ -90,7 +93,7 @@ class Workspace:
         This is triggered by workspace creation and configuration changes.
         :return:
         """
-        d = {'version': '0.01',  # should we version the workspace
+        d = {self.CONFIG_STR_VERSION: Workspace.WORKSPACE_VERSION,
              self.CONFIG_STR_NAME: self.ws_name,
              self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
              self.CONFIG_STR_CONFIG_DIR: self.dirs[self.CONFIG_STR_CONFIG_DIR],
@@ -129,13 +132,17 @@ class Workspace:
         ws_file = open(ws_filename)
         ws_config = yaml.load(ws_file)
 
+        if ws_config[Workspace.CONFIG_STR_VERSION] is not Workspace.WORKSPACE_VERSION:
+            log.warning("Reading a workspace configuration with a different version")
+
         ws = Workspace(ws_root, ws_name=ws_config[Workspace.CONFIG_STR_NAME],
                        log_level=ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL])
         ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CATALOGUES_DIR]
         ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_CONFIG_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR] = ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR]
-        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
+        ws.dirs[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
+            expanduser(ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER])
         ws.dirs[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
         ws.catalogue_servers = ws_config[Workspace.CONFIG_STR_CATALOGUE_SERVERS]
         ws.descriptor_extension = ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
