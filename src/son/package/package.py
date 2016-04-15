@@ -582,7 +582,7 @@ class Packager(object):
         """
         # Check if template is already loaded and present in _schemas_library
         if template in self._schemas_library and not reload:
-            log.debug("Loading previous stored schema={}".format(template))
+            log.debug("Loading previously stored schema for {}".format(template))
             return self._schemas_library[template]                           # return previously loaded schema
 
         # Load Online Schema
