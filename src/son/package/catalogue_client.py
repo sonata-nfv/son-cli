@@ -67,9 +67,7 @@ class CatalogueClient(object):
         return self.__get_cat_object__(CatalogueClient.CAT_URI_NS_NAME, ns_name)
 
     def get_list_all_vnf(self):
-        print(">>>>>>>>>>>>>>>>")
-        cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF, "")
-        print(cat_obj)
+        return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF, "")
 
     def get_vnf(self, vnf_id):
         """
@@ -98,7 +96,6 @@ class CatalogueClient(object):
 
     def __get_cat_object__(self, cat_uri, obj_id):
         url = self.base_url + cat_uri + obj_id
-        print(">>> Open {}".format(url))
         response = requests.get(url, auth=self._auth, headers=self._headers)
         if not response.status_code == requests.codes.ok:
             return
