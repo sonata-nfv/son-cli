@@ -21,7 +21,7 @@ setup(
         long_description=longdesc,
         package_dir={'': 'src'},
         packages=find_packages('src'),  # dependency resolution
-        namespace_packages=['son',],
+        namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
             'son': ['package/templates/*', 'workspace/samples/*']
