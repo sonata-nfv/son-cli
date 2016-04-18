@@ -11,7 +11,6 @@ log = logging.getLogger(__name__)
 
 
 class Workspace:
-
     WORKSPACE_VERSION = "0.01"
 
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
@@ -54,7 +53,6 @@ class Workspace:
         self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = Workspace.DEFAULT_SCHEMAS_DIR
         self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
             "https://raw.githubusercontent.com/sonata-nfv/son-schema/master/"
-
 
         # Sub-directories of catalogues
         self.dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
@@ -139,12 +137,12 @@ class Workspace:
         ws_config = yaml.load(ws_file)
 
         if not ws_config[Workspace.CONFIG_STR_VERSION] == Workspace.WORKSPACE_VERSION:
-            log.warning("Reading a workspace configuration with a different version")
+            log.warning("Reading a workspace configuration with a different version {}"
+                        .format(ws_config[Workspace.CONFIG_STR_VERSION]))
 
         ws = Workspace(ws_root, ws_name=ws_config[Workspace.CONFIG_STR_NAME],
                        log_level=ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL])
         ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CATALOGUES_DIR]
-        ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_CONFIG_DIR] = ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
         ws.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR] = ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR]
         ws.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
@@ -154,6 +152,19 @@ class Workspace:
         ws.descriptor_extension = ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
 
         return ws
+
+    def __eq__(self, other):
+        """
+        Function to assert if two workspaces have the same configuration.
+        It overrides the super method as is only the need to compare configurations
+        :param other:
+        :return:
+        """
+        return isinstance(other, type(self)) \
+            and self.ws_name == other.ws_name \
+            and self.ws_root == other.ws_root \
+            and self.dirs == other.dirs \
+            and self.schemas == other.schemas
 
 
 def main():

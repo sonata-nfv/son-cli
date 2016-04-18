@@ -511,7 +511,7 @@ class Packager(object):
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
 
-        log.info("Package generated successfully ({})".format(zip_name))
+        log.info("Package generated successfully ({})".format(os.path.abspath(zip_name)))
 
     def register_ns_vnf(self, vnf_id):
         """
