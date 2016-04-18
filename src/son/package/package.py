@@ -225,7 +225,7 @@ class Packager(object):
                 "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
                     vendor, nsd['vendor']))
 
-        # Cycle through VNFs and register their names later dependency check
+        # Cycle through VNFs and register their IDs for later dependency check
         if 'network_functions' in nsd:
             vnf_list = [vnf for vnf in nsd['network_functions'] if vnf['vnf_name']]
             for vnf in vnf_list:
@@ -235,6 +235,7 @@ class Packager(object):
         nsd = os.path.join(base_path, nsd_filename)
         sd_path = os.path.join(self._dst_path, "service_descriptor")
         os.makedirs(sd_path, exist_ok=True)
+
         # Copy NSD file
         sd = os.path.join(sd_path, nsd_filename)
         shutil.copyfile(nsd, sd)
@@ -570,7 +571,6 @@ class Packager(object):
 
         return
 
-
     def load_schema(self, template, reload=False):
         """
         Load schema from a local file or a remote URL.
@@ -690,7 +690,7 @@ def __validate_directory__(paths):
     """
     for path, file in paths.items():
         if not os.path.isdir(path) or file and not os.path.isfile(os.path.join(path, file)):
-            print("'{}' is not a valid project directory".format(path), file=sys.stderr)
+            print("'{}' is not a valid workspace or project directory".format(path), file=sys.stderr)
             return False
     return True
 
