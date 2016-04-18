@@ -1,11 +1,9 @@
 import os
-import io
 import unittest
 from son.workspace.workspace import Workspace
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 from unittest import mock
-import tempfile
-import yaml
+
 
 class CreateWorkspaceTests(unittest.TestCase):
 
@@ -127,5 +125,3 @@ class CreateWorkspaceTests(unittest.TestCase):
 
         # Assert returned workspace configuration is equal to the previous
         self.assertEqual(ws, new_ws)
-
-
