@@ -144,10 +144,12 @@ class Packager(object):
         except ValidationError as e:
             log.error("Failed to validate Package Descriptor. Aborting package creation.")
             log.debug(e)
+            self._package_descriptor = None
             return
         except SchemaError as e:
             log.error("Invalid Package Descriptor Schema.")
             log.debug(e)
+            self._package_descriptor = None
             return
 
     @performance
