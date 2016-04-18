@@ -110,5 +110,4 @@ class CreateWorkspaceTests(unittest.TestCase):
 
         # Assure that config file would be writen with the correct location
         configfile = os.path.join(ws.ws_root, Workspace.__descriptor_name__)
-        print(m_open.call_args)
         self.assertEqual(m_open.call_args, mock.call(configfile, 'w'))
