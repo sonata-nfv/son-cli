@@ -3,6 +3,7 @@ import coloredlogs
 import sys
 import urllib
 import zipfile
+import requests
 from contextlib import closing
 from pathlib import Path
 
@@ -438,10 +439,13 @@ class Packager(object):
                 vdu_image_path = vdu['vm_image']
 
                 if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
-                    # TODO vm_image may be a URL
-                    # What to do if vm_image is an URL. Download vm_image? Or about if the URL is private?
-                    # Ignore for now!
-                    return
+                    # Check if the image URL exists?
+                    try:
+                        requests.head(vdu_image_path)
+
+                    except requests.ConnectionError:
+                        log.warning("Failed to verify the existence of vm_image '{}'".format(vdu['vm_image']))
+                        continue
 
                 else:  # Check for URL local (e.g. file:///...)
                     ptokens = pathlib.Path(vdu_image_path).parts
