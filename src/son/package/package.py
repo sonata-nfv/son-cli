@@ -48,8 +48,9 @@ class Packager(object):
         self.config_schema_locations()
 
         # Read catalogue servers from workspace config file and create clients
-        for cat_address in workspace.catalogue_servers:
-            self._catalogueClients.append(CatalogueClient(cat_address))
+        for cat_id in workspace.catalogue_servers.keys():
+            print(workspace.catalogue_servers[cat_id])
+            self._catalogueClients.append(CatalogueClient(workspace.catalogue_servers[cat_id]))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}

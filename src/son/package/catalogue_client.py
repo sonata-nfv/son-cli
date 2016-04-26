@@ -33,6 +33,9 @@ class CatalogueClient(object):
         try:
             response = requests.get(url, auth=self._auth, headers=self._headers)
 
+        except requests.exceptions.InvalidURL:
+            log.warning("Invalid URL: '{}'. Please specify a valid address to a catalogue server".format(url))
+            return False
         except requests.exceptions.ConnectionError:
             log.warning("Connection Error while contacting '{}'. Error message: '{}'".format(url, sys.exc_info()))
             return False

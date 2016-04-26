@@ -43,7 +43,7 @@ class Workspace:
         self.descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
-        self.catalogue_servers = []
+        self._catalogue_servers = {'cat1': 'http://sample.url.1.com:port', 'cat2': 'http://sample.url.2.com:port'}
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
@@ -94,6 +94,7 @@ class Workspace:
         This is triggered by workspace creation and configuration changes.
         :return:
         """
+
         cfg_d = {self.CONFIG_STR_VERSION: Workspace.WORKSPACE_VERSION,
                  self.CONFIG_STR_NAME: self.ws_name,
                  self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
@@ -101,7 +102,7 @@ class Workspace:
                  self.CONFIG_STR_PLATFORMS_DIR: self.dirs[self.CONFIG_STR_PLATFORMS_DIR],
                  self.CONFIG_STR_SCHEMAS_LOCAL_MASTER: self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
                  self.CONFIG_STR_SCHEMAS_REMOTE_MASTER: self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
-                 self.CONFIG_STR_CATALOGUE_SERVERS: self.catalogue_servers,
+                 self.CONFIG_STR_CATALOGUE_SERVERS: self._catalogue_servers,
                  self.CONFIG_STR_LOGGING_LEVEL: self.log_level,
                  self.CONFIG_STR_DESCRIPTOR_EXTENSION: self.descriptor_extension
                  }
@@ -152,6 +153,14 @@ class Workspace:
         ws.descriptor_extension = ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
 
         return ws
+
+    @property
+    def catalogue_servers(self):
+        return self._catalogue_servers
+
+    @catalogue_servers.setter
+    def catalogue_servers(self, cat_servers):
+        self._catalogue_servers = cat_servers
 
     def __eq__(self, other):
         """
