@@ -2,6 +2,7 @@ import logging
 import requests
 import yaml
 import sys
+import validators
 from requests import exceptions
 
 log = logging.getLogger(__name__)
@@ -20,16 +21,21 @@ class CatalogueClient(object):
     CAT_URI_VNF_NAME = "/vnfs/name/"                    # GET VNF list by name
 
     def __init__(self, base_url, auth=('', '')):
-        self.base_url = base_url
+        # Assign parameters
+        self._base_url = base_url
         self._auth = auth   # Just basic auth for now
         self._headers = {'Content-Type': 'application/x-yaml'}
+
+        # Ensure parameters are valid
+        assert validators.url(self._base_url),\
+            "Failed to init catalogue client. Invalid URL: '{}'".format(self._base_url)
 
     def alive(self):
         """
         Checks if the catalogue API server is alive and responding to requests
         :return: True=server OK, False=server unavailable
         """
-        url = self.base_url + CatalogueClient.CAT_URI_BASE
+        url = self._base_url + CatalogueClient.CAT_URI_BASE
         try:
             response = requests.get(url, auth=self._auth, headers=self._headers)
 
@@ -89,6 +95,14 @@ class CatalogueClient(object):
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
         return yaml.load(cat_obj)
 
+    def post_vnf(self, vnf_data):
+        """
+        Publishes a VNF descriptor to the catalogue server
+        :param vnf_data:
+        :return:
+        """
+        return self.__post_cat_object__(CatalogueClient.CAT_URI_VNF, vnf_data)
+
     def get_vnf_by_name(self, vnf_name):
         """
         Obtains a list of VNFs matching the vnf_name
@@ -98,8 +112,27 @@ class CatalogueClient(object):
         return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
 
     def __get_cat_object__(self, cat_uri, obj_id):
-        url = self.base_url + cat_uri + obj_id
+        """
+        Generic GET function.
+        :param cat_uri:
+        :param obj_id:
+        :return:
+        """
+        url = self._base_url + cat_uri + obj_id
         response = requests.get(url, auth=self._auth, headers=self._headers)
+        if not response.status_code == requests.codes.ok:
+            return
+        return response.text
+
+    def __post_cat_object__(self, cat_uri, obj_data):
+        """
+        Generic POST function.
+        :param cat_uri:
+        :param obj_data:
+        :return:
+        """
+        url = self._base_url + cat_uri
+        response = requests.post(url, obj_data, auth=self._auth, headers=self._headers)
         if not response.status_code == requests.codes.ok:
             return
         return response.text
