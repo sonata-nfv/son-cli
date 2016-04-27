@@ -26,6 +26,10 @@ class CatalogueClient(object):
         self._auth = auth   # Just basic auth for now
         self._headers = {'Content-Type': 'application/x-yaml'}
 
+        # Ensure parameters are valid
+        assert validators.url(self._base_url),\
+            "Failed to init catalogue client. Invalid URL: '{}'".format(self._base_url)
+
     def alive(self):
         """
         Checks if the catalogue API server is alive and responding to requests
