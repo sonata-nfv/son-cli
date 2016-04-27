@@ -1,0 +1,170 @@
+import logging
+import coloredlogs
+import validators
+import os
+import yaml
+import jsonschema
+import urllib
+from urllib.request import URLError
+from jsonschema import SchemaError
+from jsonschema import ValidationError
+from son.workspace.workspace import Workspace
+
+log = logging.getLogger(__name__)
+
+
+class SchemaValidator(object):
+
+    # ID of schema templates
+    SCHEMA_PACKAGE_DESCRIPTOR = 'PD'
+    SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
+    SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
+
+    def __init__(self, workspace):
+        # Assign parameters
+        coloredlogs.install(level=workspace.log_level)
+        self._workspace = workspace
+        self._schemas_local_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
+        self._schemas_remote_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        self._schemas = {}
+
+        # Configure location for schemas
+        self.config_schema_locations()
+
+        # Keep a library of loaded schemas to avoid re-loading
+        self._schemas_library = dict()
+
+    def config_schema_locations(self):
+        self._schemas = \
+            {self.SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(self._schemas_local_master, 'pd-schema.yml'),
+                                              'remote': self._schemas_remote_master +
+                                              'package-descriptor/pd-schema.yml'},
+             self.SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(self._schemas_local_master, 'nsd-schema.yml'),
+                                              'remote': self._schemas_remote_master +
+                                              'service-descriptor/nsd-schema.yml'},
+             self.SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(self._schemas_local_master, 'vnfd-schema.yml'),
+                                               'remote': self._schemas_remote_master +
+                                               'function-descriptor/vnfd-schema.yml'}}
+
+    def load_schema(self, template, reload=False):
+        """
+        Load schema from a local file or a remote URL.
+        If the same schema was previously loaded and reload=False it will return the schema stored in cache. If
+        reload=True it will force the reload of the schema.
+        :param template: Name of local file or URL to remote schema
+        :param reload: Force the reload, even if it was previously loaded
+        :return: The loaded schema as a dictionary
+        """
+        # Check if template is already loaded and present in _schemas_library
+        if template in self._schemas_library and not reload:
+            log.debug("Loading previously stored schema for {}".format(template))
+            return self._schemas_library[template]                           # return previously loaded schema
+
+        # Load Online Schema
+        schema_addr = self._schemas[template]['remote']
+        if validators.url(schema_addr):
+            try:
+                log.debug("Loading schema '{}' from remote location '{}'".format(template, schema_addr))
+                # Load schema from remote source
+                self._schemas_library[template] = load_remote_schema(schema_addr)
+
+                # Update the corresponding local schema file
+                write_local_schema(self._schemas_local_master, self._schemas[template]['local'],
+                                   self._schemas_library[template])
+
+                return self._schemas_library[template]
+
+            except URLError:
+                log.warning("Could not load schema '{}' from remote location '{}'".format(template, schema_addr))
+        else:
+            log.warning("Invalid schema URL '{}'".format(schema_addr))
+
+        # Load Offline Schema
+        schema_addr = self._schemas[template]['local']
+        if os.path.isfile(schema_addr):
+            try:
+                log.debug("Loading schema '{}' from local file '{}'".format(template, schema_addr))
+                self._schemas_library[template] = load_local_schema(schema_addr)
+                return self._schemas_library[template]
+
+            except FileNotFoundError:
+                log.warning("Could not load schema '{}' from local file '{}'".format(template, schema_addr))
+        else:
+            log.warning("Schema file '{}' not found.".format(schema_addr))
+
+        log.error("Failed to load schema '{}'".format(template))
+
+    def validate(self, descriptor, schema_id):
+        """
+        Validate a descriptor against a schema template
+        :param descriptor:
+        :param schema_id:
+        :return:
+        """
+        try:
+            jsonschema.validate(descriptor, self.load_schema(schema_id))
+            return True
+
+        except ValidationError as e:
+            log.error("Failed to validate Descriptor against schema '{}'".format(schema_id))
+            log.debug(e)
+            return
+
+        except SchemaError as e:
+            log.error("Invalid Schema '{}'".format(schema_id))
+            log.debug(e)
+            return
+
+
+def write_local_schema(schemas_root, filename, schema):
+    """
+    Writes a schema to a local file.
+    :param schemas_root: The location of schema descriptor
+    :param filename: The name of the schema file to be written.
+    :param schema: The schema content as a dictionary.
+    :return:
+    """
+    # Verify if local dir structure already exists! If not, create it.
+    if not os.path.isdir(schemas_root):
+        log.debug("Schema directory '{}' not found. Creating it.".format(schemas_root))
+        os.mkdir(schemas_root)
+
+    if os.path.isfile(filename):
+        log.debug("Replacing schema file '{}'".format(filename))
+    else:
+        log.debug("Writing schema file '{}'".format(filename))
+
+    schema_f = open(filename, 'w')
+    yaml.dump(schema, schema_f)
+    schema_f.close()
+
+
+def load_local_schema(filename):
+    """
+    Search for a given template on the schemas folder inside the current package.
+    :param filename: The name of the schema file to look for
+    :return: The loaded schema as a dictionary
+    """
+    # Confirm that schema file exists
+    if not os.path.isfile(filename):
+        log.warning("Schema file '{}' does not exist.".format(filename))
+        raise FileNotFoundError
+
+    # Read schema file and return the schema as a dictionary
+    schema_f = open(filename, 'r')
+    schema = yaml.load(schema_f)
+    assert isinstance(schema, dict), "Failed to load schema file '{}'. Not a dictionary.".format(filename)
+    return schema
+
+
+def load_remote_schema(template_url):
+    """
+    Retrieve a remote schema from the provided URL
+    :param template_url: The URL of the required schema
+    :return: The loaded schema as a dictionary
+    """
+    response = urllib.request.urlopen(template_url)
+    tf = response.read().decode(response.headers.get_content_charset())
+    schema = yaml.load(tf)
+    assert isinstance(schema, dict)
+    return schema

@@ -1,14 +1,14 @@
 import unittest
 from unittest import mock
-from son.package.package import Packager, load_local_schema, load_remote_schema
+from son.schema.validator import load_local_schema, load_remote_schema
 from unittest.mock import patch
 
 
 class UnitLoadSchemaTests(unittest.TestCase):
 
-    @patch("son.package.package.yaml")
+    @patch("son.schema.validator.yaml")
     @patch("builtins.open")
-    @patch("son.package.package.os.path")
+    @patch("son.schema.validator.os.path")
     def test_load_local_schema(self, m_os_path, m_open, m_yaml):
         # Ensure that a FileNotFoundError is raised when the file does not exist
         m_os_path.isfile.return_value = False
@@ -29,10 +29,10 @@ class UnitLoadSchemaTests(unittest.TestCase):
         return_dict = load_local_schema("/some/file/path")
         self.assertEqual(sample_dict, return_dict)
 
-    @patch("son.package.package.yaml")
-    @patch("son.package.package.urllib.request.urlopen.headers.get_content_charset")
-    @patch("son.package.package.urllib.request.urlopen.read.decode")
-    @patch("son.package.package.urllib.request.urlopen")
+    @patch("son.schema.validator.yaml")
+    @patch("son.schema.validator.urllib.request.urlopen.headers.get_content_charset")
+    @patch("son.schema.validator.urllib.request.urlopen.read.decode")
+    @patch("son.schema.validator.urllib.request.urlopen")
     def test_load_remote_schema(self, m_urlopen, m_decode, m_cs, m_yaml):
 
         sample_dict = {"key": "content"}
