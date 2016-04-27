@@ -3,18 +3,14 @@ import os
 import pathlib
 import shutil
 import sys
-import urllib
 import zipfile
 from contextlib import closing
 from pathlib import Path
-from urllib.request import URLError
 
 import coloredlogs
 import requests
 import validators
 import yaml
-from jsonschema import SchemaError
-from jsonschema import ValidationError
 from jsonschema import validate
 
 from son.catalogue.catalogue_client import CatalogueClient
@@ -22,30 +18,26 @@ from son.package.decorators import performance
 from son.package.md5 import generate_hash
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
+from son.schema.validator import SchemaValidator
 
 log = logging.getLogger(__name__)
 
 
 class Packager(object):
 
-    # ID of schema templates
-    SCHEMA_PACKAGE_DESCRIPTOR = 'PD'
-    SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
-    SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
-
     def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
-        # Log variable
+
+        # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._version = version
         self._package_descriptor = None
         self._project_path = prj_path
         self._workspace = workspace
-        self._catalogueClients = []
-        self.schemas_local_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
-        self.schemas_remote_master = workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
 
-        self.schemas = {}
-        self.config_schema_locations()
+        # Create a schema validator
+        self._schema_validator = SchemaValidator(workspace)
+
+        self._catalogueClients = []
 
         # Read catalogue servers from workspace config file and create clients
         for cat in workspace.catalogue_servers:
@@ -54,8 +46,6 @@ class Packager(object):
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
 
-        # Keep a library of loaded schemas to avoid re-loading
-        self._schemas_library = dict()
         # Clear and create package specific folder
         if generate_pd:
 
@@ -64,7 +54,7 @@ class Packager(object):
 
             elif os.path.isdir(dst_path):   # dir exists?
 
-                if len(os.listdir(dst_path)) > 0: # dir not empty?
+                if len(os.listdir(dst_path)) > 0:  # dir not empty?
                     log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
                     sys.stderr.write("ERROR: Destination directory '{}' is not empty\n"
                                      .format(os.path.abspath(dst_path)))
@@ -79,18 +69,6 @@ class Packager(object):
                 shutil.rmtree(self._dst_path)
                 os.makedirs(self._dst_path, exist_ok=False)
             self.package_descriptor = self._project_path
-
-    def config_schema_locations(self):
-        self.schemas = \
-            {self.SCHEMA_PACKAGE_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'pd-schema.yml'),
-                                              'remote': self.schemas_remote_master +
-                                              'package-descriptor/pd-schema.yml'},
-             self.SCHEMA_SERVICE_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'nsd-schema.yml'),
-                                              'remote': self.schemas_remote_master +
-                                              'service-descriptor/nsd-schema.yml'},
-             self.SCHEMA_FUNCTION_DESCRIPTOR: {'local': os.path.join(self.schemas_local_master, 'vnfd-schema.yml'),
-                                               'remote': self.schemas_remote_master +
-                                               'function-descriptor/vnfd-schema.yml'}}
 
     @property
     def package_descriptor(self):
@@ -139,17 +117,8 @@ class Packager(object):
 
         # Validate PD
         log.debug("Validating Package Descriptor")
-        try:
-            validate(self._package_descriptor, self.load_schema(Packager.SCHEMA_PACKAGE_DESCRIPTOR))
-
-        except ValidationError as e:
-            log.error("Failed to validate Package Descriptor. Aborting package creation.")
-            log.debug(e)
-            self._package_descriptor = None
-            return
-        except SchemaError as e:
-            log.error("Invalid Package Descriptor Schema.")
-            log.debug(e)
+        if not self._schema_validator.validate(self._package_descriptor, SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
+            log.debug("Failed to validate Package Descriptor. Aborting package creation.")
             self._package_descriptor = None
             return
 
@@ -211,18 +180,11 @@ class Packager(object):
 
         # Validate NSD
         log.debug("Validating Service Descriptor NSD='{}'".format(nsd_filename))
-        try:
-            validate(nsd, self.load_schema(Packager.SCHEMA_SERVICE_DESCRIPTOR))
-
-        except ValidationError as e:
-            log.error("Failed to validate Service Descriptor NSD='{}'. Aborting package creation.".format(nsd_filename))
-            log.debug(e)
-            return
-        except SchemaError as e:
-            log.error("Invalid Service Descriptor Schema.")
-            log.debug(e)
+        if not self._schema_validator.validate(nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
+            log.error("Failed to validate Service Descriptor '{}'. Aborting package creation".format(nsd_filename))
             return
 
+        # Vendor verification
         if vendor and nsd['vendor'] != vendor:
             log.warning(
                 "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
@@ -334,6 +296,7 @@ class Packager(object):
         """
         Compile information for the list of VNFs
         This function iterates over the different VNF entries
+        :param base_path: base dir location of VNF descriptors
         :param vendor: (TBD)
         :return:
         """
@@ -394,20 +357,14 @@ class Packager(object):
 
         # Validate VNFD
         log.debug("Validating VNF descriptor file='{}'".format(vnfd_path))
-        try:
-            validate(vnfd, self.load_schema(Packager.SCHEMA_FUNCTION_DESCRIPTOR))
-
-        except ValidationError:
-            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
+        if not self._schema_validator.validate(vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
+            log.exception("Failed to validate VNF descriptor '{}'".format(vnfd_path))
             return
 
-        except SchemaError:
-            log.exception("Failed to validate VNF descriptor file '{}'".format(vnfd_path))
-            return
-
+        # Vendor verification
         if vendor and vnfd['vendor'] != vendor:
             log.warning("You are adding a VNF with different group, Project vendor={} and VNF vendor={}"
-                              .format(vendor, vnfd['vendor']))
+                        .format(vendor, vnfd['vendor']))
 
         # Check if this VNF exists in the ns_vnf registry. If does not, cancel its packaging
         if not self.check_in_ns_vnf(get_vnf_id(vnfd)):
@@ -496,7 +453,6 @@ class Packager(object):
     def generate_package(self, name):
         """
         Generate the final package version.
-        :param dst_path; The path were the package will be generated
         :param name: The name of the final version of the package, the project name will be used if no name provided
         """
 
@@ -577,53 +533,6 @@ class Packager(object):
 
         return
 
-    def load_schema(self, template, reload=False):
-        """
-        Load schema from a local file or a remote URL.
-        If the same schema was previously loaded and reload=False it will return the schema stored in cache. If
-        reload=True it will force the reload of the schema.
-        :param template: Name of local file or URL to remote schema
-        :param reload: Force the reload, even if it was previously loaded
-        :return: The loaded schema as a dictionary
-        """
-        # Check if template is already loaded and present in _schemas_library
-        if template in self._schemas_library and not reload:
-            log.debug("Loading previously stored schema for {}".format(template))
-            return self._schemas_library[template]                           # return previously loaded schema
-
-        # Load Online Schema
-        schema_addr = self.schemas[template]['remote']
-        if validators.url(schema_addr):
-            try:
-                log.debug("Loading schema '{}' from remote location '{}'".format(template, schema_addr))
-                # Load schema from remote source
-                self._schemas_library[template] = load_remote_schema(schema_addr)
-
-                # Update the corresponding local schema file
-                write_local_schema(self.schemas_local_master, self.schemas[template]['local'],
-                                   self._schemas_library[template])
-
-                return self._schemas_library[template]
-
-            except URLError:
-                log.warning("Could not load schema '{}' from remote location '{}'".format(template, schema_addr))
-        else:
-            log.warning("Invalid schema URL '{}'".format(schema_addr))
-
-        # Load Offline Schema
-        schema_addr = self.schemas[template]['local']
-        if os.path.isfile(schema_addr):
-            try:
-                log.debug("Loading schema '{}' from local file '{}'".format(template, schema_addr))
-                self._schemas_library[template] = load_local_schema(schema_addr)
-                return self._schemas_library[template]
-            except FileNotFoundError:
-                log.warning("Could not load schema '{}' from local file '{}'".format(template, schema_addr))
-        else:
-            log.warning("Schema file '{}' not found.".format(schema_addr))
-
-        log.error("Failed to load schema '{}'".format(template))
-
 
 def get_vnf_id(vnfd):
     return get_vnf_id_full(vnfd['vendor'], vnfd['name'], vnfd['version'])
@@ -631,60 +540,6 @@ def get_vnf_id(vnfd):
 
 def get_vnf_id_full(vnf_vendor, vnf_name, vnf_version):
     return vnf_vendor + '.' + vnf_name + '.' + vnf_version
-
-
-def write_local_schema(schemas_root, filename, schema):
-    """
-    Writes a schema to a local file.
-    :param schemas_root: The location of schema descriptor
-    :param filename: The name of the schema file to be written.
-    :param schema: The schema content as a dictionary.
-    :return:
-    """
-    # Verify if local dir structure already exists! If not, create it.
-    if not os.path.isdir(schemas_root):
-        log.debug("Schema directory '{}' not found. Creating it.".format(schemas_root))
-        os.mkdir(schemas_root)
-
-    if os.path.isfile(filename):
-        log.debug("Replacing schema file '{}'".format(filename))
-    else:
-        log.debug("Writing schema file '{}'".format(filename))
-
-    schema_f = open(filename, 'w')
-    yaml.dump(schema, schema_f)
-    schema_f.close()
-
-
-def load_local_schema(filename):
-    """
-    Search for a given template on the schemas folder inside the current package.
-    :param filename: The name of the schema file to look for
-    :return: The loaded schema as a dictionary
-    """
-    # Confirm that schema file exists
-    if not os.path.isfile(filename):
-        log.warning("Schema file '{}' does not exist.".format(filename))
-        raise FileNotFoundError
-
-    # Read schema file and return the schema as a dictionary
-    schema_f = open(filename, 'r')
-    schema = yaml.load(schema_f)
-    assert isinstance(schema, dict), "Failed to load schema file '{}'. Not a dictionary.".format(filename)
-    return schema
-
-
-def load_remote_schema(template_url):
-    """
-    Retrieve a remote schema from the provided URL
-    :param template_url: The URL of the required schema
-    :return: The loaded schema as a dictionary
-    """
-    response = urllib.request.urlopen(template_url)
-    tf = response.read().decode(response.headers.get_content_charset())
-    schema = yaml.load(tf)
-    assert isinstance(schema, dict)
-    return schema
 
 
 def __validate_directory__(paths):
