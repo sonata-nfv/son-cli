@@ -5,16 +5,43 @@ import coloredlogs
 from os.path import expanduser
 from son.workspace.workspace import Workspace
 from son.workspace.project import Project
+from son.catalogue.catalogue_client import CatalogueClient
 
 log = logging.getLogger(__name__)
 
 
 class Publisher(object):
 
-    def __init__(self, workspace, project=None, component=None):
+    def __init__(self, workspace, project=None, component=None, catalogue=None):
+        # Assign parameters
         self._workspace = workspace
         self._project = project
         self._component = component
+        self._catalogue = catalogue
+        self._catalogue_clients = []
+
+
+    def create_catalogue_clients(self):
+        # If catalogue argument was specified -> ignore default publish catalogues
+        if self._catalogue:
+            # Get corresponding catalogue from workspace config
+            cat_url = self._workspace.get_catalogue_server(self._catalogue)['url']
+            assert cat_url, \
+                "The specified catalogue ID '{}' does not exist in workspace configuration".format(self._catalogue)
+
+            # Instantiate catalogue client with the obtained address
+            self._catalogue_clients.append(CatalogueClient(cat_url))
+
+        # If catalogue argument is absent -> get default publish catalogues
+        else:
+            # Get publish catalogues from workspace config
+            for cat in self._workspace.catalogue_servers:
+                if cat['publish']:
+                    self._catalogue_clients.append(cat['url'])
+
+    def publish_component(self):
+
+
 
 
 def main():

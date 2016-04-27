@@ -162,6 +162,9 @@ class Workspace:
     def catalogue_servers(self, cat_servers):
         self._catalogue_servers = cat_servers
 
+    def get_catalogue_server(self, cat_id):
+        return [cat for cat in self._catalogue_servers if cat['id'] == cat_id]
+
     def __eq__(self, other):
         """
         Function to assert if two workspaces have the same configuration.
