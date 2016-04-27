@@ -55,7 +55,7 @@ class Publisher(object):
         assert len(self._catalogue_clients) > 0, "There are no catalogue servers available."
 
         log.debug("Added catalogue clients for servers: '{}'".format(self._catalogue_clients))
-        
+
 
 def main():
     import argparse
@@ -66,6 +66,7 @@ def main():
     parser.add_argument("--project",
                         help="Specify project to be published", required=False)
     parser.add_argument("--component", help="Project component to be published.", required=False)
+    parser.add_argument("--catalogue", help="Catalogue ID where to publish. Overrides defaults in workspace config.")
 
     args = parser.parse_args()
 
@@ -92,11 +93,11 @@ def main():
         if not proj:
             print("Could not find a SONATA SDK project at '{}'".format(prj_root), file=sys.stderr)
             exit(1)
-        pub = Publisher(ws, project=proj)
+        pub = Publisher(ws, project=proj, catalogue=args.catalogue)
 
     if args.component:
         comp_file = os.path.expanduser(args.component)
         if not os.path.isfile(comp_file):
             print("'{}' is not a valid file".format(comp_file), file=sys.stderr)
             exit(1)
-        pub = Publisher(ws, component=comp_file)
+        pub = Publisher(ws, component=comp_file, catalogue=args.catalogue)
