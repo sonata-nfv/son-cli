@@ -1,27 +1,27 @@
 import logging
-import coloredlogs
+import os
+import pathlib
+import shutil
 import sys
 import urllib
 import zipfile
-import requests
 from contextlib import closing
 from pathlib import Path
-
-import os
-import shutil
-import yaml
-import pathlib
-from jsonschema import validate
-from jsonschema import ValidationError
-from jsonschema import SchemaError
-import validators
 from urllib.request import URLError
 
+import coloredlogs
+import requests
+import validators
+import yaml
+from jsonschema import SchemaError
+from jsonschema import ValidationError
+from jsonschema import validate
+
+from son.catalogue.catalogue_client import CatalogueClient
 from son.package.decorators import performance
 from son.package.md5 import generate_hash
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
-from son.package.catalogue_client import CatalogueClient
 
 log = logging.getLogger(__name__)
 
@@ -48,9 +48,8 @@ class Packager(object):
         self.config_schema_locations()
 
         # Read catalogue servers from workspace config file and create clients
-        for cat_id in workspace.catalogue_servers.keys():
-            print(workspace.catalogue_servers[cat_id])
-            self._catalogueClients.append(CatalogueClient(workspace.catalogue_servers[cat_id]))
+        for cat in workspace.catalogue_servers:
+            self._catalogueClients.append(CatalogueClient(cat['url']))
 
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
