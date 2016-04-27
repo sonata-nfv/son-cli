@@ -43,7 +43,8 @@ class Workspace:
         self.descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
-        self._catalogue_servers = {'cat1': 'http://sample.url.1.com:port', 'cat2': 'http://sample.url.2.com:port'}
+        self._catalogue_servers = [{'id': 'cat1', 'url': 'http://cat1url.com:port', 'publish': 'yes'},
+                                   {'id': 'cat2', 'url': 'http://cat2url.com.port', 'publish': 'no'}]
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
@@ -94,7 +95,6 @@ class Workspace:
         This is triggered by workspace creation and configuration changes.
         :return:
         """
-
         cfg_d = {self.CONFIG_STR_VERSION: Workspace.WORKSPACE_VERSION,
                  self.CONFIG_STR_NAME: self.ws_name,
                  self.CONFIG_STR_CATALOGUES_DIR: self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
