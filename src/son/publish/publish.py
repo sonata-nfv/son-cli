@@ -2,10 +2,12 @@ import sys
 import os
 import logging
 import coloredlogs
+import yaml
 from os.path import expanduser
 from son.workspace.workspace import Workspace
 from son.workspace.project import Project
 from son.catalogue.catalogue_client import CatalogueClient
+from jsonschema import validate
 
 log = logging.getLogger(__name__)
 
@@ -14,14 +16,23 @@ class Publisher(object):
 
     def __init__(self, workspace, project=None, component=None, catalogue=None):
         # Assign parameters
+        coloredlogs.install(level=workspace.log_level)
         self._workspace = workspace
         self._project = project
         self._component = component
         self._catalogue = catalogue
         self._catalogue_clients = []
 
+        # Instantiate catalogue clients
+        self.create_catalogue_clients()
 
     def create_catalogue_clients(self):
+        """
+        Instantiates catalogue clients for selected catalogue servers
+        :return:
+        """
+        log.debug("Creating catalogue clients...")
+
         # If catalogue argument was specified -> ignore default publish catalogues
         if self._catalogue:
             # Get corresponding catalogue from workspace config
@@ -35,14 +46,16 @@ class Publisher(object):
         # If catalogue argument is absent -> get default publish catalogues
         else:
             # Get publish catalogues from workspace config
+
             for cat in self._workspace.catalogue_servers:
-                if cat['publish']:
+                if cat['publish'].lower() == 'yes':
                     self._catalogue_clients.append(cat['url'])
 
-    def publish_component(self):
+        # Ensure there are catalogues available
+        assert len(self._catalogue_clients) > 0, "There are no catalogue servers available."
 
-
-
+        log.debug("Added catalogue clients for servers: '{}'".format(self._catalogue_clients))
+        
 
 def main():
     import argparse
