@@ -6,15 +6,22 @@ import yaml
 import shutil
 import pkg_resources
 
+
 log = logging.getLogger(__name__)
+
 
 class Project:
 
     __descriptor_name__ = 'project.yml'
 
     def __init__(self, prj_root, workspace):
-        self._prj_root = prj_root
         coloredlogs.install(level=workspace.log_level)
+        self._prj_root = prj_root
+        self._workspace = workspace
+
+    @property
+    def project_root(self):
+        return self._prj_root
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))
@@ -90,6 +97,38 @@ class Project:
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
+
+    def get_ns_descriptor(self):
+        """
+        Obtain the file list of VNF descriptors
+        :return:
+        """
+        nsd_root = os.path.join(self._prj_root, 'sources', 'nsd')
+        nsd_list = [os.path.join(nsd_root, file) for file in os.listdir(nsd_root)
+                    if os.path.isfile(os.path.join(nsd_root, file)) and
+                    file.endswith(self._workspace.descriptor_extension)]
+
+        if len(nsd_list) == 0:
+            log.error("Project does not contain a NS Descriptor")
+            return
+
+        if len(nsd_list) != 1:
+            log.warning("Project contains more than one NS Descriptor")
+
+        return nsd_list
+
+    def get_vnf_descriptors(self):
+        """
+        Obtain the file list of VNF descriptors
+        :return:
+        """
+        vnf_root = os.path.join(self._prj_root, 'sources', 'vnf')
+        vnfd_list = []
+        for root, dirs, files in os.walk(vnf_root):
+            for file in files:
+                if file.endswith(self._workspace.descriptor_extension):
+                    vnfd_list.append(os.path.join(root, file))
+        return vnfd_list
 
     def _create_sample(self, prj_type, path):
         switcher = {
@@ -168,3 +207,17 @@ class Project:
         src_path = os.path.join('samples', sample_nsd)
         srcfile = pkg_resources.resource_filename(rp, src_path)
         shutil.copyfile(srcfile, os.path.join(path, sample_nsd))
+
+    @staticmethod
+    def __is_valid__(project):
+        """
+        Checks if a given project is valid
+        :return:
+        """
+        if type(project) is not Project:
+            return False
+
+        if not os.path.isfile(os.path.join(project.project_root, Project.__descriptor_name__)):
+            return False
+
+        return True

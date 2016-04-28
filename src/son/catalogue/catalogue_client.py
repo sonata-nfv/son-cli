@@ -67,6 +67,19 @@ class CatalogueClient(object):
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
         return yaml.load(cat_obj)
 
+    def post_ns(self, nsd_data):
+        """
+        Publishes a NS descriptor to the catalogue server
+        :param nsd_data:
+        :return:
+        """
+        response = self.__post_cat_object__(CatalogueClient.CAT_URI_NS, nsd_data)
+        if response is not None and response.status_code != requests.codes.ok:
+            log.error("Publishing failed. HTTP code: {}".format(response.status_code))
+            return
+
+        return response
+
     def get_ns_by_name(self, ns_name):
         """
         Obtains a list of network services matching the ns_name
