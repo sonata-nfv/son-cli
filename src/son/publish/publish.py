@@ -61,7 +61,38 @@ class Publisher(object):
 
         log.debug("Added {} catalogue clients".format(len(self._catalogue_clients)))
 
-    def publish_component(self, filename):
+    def publish_project(self):
+        """
+        Publish all components of a project to the available catalogue servers
+        :return:
+        """
+        log.info("Publishing project: '{}'".format(self._project.project_root))
+
+        # Ensure project was defined and its valid
+        if not self._project or not Project.__is_valid__(self._project):
+            log.error("Publish failed. Invalid or undefined project.")
+            return
+
+        # Retrieve project NSD and VNFDs files
+        comp_list = self._project.get_ns_descriptor() + self._project.get_vnf_descriptors()
+
+        log.debug("The following project components will be published: {}".format(comp_list))
+
+        # Publish project components
+        for comp in comp_list:
+            self.publish_component(comp)
+
+    def publish_component(self, filename=None):
+        """
+        Publish a single component file (e.g. descriptor) to the available catalogue servers
+        :param filename:
+        :return:
+        """
+        log.info("Publishing component: '{}'".format(filename))
+
+        # If filename parameter is absent, assume the component of object init
+        if not filename:
+            filename = self._component
 
         # Check if file exists
         if not os.path.isfile(filename):
@@ -86,17 +117,17 @@ class Publisher(object):
         for cat_client in self._catalogue_clients:
 
             if descriptor_type is SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR:
-                log.debug("Publishing Package Descriptor: {}".format(compd['package_name']))
+                log.debug("Publishing Package Descriptor: {}".format(filename))
                 cat_client.post_pd(comp_data)
 
             elif descriptor_type is SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR:
                 log.debug("Publishing Service Descriptor: {}"
-                          .format(compd['vendor'] + "." + compd['name'] + "." + compd['version']))
+                          .format(filename))
                 cat_client.post_ns(comp_data)
 
             elif descriptor_type is SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR:
                 log.debug("Publishing Function Descriptor: {}"
-                          .format(compd['vendor'] + "." + compd['name'] + "." + compd['version']))
+                          .format(filename))
                 cat_client.post_vnf(comp_data)
 
 
@@ -138,6 +169,7 @@ def main():
             print("Could not find a SONATA SDK project at '{}'".format(prj_root), file=sys.stderr)
             exit(1)
         pub = Publisher(ws, project=proj, catalogue=args.catalogue)
+        pub.publish_project()
 
     if args.component:
         comp_file = os.path.expanduser(args.component)
@@ -145,4 +177,4 @@ def main():
             print("'{}' is not a valid file".format(comp_file), file=sys.stderr)
             exit(1)
         pub = Publisher(ws, component=comp_file, catalogue=args.catalogue)
-        pub.publish_component(comp_file)
+        pub.publish_component()
