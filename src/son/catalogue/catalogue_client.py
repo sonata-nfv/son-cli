@@ -81,7 +81,6 @@ class CatalogueClient(object):
     def get_vnf(self, vnf_id):
         """
         Obtains a specific VNF
-        :param ns_id: ID of the VNF in the form 'vendor.vnf_name.version'
         :return: yaml object containing VNF
         :param vnf_id:
         :return:
@@ -101,7 +100,12 @@ class CatalogueClient(object):
         :param vnf_data:
         :return:
         """
-        return self.__post_cat_object__(CatalogueClient.CAT_URI_VNF, vnf_data)
+        response = self.__post_cat_object__(CatalogueClient.CAT_URI_VNF, vnf_data)
+        if response is not None and response.status_code != requests.codes.ok:
+            log.error("Publishing failed. HTTP code: {}".format(response.status_code))
+            return
+
+        return response
 
     def get_vnf_by_name(self, vnf_name):
         """
@@ -132,7 +136,12 @@ class CatalogueClient(object):
         :return:
         """
         url = self._base_url + cat_uri
-        response = requests.post(url, obj_data, auth=self._auth, headers=self._headers)
-        if not response.status_code == requests.codes.ok:
+        log.debug("Object POST to: {}\n{}".format(url, obj_data))
+
+        try:
+            response = requests.post(url, data=obj_data, auth=self._auth, headers=self._headers)
+            return response
+
+        except requests.exceptions.ConnectionError:
+            log.error("Connection error to server '{}'. VNF publishing failed".format(CatalogueClient.CAT_URI_VNF))
             return
-        return response.text

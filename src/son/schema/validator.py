@@ -115,6 +115,32 @@ class SchemaValidator(object):
             log.debug(e)
             return
 
+    def get_descriptor_type(self, descriptor):
+        """
+        This function obtains the type of a descriptor.
+        Its methodology is based on trial-error, since it attempts to validate the descriptor against
+        the available schema templates until a success is achieved
+        :param descriptor:
+        :return:
+        """
+        # Gather schema templates ids
+        templates = {self.SCHEMA_PACKAGE_DESCRIPTOR, self.SCHEMA_SERVICE_DESCRIPTOR, self.SCHEMA_FUNCTION_DESCRIPTOR}
+
+        # Cycle through templates until a success validation is return
+        for schema_id in templates:
+            try:
+                jsonschema.validate(descriptor, self.load_schema(schema_id))
+                return schema_id
+
+            except ValidationError:
+
+                continue
+
+            except SchemaError:
+                log.error("Invalid Schema '{}'".format(schema_id))
+                log.debug(e)
+                return
+
 
 def write_local_schema(schemas_root, filename, schema):
     """

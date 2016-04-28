@@ -7,7 +7,7 @@ from os.path import expanduser
 from son.workspace.workspace import Workspace
 from son.workspace.project import Project
 from son.catalogue.catalogue_client import CatalogueClient
-from jsonschema import validate
+from son.schema.validator import SchemaValidator
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +25,9 @@ class Publisher(object):
 
         # Instantiate catalogue clients
         self.create_catalogue_clients()
+
+        # Create a schema validator
+        self._schema_validator = SchemaValidator(workspace)
 
     def create_catalogue_clients(self):
         """
@@ -49,12 +52,52 @@ class Publisher(object):
 
             for cat in self._workspace.catalogue_servers:
                 if cat['publish'].lower() == 'yes':
-                    self._catalogue_clients.append(cat['url'])
+                    self._catalogue_clients.append(CatalogueClient(cat['url']))
 
         # Ensure there are catalogues available
-        assert len(self._catalogue_clients) > 0, "There are no catalogue servers available."
+        if not len(self._catalogue_clients) > 0:
+            log.warning("There are no catalogue servers configured for publishing")
+            return
 
-        log.debug("Added catalogue clients for servers: '{}'".format(self._catalogue_clients))
+        log.debug("Added {} catalogue clients".format(len(self._catalogue_clients)))
+
+    def publish_component(self, filename):
+
+        # Check if file exists
+        if not os.path.isfile(filename):
+            log.error("Publish failed. File '{}' does not exist.".format(filename))
+            return
+
+        # Check that catalogue clients exist
+        if not len(self._catalogue_clients) > 0:
+            log.error("Publish failed. There are no catalogue clients available.")
+            return
+
+        # Load component descriptor
+        with open(filename, 'r') as compf:
+            compd = yaml.load(compf)
+
+        # Determine descriptor type of component
+        descriptor_type = self._schema_validator.get_descriptor_type(compd)
+
+        comp_data = yaml.dump(compd)
+
+        # Publish to the catalogue servers based on the descriptor type
+        for cat_client in self._catalogue_clients:
+
+            if descriptor_type is SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR:
+                log.debug("Publishing Package Descriptor: {}".format(compd['package_name']))
+                cat_client.post_pd(comp_data)
+
+            elif descriptor_type is SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR:
+                log.debug("Publishing Service Descriptor: {}"
+                          .format(compd['vendor'] + "." + compd['name'] + "." + compd['version']))
+                cat_client.post_ns(comp_data)
+
+            elif descriptor_type is SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR:
+                log.debug("Publishing Function Descriptor: {}"
+                          .format(compd['vendor'] + "." + compd['name'] + "." + compd['version']))
+                cat_client.post_vnf(comp_data)
 
 
 def main():
@@ -65,8 +108,9 @@ def main():
                         .format(Workspace.DEFAULT_WORKSPACE_DIR), required=False)
     parser.add_argument("--project",
                         help="Specify project to be published", required=False)
-    parser.add_argument("--component", help="Project component to be published.", required=False)
-    parser.add_argument("--catalogue", help="Catalogue ID where to publish. Overrides defaults in workspace config.")
+    parser.add_argument("-d", "--component", help="Project component to be published.", required=False)
+    parser.add_argument("-c", "--catalogue",
+                        help="Catalogue ID where to publish. Overrides defaults in workspace config.")
 
     args = parser.parse_args()
 
@@ -101,3 +145,4 @@ def main():
             print("'{}' is not a valid file".format(comp_file), file=sys.stderr)
             exit(1)
         pub = Publisher(ws, component=comp_file, catalogue=args.catalogue)
+        pub.publish_component(comp_file)
