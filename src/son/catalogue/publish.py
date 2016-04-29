@@ -39,12 +39,15 @@ class Publisher(object):
         # If catalogue argument was specified -> ignore default publish catalogues
         if self._catalogue:
             # Get corresponding catalogue from workspace config
-            cat_url = self._workspace.get_catalogue_server(self._catalogue)['url']
-            assert cat_url, \
-                "The specified catalogue ID '{}' does not exist in workspace configuration".format(self._catalogue)
+            cat = self._workspace.get_catalogue_server(self._catalogue)
+            print(type(cat))
+            if not cat:
+                log.warning("The specified catalogue ID '{}' does not exist in workspace configuration"
+                            .format(self._catalogue))
+                return
 
             # Instantiate catalogue client with the obtained address
-            self._catalogue_clients.append(CatalogueClient(cat_url))
+            self._catalogue_clients.append(CatalogueClient(cat['url']))
 
         # If catalogue argument is absent -> get default publish catalogues
         else:
@@ -88,11 +91,12 @@ class Publisher(object):
         :param filename:
         :return:
         """
-        log.info("Publishing component: '{}'".format(filename))
 
         # If filename parameter is absent, assume the component of object init
         if not filename:
             filename = self._component
+
+        log.info("Publishing component: '{}'".format(filename))
 
         # Check if file exists
         if not os.path.isfile(filename):
