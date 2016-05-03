@@ -163,7 +163,9 @@ class Workspace:
         self._catalogue_servers = cat_servers
 
     def get_catalogue_server(self, cat_id):
-        return [cat for cat in self._catalogue_servers if cat['id'] == cat_id]
+        for cat in self._catalogue_servers:
+            if cat['id'] == cat_id:
+                return cat
 
     def __eq__(self, other):
         """
