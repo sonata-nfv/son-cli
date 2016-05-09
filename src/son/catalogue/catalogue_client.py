@@ -3,7 +3,6 @@ import requests
 import yaml
 import sys
 import validators
-from requests import exceptions
 
 log = logging.getLogger(__name__)
 
