@@ -30,6 +30,10 @@ class CatalogueClient(object):
         assert validators.url(self._base_url),\
             "Failed to init catalogue client. Invalid URL: '{}'".format(self._base_url)
 
+    @property
+    def base_url(self):
+        return self._base_url
+
     def alive(self):
         """
         Checks if the catalogue API server is alive and responding to requests
