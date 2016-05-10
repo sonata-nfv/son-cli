@@ -60,7 +60,6 @@ class UnitCreatePackageTests(unittest.TestCase):
         for key in prj_config:
             value = prj_config.pop(key)
             self.assertFalse(packager.package_gds(prj_config))
-            print(prj_config)
             prj_config[key] = value
 
         # Make prj_config complete...
