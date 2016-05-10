@@ -462,7 +462,7 @@ class Packager(object):
         # Validate all needed information
         if not self._package_descriptor:
             log.error("Missing package descriptor. Failed to generate package.")
-            return
+            exit(1)
 
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.son')
