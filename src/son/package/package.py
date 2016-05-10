@@ -46,6 +46,8 @@ class Packager(object):
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
 
+        self._dst_path = dst_path
+
         # Clear and create package specific folder
         if generate_pd:
 
