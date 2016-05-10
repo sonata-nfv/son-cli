@@ -396,13 +396,14 @@ class Packager(object):
                 vdu_image_path = vdu['vm_image']
 
                 if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
-                    # Check if the image URL exists?
                     try:
-                        requests.head(vdu_image_path)
+                        # Check if the image URL exists with a short Timeout
+                        requests.head(vdu_image_path, timeout=1)
 
-                    except requests.ConnectionError:
+                    except (requests.Timeout, requests.ConnectionError):
                         log.warning("Failed to verify the existence of vm_image '{}'".format(vdu['vm_image']))
-                        continue
+
+                    continue
 
                 else:  # Check for URL local (e.g. file:///...)
                     ptokens = pathlib.Path(vdu_image_path).parts

@@ -3,7 +3,6 @@ import requests
 import yaml
 import sys
 import validators
-from requests import exceptions
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +28,10 @@ class CatalogueClient(object):
         # Ensure parameters are valid
         assert validators.url(self._base_url),\
             "Failed to init catalogue client. Invalid URL: '{}'".format(self._base_url)
+
+    @property
+    def base_url(self):
+        return self._base_url
 
     def alive(self):
         """
