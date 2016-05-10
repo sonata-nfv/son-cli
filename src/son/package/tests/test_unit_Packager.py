@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from unittest import mock
 from son.package.package import Packager
 from son.workspace.workspace import Workspace
-import os
+
 
 class UnitCreatePackageTests(unittest.TestCase):
 
@@ -38,9 +38,6 @@ class UnitCreatePackageTests(unittest.TestCase):
     def test_package_gds(self):
         """
         Test the validation of the project general description section
-        :param m_open:
-        :param m_yaml:
-        :return:
         """
         # First, create a workspace to give to Packager
         workspace = Workspace("ws/root", ws_name="ws_test", log_level='debug')
