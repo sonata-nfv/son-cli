@@ -35,22 +35,19 @@ class UnitCreatePackageTests(unittest.TestCase):
         # make assertions
         self.assertEqual(m_join.call_args_list[-1], mock.call('dst/path', 'package_name.son'))
 
-    
+    def test_package_gds(self):
+        """
+        Test the validation of the project general description section
+        :param m_open:
+        :param m_yaml:
+        :return:
+        """
+        # First, create a workspace to give to Packager
+        workspace = Workspace("ws/root", ws_name="ws_test", log_level='debug')
 
-
-    @patch('son.package.package.yaml')
-    @patch('builtins.open')
-    def temp_test(self, m_open, m_yaml):
-        # Mock required functions
-        context_manager_mock = Mock()
-        m_open.return_value = context_manager_mock
-        file_mock = Mock()
-        file_mock.read.return_value = None
-        enter_mock = Mock()
-        enter_mock.return_value = file_mock
-        exit_mock = Mock()
-        setattr(context_manager_mock, '__enter__', enter_mock)
-        setattr(context_manager_mock, '__exit__', exit_mock)
+        # Instantiate a Packager instance
+        packager = Packager("prj/path", workspace, generate_pd=False, dst_path="dst/path")
+        packager._package_descriptor = True
 
         # Create fake project configuration
         prj_config = {
@@ -58,11 +55,21 @@ class UnitCreatePackageTests(unittest.TestCase):
             'description': 'Project description',
             'group': 'eu.sonata.project',
             'maintainer': 'Name, Company, Contact',
-            'name': 'sonata - project - sample',
             'publish_to': '[personal]',
             'version': '0.0.1'
             }
-        # Assign prj_config to the loaded config
-        m_yaml.load.return_value = prj_config
+
+        # Remove keys, one by one...
+        for key in prj_config:
+            value = prj_config.pop(key)
+            self.assertFalse(packager.package_gds(prj_config))
+            print(prj_config)
+            prj_config[key] = value
+
+        # Make prj_config complete...
+        prj_config['name'] = 'sonata - project - sample'
+
+        self.assertTrue(packager.package_gds(prj_config))
+
 
 
