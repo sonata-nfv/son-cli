@@ -19,6 +19,10 @@ import logging
 
 log = logging.getLogger(__name__)
 
+
+def _create_dict(**kwargs):
+    return kwargs
+
 class Emu_Profiler():
 
     def __init__(self, net_api, compute_api):
@@ -34,6 +38,7 @@ class Emu_Profiler():
                                                kwargs.get('image'),
                                                kwargs.get('network'),
                                                kwargs.get('command'))
+        logging.info('vnf status:{0}'.format(vnf_status))
         # start traffic source (with fixed ip addres, no use for now...)
         psrc_status = self.compute_api.compute_action_start(dc_label, 'psrc', 'profile_source', [{'id': 'output'}], None)
         # start traffic sink (with fixed ip addres)
@@ -86,6 +91,9 @@ class Emu_Profiler():
         self.vnf_uuid = vnf_status['id']
         self.psrc_mgmt_ip = psrc_status['docker_network']
 
+        # need to wait a bit before containers are fully up?
+        time.sleep(3)
+
     def generate(self):
         for rate in [0, 1, 2, 3]:
             # logging.info('query:{0}'.format(query_cpu))
@@ -99,7 +107,8 @@ class Emu_Profiler():
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         # ssh.connect(mgmt_ip, username='steven', password='test')
-        ssh.connect(mgmt_ip, username='root', password='root')
+        #ssh.connect(mgmt_ip, username='root', password='root')
+        ssh.connect(mgmt_ip)
 
         iperf_cmd = 'iperf -c {0} -u -l18 -b{1}M -t1000 &'.format(input_ip, rate)
         if rate > 0:
@@ -124,5 +133,4 @@ class Emu_Profiler():
 
         return output_line
 
-    def _create_dict(**kwargs):
-        return kwargs
+

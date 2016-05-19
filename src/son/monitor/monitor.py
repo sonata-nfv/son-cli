@@ -99,9 +99,10 @@ def profile_emu(args):
 
     profiler_emu = profiler.Emu_Profiler(NET_API, COMPUTE_API)
 
+    vnf_name = _parse_vnf_name(args.get("vnf_name"))
     dc_label = args.get("datacenter")
-    vnf_name = args.get("name")
-    profiler_emu.deploy_chain(dc_label, vnf_name, args)
+    profiler_emu.deploy_chain(dc_label, vnf_name, params)
+
 
     for output in profiler_emu.generate():
         print(output + '\n')
@@ -159,7 +160,7 @@ def _execute_command(args):
         # call the local method with the same name as the command arg
         function = function_mapper_sp[args["command"]]
         function(args)
-    elif args["command"] is not None and (args.get('vim') == 'emu' or args.get('vim') is None) :
+    elif args["command"] is not None and (args.get('vim') == 'emu' or args.get('vim') is None):
         # call the local method with the same name as the command arg
         function = function_mapper_emu[args["command"]]
         function(args)
