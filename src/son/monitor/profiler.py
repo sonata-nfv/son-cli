@@ -107,8 +107,8 @@ class Emu_Profiler():
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         # ssh.connect(mgmt_ip, username='steven', password='test')
-        #ssh.connect(mgmt_ip, username='root', password='root')
-        ssh.connect(mgmt_ip)
+        ssh.connect(mgmt_ip, username='root', password='root')
+        #ssh.connect(mgmt_ip)
 
         iperf_cmd = 'iperf -c {0} -u -l18 -b{1}M -t1000 &'.format(input_ip, rate)
         if rate > 0:
@@ -116,7 +116,7 @@ class Emu_Profiler():
 
         start_time = time.time()
         query_cpu = '(sum(rate(container_cpu_usage_seconds_total{{id="/docker/{0}"}}[{1}s])))'.format(vnf_uuid, 1)
-        while (time.time() - start_time) < 15:
+        while (time.time() - start_time) < 10:
             data = prometheus.query_Prometheus(query_cpu)
             # logging.info('rate: {1} data:{0}'.format(data, rate))
             gevent.sleep(0)
