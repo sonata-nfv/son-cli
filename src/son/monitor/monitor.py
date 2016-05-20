@@ -20,10 +20,7 @@ or
 
 """
 
-#from emuvim.cli import compute
-#from emuvim.cli import network
-#from emuvim.cli import datacenter
-#from emuvim.cli import monitor
+
 from son.monitor import prometheus
 from son.monitor import profiler
 
@@ -37,13 +34,14 @@ import logging
 log = logging.getLogger(__name__)
 
 ## parameters for the emulator VIM
+# TODO: these settings come from the deployed topology in the emulator, read from centralized config file?
 COMPUTE_API = zerorpc.Client()  # heartbeat=None, timeout=120
 COMPUTE_API.connect("tcp://127.0.0.1:4242")  # TODO hard coded for now. we'll change this later
 NET_API = zerorpc.Client()
 NET_API.connect("tcp://127.0.0.1:5151")  # TODO hard coded for now. we'll change this later
 
 
-
+## commands to export specific counter metrics from the emulator to prometheus
 def start_metric_emu(args):
     vnf_name = _parse_vnf_name(args.get("vnf_name"))
     vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
@@ -84,7 +82,7 @@ def stop_flow(args):
         args.get("cookie"))
     pp.pprint(r)
 
-
+## command to start a profiling action
 def profile_emu(args):
     nw_list = list()
     if args.get("network") is not None:
@@ -99,15 +97,16 @@ def profile_emu(args):
 
     profiler_emu = profiler.Emu_Profiler(NET_API, COMPUTE_API)
 
+    #deploy the test service chain
     vnf_name = _parse_vnf_name(args.get("vnf_name"))
     dc_label = args.get("datacenter")
     profiler_emu.deploy_chain(dc_label, vnf_name, params)
 
-
+    #generate output table
     for output in profiler_emu.generate():
         print(output + '\n')
 
-
+## command to query some metrics in prometheus
 def prometheus_query_emu(args):
     vnf_name = _parse_vnf_name(args.get("vnf_name"))
     vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
@@ -121,6 +120,7 @@ def prometheus_query_emu(args):
     pp.pprint(r)
 
 
+## helper functions
 def _parse_vnf_name( vnf_name_str):
     vnf_name = vnf_name_str.split(':')[0]
     return vnf_name
@@ -169,7 +169,7 @@ def _execute_command(args):
 
 
 
-
+## cli parser
 
 description = """
     Install monitor features of the SONATA service platform/emulator or get monitor data
