@@ -11,3 +11,6 @@
 
     - name: install pip 3.x
       apt: pkg=python3-pip state=installed
+
+    - name: install gevent dependencies
+      apt: pkg=libffi-dev state=installed
