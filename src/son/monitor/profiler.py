@@ -14,7 +14,12 @@ import paramiko
 import time
 import gevent
 
-from son.monitor import prometheus
+try:
+    from son.monitor import prometheus
+except:
+    import prometheus
+
+
 import logging
 
 log = logging.getLogger(__name__)

@@ -24,16 +24,13 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['package/templates/*', 'workspace/samples/*']
+            'son': []
         },
-        install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests', 'coloredlogs'],
+        install_requires=['setuptools', 'requests', 'gevent', 'paramiko', 'zerorpc'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
-                'son-workspace=son.workspace.workspace:main',
-                'son-package=son.package.package:main',
-                'son-publish=son.catalogue.publish:main',
-                'son-push=son.push.push:main'
+                'son-monitor=son.monitor.monitor:main'
             ],
         },
         test_suite='son',

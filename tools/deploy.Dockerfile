@@ -23,3 +23,11 @@ RUN cd /ansible \
     # Install the son-cli package from a local wheel
     && pip3 install /tmp/son-*-py3-*.whl \
     && echo 'Done'
+
+# install son-monitor
+RUN cd /son-cli/ansible \
+    # Start the basic Ansible setup
+    && ansible-playbook install_son-monitor.yml \
+    && cd /son-cli \
+    && python setup_son-monitor.py develop \
+    && echo 'installed son-monitor'

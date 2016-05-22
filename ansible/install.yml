@@ -11,13 +11,3 @@
 
     - name: install pip 3.x
       apt: pkg=python3-pip state=installed
-
-
-    - name: install son-monitor dependecies
-      apt: pkg={{item}} state=installed
-      with_items:
-        - python-dev
-        - build-essential
-        - libffi-dev
-        - libssl-dev
-
