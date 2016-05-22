@@ -15,6 +15,7 @@ RUN apt-get update \
 
 COPY ansible /ansible
 COPY ./dist/son-*-py3-*.whl /tmp/
+COPY ./dist/son-*-py2-*.whl /tmp/
 
 RUN cd /ansible \
     # Start the basic Ansible setup
@@ -22,6 +23,15 @@ RUN cd /ansible \
     && echo 'Installing son-cli' \
     # Install the son-cli package from a local wheel
     && pip3 install /tmp/son-*-py3-*.whl \
-    && echo 'Done'
+    && echo 'Done, installed son-cli'
+
+# install son-monitor (python2 based)
+RUN cd /ansible \
+    # Start the basic Ansible setup
+    && ansible-playbook install_son-monitor.yml \
+    && echo 'Installing son-monitor' \
+    # Install the son-monitor package from a local wheel
+    && pip install /tmp/son-*-py2-*.whl \
+    && echo 'Done, installed son-monitor'
 
 
