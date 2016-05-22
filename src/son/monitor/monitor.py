@@ -1,3 +1,7 @@
+#!/usr/bin/python2
+
+# Python2 is needed because the zerorpc server in son-emu is using python2
+
 """
 son-monitor features available by cli
 
@@ -20,9 +24,15 @@ or
 
 """
 
+try:
+    from son.monitor import prometheus
+except:
+    import prometheus
 
-from son.monitor import prometheus
-from son.monitor import profiler
+try:
+    from son.monitor import profiler
+except:
+    import profiler
 
 import argparse
 import zerorpc
@@ -247,4 +257,7 @@ def main():
         return
 
     _execute_command(args)
+
+if __name__ == "__main__":
+	main()
 

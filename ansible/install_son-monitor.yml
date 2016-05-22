@@ -1,0 +1,19 @@
+- hosts: localhost
+  tasks:
+    - name: updates apt
+      apt: update_cache=yes
+
+    - name: install son-monitor dependecies
+      apt: pkg={{item}} state=installed
+      with_items:
+        - python2.7
+        - python-dev
+        - python-pip
+        - build-essential
+        - python-setuptools
+        - python-zmq
+        - libzmq-dev
+        - libffi-dev
+        - libssl-dev
+
+
