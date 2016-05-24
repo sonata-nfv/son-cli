@@ -394,7 +394,7 @@ class Packager(object):
             vdu_list = [vdu for vdu in vnfd['virtual_deployment_units'] if vdu['vm_image']]
             for vdu in vdu_list:
 
-                # vm_image can be a local File, a local Dir, a URL or a URI
+                # vm_image can be a local File, a local Dir, a URL or a reference to docker image
                 vdu_image_path = vdu['vm_image']
 
                 if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
@@ -430,9 +430,8 @@ class Packager(object):
                                     dir_o = dir_o[1:]
                                 pce.append(self.__pce_img_gen__(root, vnf, vdu, f, dir_p=dir_p, dir_o=dir_o))
 
-                else:  # Invalid vm_image
-                    log.warning("Cannot find vm_image={} referenced in [VNFD={}, VDU id={}]".format(
-                        bd, vnfd_list[0], vdu['id']))
+                elif vdu['vm_image_format'] == 'docker':
+                    log.debug("Referenced vm_image is docker '{}'".format(vdu['vm_image']))
 
         return pce
 
