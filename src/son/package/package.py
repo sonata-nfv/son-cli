@@ -91,25 +91,12 @@ class Packager(object):
         log.info('Create General Description section')
         gds = self.package_gds(prj)
 
-        package_content_section = []
+        log.info('Create Package Content Section')
+        pcs = self.package_pcs()
 
-        # Load and add service descriptor
-        pcs = self.generate_nsd()
-        if not pcs or len(pcs) == 0:
-            log.error("Failed to package service descriptor")
-            return
-        package_content_section += pcs
-
-        # Load and add the function descriptors
-        pcs = self.generate_vnfds()
-        if not pcs or len(pcs) == 0:
-            log.error("Failed to package function descriptors")
-            return
-        package_content_section += pcs
-
-        # Set the package descriptor
+        # Compile the package descriptor
         self._package_descriptor = gds
-        self._package_descriptor.update(dict(package_content=package_content_section))
+        self._package_descriptor.update(dict(package_content=pcs))
 
         # Create the manifest folder and file
         meta_inf = os.path.join(self._dst_path, "META-INF")
@@ -127,7 +114,7 @@ class Packager(object):
     @performance
     def package_gds(self, prj_descriptor):
         """
-        Compile information for the general description section.
+        Compile information for the General Description Section.
         This section is exclusively filled by the project descriptor
         file located on the root of every project.
 
@@ -149,6 +136,32 @@ class Packager(object):
                   file=sys.stderr)
             return False
         return gds
+
+    @performance
+    def package_pcs(self):
+        """
+        Compile information for the Package Content Section.
+        This section contains all the artifacts that are contained and
+        shipped by the package.
+        :return:
+        """
+        pcs = []
+
+        # Load and add service descriptor
+        nsd = self.generate_nsd()
+        if not pcs or len(pcs) == 0:
+            log.error("Failed to package service descriptor")
+            return False
+        pcs += nsd
+
+        # Load and add the function descriptors
+        vnfds = self.generate_vnfds()
+        if not pcs or len(pcs) == 0:
+            log.error("Failed to package function descriptors")
+            return False
+        pcs += vnfds
+
+        return pcs
 
     @performance
     def generate_nsd(self, vendor=None):
