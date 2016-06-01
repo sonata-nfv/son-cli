@@ -133,7 +133,7 @@ class Packager(object):
 
         :param prj_descriptor: The file to gather all needed information.
         """
-        gds_fields = ['group', 'name', 'version', 'maintainer', 'description']
+        gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
 
@@ -142,7 +142,7 @@ class Packager(object):
             if field not in prj_descriptor.keys():
                 errors.append(field)
             else:
-                gds['package_' + field] = prj_descriptor[field]
+                gds[field] = prj_descriptor[field]
 
         if errors:
             print('Please define {} on {}'.format(', '.join(errors), Project.__descriptor_name__),
