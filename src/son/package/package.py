@@ -51,7 +51,13 @@ class Packager(object):
         # Keep a list of repositories and catalogue servers that this package depend on.
         # This will be included in the Package Resolver Section
         self._package_resolvers = []
+
+        # Keep a list of external artifact dependencies that this package depends up on
+        # This will be included in the Artifact Dependencies Section
         self._artifact_dependencies = []
+
+        # States if this package is self-contained, i.e. if contains all its relevant artifacts
+        self._sealed = True
 
         # Clear and create package specific folder
         if generate_pd:
@@ -93,9 +99,6 @@ class Packager(object):
         with open(prj_file, 'r') as prj_file:
             prj = yaml.load(prj_file)
 
-        log.info('Create General Description section')
-        general_description = self.package_gds(prj)
-
         log.info('Create Package Content Section')
         package_content = self.package_pcs()
 
@@ -107,6 +110,10 @@ class Packager(object):
 
         log.info('Create Artifact Dependencies Section')
         artifact_dependencies = self.package_ads()
+
+        # The general section must be created last, some fields depend on prior processing
+        log.info('Create General Description section')
+        general_description = self.package_gds(prj)
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -140,6 +147,7 @@ class Packager(object):
         gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
+        gds['sealed'] = self._sealed
 
         errors = []
         for field in gds_fields:
@@ -614,6 +622,9 @@ class Packager(object):
                         'password': password
                     }}
         self._artifact_dependencies.append(ad_entry)
+
+        # Set package sealed to false as it will not be self-contained
+        self._sealed = False
 
     def load_vnf_from_catalogue_server(self, vnf_id):
 
