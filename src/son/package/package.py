@@ -48,6 +48,9 @@ class Packager(object):
 
         self._dst_path = dst_path
 
+        # Specifies THE service template of this package
+        self._entry_service_template = None
+
         # Keep a list of repositories and catalogue servers that this package depend on.
         # This will be included in the Package Resolver Section
         self._package_resolvers = []
@@ -149,6 +152,7 @@ class Packager(object):
         gds['descriptor_version'] = self._version
         gds['schema'] = self._schema_validator.get_remote_schema(SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
         gds['sealed'] = self._sealed
+        gds['entry_service_template'] = self._entry_service_template
 
         errors = []
         for field in gds_fields:
@@ -287,6 +291,9 @@ class Packager(object):
         pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
         pce_sd["md5"] = generate_hash(nsd)
         pce.append(pce_sd)
+
+        # Specify the NSD as THE entry service template of package descriptor
+        self._entry_service_template = pce_sd['name']
 
         return pce
 
