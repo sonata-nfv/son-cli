@@ -147,6 +147,7 @@ class Packager(object):
         gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
+        gds['schema'] = self._schema_validator.get_remote_schema(SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
         gds['sealed'] = self._sealed
 
         errors = []
