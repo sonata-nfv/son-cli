@@ -86,10 +86,10 @@ class Project:
         """
         d = {
             'name': 'sonata-project-sample',
-            'group': 'eu.sonata.project',
-            'version': '0.0.1',
+            'vendor': 'eu.sonata-nfv.package',
+            'version': '0.3',
             'maintainer': 'Name, Company, Contact',
-            'description': 'Project description',
+            'description': 'Some description about this sample',
             'catalogues': ['personal'],
             'publish_to': ['personal']
         }

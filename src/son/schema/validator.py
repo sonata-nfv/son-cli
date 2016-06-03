@@ -46,6 +46,22 @@ class SchemaValidator(object):
                                                'remote': self._schemas_remote_master +
                                                'function-descriptor/vnfd-schema.yml'}}
 
+    def get_remote_schema(self, descriptor):
+        """
+        Obtains current remote schema URL for a particular descriptor
+        :param descriptor: the target descriptor
+        :return: the schema URL
+        """
+        return self._schemas[descriptor]['remote']
+
+    def get_local_schema(self, descriptor):
+        """
+        Obtains current local schema file for a particular descriptor
+        :param descriptor: the target descriptor
+        :return: the schema filename
+        """
+        return self._schemas[descriptor]['local']
+
     def load_schema(self, template, reload=False):
         """
         Load schema from a local file or a remote URL.

@@ -50,7 +50,7 @@ class UnitCreatePackageTests(unittest.TestCase):
         prj_config = {
             'catalogues': '[personal]',
             'description': 'Project description',
-            'group': 'eu.sonata.project',
+            'vendor': 'eu.sonata.project',
             'maintainer': 'Name, Company, Contact',
             'publish_to': '[personal]',
             'version': '0.0.1'

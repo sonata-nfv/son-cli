@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
+    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="1.0"):
 
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
@@ -47,6 +47,20 @@ class Packager(object):
         self._ns_vnf_registry = {}
 
         self._dst_path = dst_path
+
+        # Specifies THE service template of this package
+        self._entry_service_template = None
+
+        # Keep a list of repositories and catalogue servers that this package depend on.
+        # This will be included in the Package Resolver Section
+        self._package_resolvers = []
+
+        # Keep a list of external artifact dependencies that this package depends up on
+        # This will be included in the Artifact Dependencies Section
+        self._artifact_dependencies = []
+
+        # States if this package is self-contained, i.e. if contains all its relevant artifacts
+        self._sealed = True
 
         # Clear and create package specific folder
         if generate_pd:
@@ -88,28 +102,28 @@ class Packager(object):
         with open(prj_file, 'r') as prj_file:
             prj = yaml.load(prj_file)
 
+        log.info('Create Package Content Section')
+        package_content = self.package_pcs()
+
+        log.info('Create Package Resolver Section')
+        package_resolver = self.package_prs()
+
+        log.info('Create Package Dependencies Section')
+        package_dependencies = self.package_pds()
+
+        log.info('Create Artifact Dependencies Section')
+        artifact_dependencies = self.package_ads()
+
+        # The general section must be created last, some fields depend on prior processing
         log.info('Create General Description section')
-        gds = self.package_gds(prj)
+        general_description = self.package_gds(prj)
 
-        package_content_section = []
-
-        # Load and add service descriptor
-        pcs = self.generate_nsd()
-        if not pcs or len(pcs) == 0:
-            log.error("Failed to package service descriptor")
-            return
-        package_content_section += pcs
-
-        # Load and add the function descriptors
-        pcs = self.generate_vnfds()
-        if not pcs or len(pcs) == 0:
-            log.error("Failed to package function descriptors")
-            return
-        package_content_section += pcs
-
-        # Set the package descriptor
-        self._package_descriptor = gds
-        self._package_descriptor.update(dict(package_content=package_content_section))
+        # Compile all sections in package descriptor
+        self._package_descriptor = general_description
+        self._package_descriptor.update(package_content)
+        self._package_descriptor.update(package_resolver)
+        self._package_descriptor.update(package_dependencies)
+        self._package_descriptor.update(artifact_dependencies)
 
         # Create the manifest folder and file
         meta_inf = os.path.join(self._dst_path, "META-INF")
@@ -127,22 +141,25 @@ class Packager(object):
     @performance
     def package_gds(self, prj_descriptor):
         """
-        Compile information for the general description section.
+        Compile information for the General Description Section.
         This section is exclusively filled by the project descriptor
         file located on the root of every project.
-
         :param prj_descriptor: The file to gather all needed information.
         """
-        gds_fields = ['group', 'name', 'version', 'maintainer', 'description']
+        # List of mandatory fields to be included in the GDS
+        gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
+        gds['schema'] = self._schema_validator.get_remote_schema(SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
+        gds['sealed'] = self._sealed
+        gds['entry_service_template'] = self._entry_service_template
 
         errors = []
         for field in gds_fields:
             if field not in prj_descriptor.keys():
                 errors.append(field)
             else:
-                gds['package_' + field] = prj_descriptor[field]
+                gds[field] = prj_descriptor[field]
 
         if errors:
             print('Please define {} on {}'.format(', '.join(errors), Project.__descriptor_name__),
@@ -151,6 +168,66 @@ class Packager(object):
         return gds
 
     @performance
+    def package_pcs(self):
+        """
+        Compile information for the Package Content Section.
+        This section contains all the artifacts that are contained and
+        shipped by the package.
+        """
+        pcs = []
+
+        # Load and add service descriptor
+        nsd = self.generate_nsd()
+        if not nsd or len(nsd) == 0:
+            log.error("Failed to package service descriptor")
+            return False
+        pcs += nsd
+
+        # Load and add the function descriptors
+        vnfds = self.generate_vnfds()
+        if not vnfds or len(vnfds) == 0:
+            log.error("Failed to package function descriptors")
+            return False
+        pcs += vnfds
+
+        return dict(package_content=pcs)
+
+    @performance
+    def package_prs(self):
+        """
+        Compile information for the Package Resolver Section.
+        This section contains information about catalogues and repositories
+        needed to resolve the dependencies specified in this package descriptor.
+        """
+        if len(self._package_resolvers) == 0:
+            log.debug("There are no required Package Resolvers. This section will not be included.")
+            return dict()
+
+        return dict(package_resolvers=self._package_resolvers)
+
+    @performance
+    def package_pds(self):
+        """
+        Compile information for the Package Dependencies Section.
+        This section specifies additional packages that this package depends up on.
+        """
+        log.debug("There are no required Package Dependencies. This section will not be included.")
+        return dict()
+
+    @performance
+    def package_ads(self):
+        """
+        Compile information for the Artifact Dependencies Section
+        This section contains components that are not included in the package but
+        are referenced in its descriptors. For instance, it includes the url of
+        vm_images used by network functions.
+        """
+        if len(self._artifact_dependencies) == 0:
+            log.debug("There are no required Artifact Dependencies. This section will not be included.")
+            return dict()
+
+        return dict(artifact_dependencies=self._artifact_dependencies)
+
     def generate_nsd(self, vendor=None):
         """
         Compile information for the service descriptor section.
@@ -214,6 +291,9 @@ class Packager(object):
         pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
         pce_sd["md5"] = generate_hash(nsd)
         pce.append(pce_sd)
+
+        # Specify the NSD as THE entry service template of package descriptor
+        self._entry_service_template = pce_sd['name']
 
         return pce
 
@@ -293,7 +373,6 @@ class Packager(object):
 
         return True
 
-    @performance
     def generate_project_source_vnfds(self, base_path, vendor=None):
         """
         Compile information for the list of VNFs
@@ -313,7 +392,6 @@ class Packager(object):
 
         return pcs
 
-    @performance
     def generate_external_vnfds(self, base_path, vnf_ids, vendor=None):
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)) and
                              file in vnf_ids, os.listdir(base_path))
@@ -397,13 +475,19 @@ class Packager(object):
                 # vm_image can be a local File, a local Dir, a URL or a reference to docker image
                 vdu_image_path = vdu['vm_image']
 
-                if validators.url(vdu_image_path):  # Check if is URL/URI. Can still be local (file:///...)
+                if validators.url(vdu_image_path):  # Check if is URL/URI.
                     try:
                         # Check if the image URL exists with a short Timeout
                         requests.head(vdu_image_path, timeout=1)
 
                     except (requests.Timeout, requests.ConnectionError):
                         log.warning("Failed to verify the existence of vm_image '{}'".format(vdu['vm_image']))
+
+                    # Add image URL to artifact dependencies
+                    self._add_artifact_dependency(name=vnfd['name'] + '-' + vdu['id'] + '-vm_image',
+                                                  url=vdu['vm_image'],
+                                                  md5='02236f2ae558018ed14b5222ef1bd9f1')
+                    # TODO: remote url must provide md5? This is just a dummy to pass validation.
 
                     continue
 
@@ -511,6 +595,45 @@ class Packager(object):
 
         return u_vnfs
 
+    def _add_package_resolver(self, name, username='username', password='password'):
+
+        log.debug("Adding package resolver entry '{}'".format(name))
+
+        # Check if already included
+        for pr_entry in self._package_resolvers:
+            if pr_entry['name'] == name:
+                log.debug("Package resolver entry '{}' was previously added. Ignoring.".format(name))
+                return
+
+        pr_entry = {'name': name,
+                    'credentials': {
+                        'username': username,
+                        'password': password
+                    }}
+        self._package_resolvers.append(pr_entry)
+
+    def _add_artifact_dependency(self, name, url, md5, username='username', password='password'):
+
+        log.debug("Adding artifact dependency entry '{}'".format(name))
+
+        # Check if already included
+        for ad_entry in self._artifact_dependencies:
+            if ad_entry['name'] == name:
+                log.debug("Artifact dependency entry '{}' was previously added. Ignoring.".format(name))
+                return
+
+        ad_entry = {'name': name,
+                    'url': url,
+                    'md5': md5,
+                    'credentials': {
+                        'username': username,
+                        'password': password
+                    }}
+        self._artifact_dependencies.append(ad_entry)
+
+        # Set package sealed to false as it will not be self-contained
+        self._sealed = False
+
     def load_vnf_from_catalogue_server(self, vnf_id):
 
         # Check if there are catalogue clients available
@@ -531,6 +654,10 @@ class Packager(object):
             vnfd = client.get_vnf(vnf_id)
             if not vnfd:
                 continue
+
+            # Mark this catalogue server as a dependency
+            self._add_package_resolver(client.base_url)
+
             return vnfd
 
         return

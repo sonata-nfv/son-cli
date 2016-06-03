@@ -7,7 +7,7 @@ class IntPDTester(unittest.TestCase):
 
     __pfd__ = {
         'name': 'sonata-project-sample',
-        'group': 'com.sonata.project',
+        'vendor': 'com.sonata.project',
         'version': '0.0.1',
         'maintainer': 'Name, Company, Contact',
         'description': 'Project description',
