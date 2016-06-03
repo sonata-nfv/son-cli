@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="0.1"):
+    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="1.0"):
 
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
