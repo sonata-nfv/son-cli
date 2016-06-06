@@ -277,7 +277,7 @@ class Packager(object):
 
         # Create SD location
         nsd = os.path.join(base_path, nsd_filename)
-        sd_path = os.path.join(self._dst_path, "service_descriptor")
+        sd_path = os.path.join(self._dst_path, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
         # Copy NSD file
