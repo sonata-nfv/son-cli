@@ -26,7 +26,7 @@ setup(
         package_data= {
             'son': ['package/templates/*', 'workspace/samples/*']
         },
-        install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators==0.10', 'requests', 'coloredlogs'],
+        install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests', 'coloredlogs'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
