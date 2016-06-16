@@ -561,7 +561,7 @@ class Packager(object):
         log.info("Package generated successfully.\nFile: {}\nMD5: {}\n".format(os.path.abspath(zip_name), package_md5))
 
     def register_ns_vnf(self, vnf_id):
-        """ 
+        """
         Add a vnf to the NS VNF registry.
         :param vnf_id:
         :return: True for successful registry. False if the VNF already exists in the registry.
