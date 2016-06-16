@@ -563,6 +563,11 @@ class Packager(object):
             log.critical("Missing package descriptor. Failed to generate package.")
             exit(1)
 
+        if not name:
+            name = self._package_descriptor['vendor'] + "." + \
+                   self._package_descriptor['name'] + "." + \
+                   self._package_descriptor['version']
+
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.son')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
@@ -734,7 +739,5 @@ def main():
     # Obtain Workspace object
     workspace = Workspace.__create_from_descriptor__(ws_root)
 
-    name = Path(prj).name if not args.name else args.name
-
     pck = Packager(prj, workspace, dst_path=args.destination)
-    pck.generate_package(name)
+    pck.generate_package(args.name)
