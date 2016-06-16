@@ -280,9 +280,9 @@ class Packager(object):
         sd_path = os.path.join(self._dst_path, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
-        # Copy NSD file
+        # Copy service descriptor file
         sd = os.path.join(sd_path, nsd_filename)
-        shutil.copyfile(nsd, sd)
+        self.copy_descriptor_file(nsd, sd)
 
         # Generate NSD package content entry
         pce = []
@@ -457,9 +457,9 @@ class Packager(object):
         fd_path = os.path.join(self._dst_path, "function_descriptors")
         os.makedirs(fd_path, exist_ok=True)
 
-        # Copy VNFD file
+        # Copy the descriptor file
         fd = os.path.join(fd_path, vnfd_list[0])
-        shutil.copyfile(os.path.join(base_path, vnfd_list[0]), fd)
+        self.copy_descriptor_file(os.path.join(base_path, vnfd_list[0]), fd)
 
         # Generate VNFD Entry
         pce_fd = dict()
@@ -518,6 +518,22 @@ class Packager(object):
                     log.debug("Referenced vm_image is docker '{}'".format(vdu['vm_image']))
 
         return pce
+
+    @staticmethod
+    def copy_descriptor_file(src_descriptor, dst_descriptor):
+        """
+        Copy a descriptor file. Instead of just copying the file,
+        it parses and reads the content of the source file, then it creates
+        a new file and writes in it the digested content.
+        :param src_descriptor:
+        :param dst_descriptor:
+        :return:
+        """
+        with open(src_descriptor, "r") as vnfd_file:
+            vnf_content = yaml.load(vnfd_file)
+
+        with open(dst_descriptor, "w") as vnfd_file:
+            vnfd_file.write(yaml.dump(vnf_content, default_flow_style=False))
 
     def __pce_img_gen__(self, bd, vnf, vdu, f, dir_p='', dir_o=''):
         pce = dict()
