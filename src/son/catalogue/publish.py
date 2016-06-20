@@ -168,7 +168,7 @@ def main():
 
     if args.project:
         prj_root = os.path.expanduser(args.project)
-        proj = Project(prj_root, ws)
+        proj = Project(ws, prj_root)
         if not proj:
             print("Could not find a SONATA SDK project at '{}'".format(prj_root), file=sys.stderr)
             exit(1)

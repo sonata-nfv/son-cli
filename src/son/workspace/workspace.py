@@ -245,7 +245,7 @@ def main():
         log.debug("Attempting to create a new project")
 
         prj_root = os.path.expanduser(args.project)
-        proj = Project(prj_root, ws)
+        proj = Project(ws, prj_root)
         proj.create_prj()
 
         log.debug("Project created.")
