@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from unittest import mock
 from son.package.package import Packager
 from son.workspace.workspace import Workspace
+from son.workspace.workspace import Project
 
 
 class UnitCreatePackageTests(unittest.TestCase):
@@ -17,8 +18,11 @@ class UnitCreatePackageTests(unittest.TestCase):
         # First, create a workspace to give to Packager
         workspace = Workspace("ws/root", ws_name="ws_test", log_level='debug')
 
+        # Create project
+        project = Project(workspace, 'prj/path')
+
         # Instantiate a Packager instance
-        packager = Packager("prj/path", workspace, generate_pd=False, dst_path="dst/path")
+        packager = Packager(workspace=workspace, project=project, generate_pd=False, dst_path="dst/path")
         packager._package_descriptor = True
 
         # Prepare mocks
@@ -42,8 +46,11 @@ class UnitCreatePackageTests(unittest.TestCase):
         # First, create a workspace to give to Packager
         workspace = Workspace("ws/root", ws_name="ws_test", log_level='debug')
 
+        # Create project
+        project = Project(workspace, 'prj/path')
+
         # Instantiate a Packager instance
-        packager = Packager("prj/path", workspace, generate_pd=False, dst_path="dst/path")
+        packager = Packager(workspace=workspace, project=project, generate_pd=False, dst_path="dst/path")
         packager._package_descriptor = True
 
         # Create fake project configuration

@@ -100,7 +100,7 @@ class Packager(object):
         """
         Create and set the full package descriptor as a dictionary.
         It process the file by each individual section.
-        :param prj_path: The project path to load the project yaml file
+        :param project: The project object
         """
         log.info('Create Package Content Section')
         package_content = self.package_pcs()
@@ -377,7 +377,7 @@ class Packager(object):
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
             if not pc_entries or len(pc_entries) == 0:
                 continue
-            for pce in pc_entries:
+            for pce in iter(pc_entries):
                 pcs.append(pce)
 
         return pcs
@@ -390,7 +390,7 @@ class Packager(object):
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
             if not pc_entries or len(pc_entries) == 0:
                 continue
-            for pce in pc_entries:
+            for pce in iter(pc_entries):
                 pcs.append(pce)
 
         return pcs
@@ -523,11 +523,11 @@ class Packager(object):
         img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
         pce["content-type"] = "application/sonata.{}_files".format(img_format)
         pce["name"] = "/{}_files/{}{}/{}".format(img_format, vnf, dir_p, f)
-        pce["md5"] = self.__pce_img_gen_fc__(pce, img_format, vnf, f, bd, dir_o)
+        pce["md5"] = self.__pce_img_gen_fc__(img_format, vnf, f, bd, dir_o)
 
         return pce
 
-    def __pce_img_gen_fc__(self, pce, img_format, vnf, f, root, dir_o=''):
+    def __pce_img_gen_fc__(self, img_format, vnf, f, root, dir_o=''):
         fd_path = os.path.join("{}_files".format(img_format), vnf, dir_o)
         fd_path = os.path.join(self._dst_path, fd_path)
         os.makedirs(fd_path, exist_ok=True)

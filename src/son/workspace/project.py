@@ -78,10 +78,9 @@ class Project:
             path = os.path.join(vnf_path, d)
             os.makedirs(path, exist_ok=False)
 
-    def _create_nsd_dir(self, name=None):
+    def _create_nsd_dir(self):
         """
         Function to create a new NSD inside project source.
-        :param name:The NSD name
         """
         nsd_path = os.path.join(self._prj_root, 'sources', 'nsd')
         self._create_sample('nsd', nsd_path)
@@ -151,7 +150,8 @@ class Project:
             return
         func(path)
 
-    def _create_sample_fsm(self, path):
+    @staticmethod
+    def _create_sample_fsm(path):
         d = {
             'name': 'sample fsm',
             'id': 'com.sonata.fsm.sample',
@@ -161,7 +161,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_ssm(self, path):
+    @staticmethod
+    def _create_sample_ssm(path):
         d = {
             'name': 'sample ssm',
             'id': 'com.sonata.ssm.sample',
@@ -171,7 +172,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_pattern(self, path):
+    @staticmethod
+    def _create_sample_pattern(path):
         d = {
             'name': 'sample pattern',
             'id': 'com.sonata.pattern.sample',
@@ -181,7 +183,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_vnf(self, path):
+    @staticmethod
+    def _create_sample_vnf(path):
         """
         Create a sample VNF descriptor (to be evoked upon project creation)
         :param path: The VNF sample directory
@@ -201,7 +204,8 @@ class Project:
         srcfile = pkg_resources.resource_filename(rp, src_path)
         shutil.copyfile(srcfile, os.path.join(path, sample_image))
 
-    def _create_sample_nsd(self, path):
+    @staticmethod
+    def _create_sample_nsd(path):
         """
         Create a sample NS descriptor (to be evoked upon project creation)
         :param path: The NSD sample directory
