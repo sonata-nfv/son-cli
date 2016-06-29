@@ -11,7 +11,7 @@ import os.path as path
 cwd = path.dirname(__file__)
 longdesc = codecs.open(path.join(cwd, 'README.md'), 'r', 'ascii').read()
 
-name = 'son'
+name = 'sonata-cli'
 setup(
         name=name,
         license='To be determined',
