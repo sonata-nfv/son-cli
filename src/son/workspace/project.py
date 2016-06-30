@@ -12,16 +12,23 @@ log = logging.getLogger(__name__)
 
 class Project:
 
+    PROJECT_VERSION = "0.3"
+
     __descriptor_name__ = 'project.yml'
 
-    def __init__(self, prj_root, workspace):
+    def __init__(self, workspace, prj_root, config=None):
         coloredlogs.install(level=workspace.log_level)
         self._prj_root = prj_root
         self._workspace = workspace
+        self._prj_config = config
 
     @property
     def project_root(self):
         return self._prj_root
+
+    @property
+    def project_config(self):
+        return self._prj_config
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))
@@ -71,10 +78,9 @@ class Project:
             path = os.path.join(vnf_path, d)
             os.makedirs(path, exist_ok=False)
 
-    def _create_nsd_dir(self, name=None):
+    def _create_nsd_dir(self):
         """
         Function to create a new NSD inside project source.
-        :param name:The NSD name
         """
         nsd_path = os.path.join(self._prj_root, 'sources', 'nsd')
         self._create_sample('nsd', nsd_path)
@@ -84,10 +90,10 @@ class Project:
         Creates the project descriptor (project.yml)
         :return:
         """
-        d = {
+        self._prj_config = {
             'name': 'sonata-project-sample',
             'vendor': 'eu.sonata-nfv.package',
-            'version': '0.3',
+            'version': self.PROJECT_VERSION,
             'maintainer': 'Name, Company, Contact',
             'description': 'Some description about this sample',
             'catalogues': ['personal'],
@@ -96,7 +102,7 @@ class Project:
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(d))
+            prj_file.write(yaml.dump(self._prj_config))
 
     def get_ns_descriptor(self):
         """
@@ -144,7 +150,8 @@ class Project:
             return
         func(path)
 
-    def _create_sample_fsm(self, path):
+    @staticmethod
+    def _create_sample_fsm(path):
         d = {
             'name': 'sample fsm',
             'id': 'com.sonata.fsm.sample',
@@ -154,7 +161,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_ssm(self, path):
+    @staticmethod
+    def _create_sample_ssm(path):
         d = {
             'name': 'sample ssm',
             'id': 'com.sonata.ssm.sample',
@@ -164,7 +172,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_pattern(self, path):
+    @staticmethod
+    def _create_sample_pattern(path):
         d = {
             'name': 'sample pattern',
             'id': 'com.sonata.pattern.sample',
@@ -174,7 +183,8 @@ class Project:
         with open(prj_path, 'w') as prj_file:
             prj_file.write(yaml.dump(d))
 
-    def _create_sample_vnf(self, path):
+    @staticmethod
+    def _create_sample_vnf(path):
         """
         Create a sample VNF descriptor (to be evoked upon project creation)
         :param path: The VNF sample directory
@@ -194,7 +204,8 @@ class Project:
         srcfile = pkg_resources.resource_filename(rp, src_path)
         shutil.copyfile(srcfile, os.path.join(path, sample_image))
 
-    def _create_sample_nsd(self, path):
+    @staticmethod
+    def _create_sample_nsd(path):
         """
         Create a sample NS descriptor (to be evoked upon project creation)
         :param path: The NSD sample directory
@@ -221,3 +232,25 @@ class Project:
             return False
 
         return True
+
+    @staticmethod
+    def __create_from_descriptor__(workspace, prj_root):
+        """
+        Creates a Project object based on a configuration descriptor
+        :param prj_root: base path of the project
+        :return: Project object
+        """
+        prj_filename = os.path.join(prj_root, Project.__descriptor_name__)
+        if not os.path.isdir(prj_root) or not os.path.isfile(prj_filename):
+            log.error("Unable to load project descriptor '{}'".format(prj_filename))
+            return None
+
+        log.info("Loading Project configuration '{}'".format(prj_filename))
+        with open(prj_filename, 'r') as prj_file:
+            prj_config = yaml.load(prj_file)
+
+        if not prj_config['version'] == Project.PROJECT_VERSION:
+            log.warning("Reading a project configuration with a different version {}"
+                        .format(prj_config['version']))
+
+        return Project(workspace, prj_root, config=prj_config)

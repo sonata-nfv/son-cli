@@ -11,7 +11,7 @@ import os.path as path
 cwd = path.dirname(__file__)
 longdesc = codecs.open(path.join(cwd, 'README.md'), 'r', 'ascii').read()
 
-name = 'son'
+name = 'sonata-cli'
 setup(
         name=name,
         license='To be determined',
@@ -24,7 +24,7 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['package/templates/*', 'workspace/samples/*']
+            'son': ['schema/tests/son-schema/*', 'workspace/samples/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests', 'coloredlogs'],
         zip_safe=False,
@@ -39,5 +39,4 @@ setup(
         test_suite='son',
         setup_requires=['pytest-runner'],
         tests_require=['pytest']
-#test_suite='son.workspace.tests.TestSample.main'
     )

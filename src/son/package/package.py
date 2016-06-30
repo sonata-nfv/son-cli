@@ -5,13 +5,11 @@ import shutil
 import sys
 import zipfile
 from contextlib import closing
-from pathlib import Path
 
 import coloredlogs
 import requests
 import validators
 import yaml
-from jsonschema import validate
 
 from son.catalogue.catalogue_client import CatalogueClient
 from son.package.decorators import performance
@@ -25,14 +23,14 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    def __init__(self, prj_path, workspace, dst_path=None, generate_pd=True, version="1.0"):
+    def __init__(self, workspace, project, dst_path=None, generate_pd=True, version="1.0"):
 
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._version = version
         self._package_descriptor = None
-        self._project_path = prj_path
         self._workspace = workspace
+        self._project = project
 
         # Create a schema validator
         self._schema_validator = SchemaValidator(workspace)
@@ -64,44 +62,46 @@ class Packager(object):
 
         # Clear and create package specific folder
         if generate_pd:
+            self.init_package_skeleton(dst_path)
+            self.package_descriptor = self._project
 
-            if not dst_path:
-                self._dst_path = os.path.join(self._project_path, "target")
+    def init_package_skeleton(self, dst_path):
+        """
+        Validate and initialize the destination folder for the creation
+        of the package artifacts.
+        :param dst_path: The directory where the package components are kept
+        """
+        if not dst_path:
+            self._dst_path = os.path.join(self._project.project_root, "target")
 
-            elif os.path.isdir(dst_path):   # dir exists?
+        elif os.path.isdir(dst_path):  # dir exists?
 
-                if len(os.listdir(dst_path)) > 0:  # dir not empty?
-                    log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
-                    sys.stderr.write("ERROR: Destination directory '{}' is not empty\n"
-                                     .format(os.path.abspath(dst_path)))
-                    exit(1)
+            if len(os.listdir(dst_path)) > 0:  # dir not empty?
+                log.error("Destination directory '{}' is not empty".format(os.path.abspath(dst_path)))
+                sys.stderr.write("ERROR: Destination directory '{}' is not empty\n"
+                                 .format(os.path.abspath(dst_path)))
+                exit(1)
 
-                self._dst_path = os.path.abspath(dst_path)
+            self._dst_path = os.path.abspath(dst_path)
 
-            else:
-                self._dst_path = os.path.abspath(dst_path)
+        else:
+            self._dst_path = os.path.abspath(dst_path)
 
-            if os.path.exists(self._dst_path):
-                shutil.rmtree(self._dst_path)
-                os.makedirs(self._dst_path, exist_ok=False)
-            self.package_descriptor = self._project_path
+        if os.path.exists(self._dst_path):
+            shutil.rmtree(self._dst_path)
+            os.makedirs(self._dst_path, exist_ok=False)
 
     @property
     def package_descriptor(self):
         return self._package_descriptor
 
     @package_descriptor.setter
-    def package_descriptor(self, prj_path):
+    def package_descriptor(self, project):
         """
         Create and set the full package descriptor as a dictionary.
         It process the file by each individual section.
-        :param prj_path: The project path to load the project yaml file
+        :param project: The project object
         """
-        log.info('Loading Project file')
-        prj_file = os.path.join(prj_path, Project.__descriptor_name__)
-        with open(prj_file, 'r') as prj_file:
-            prj = yaml.load(prj_file)
-
         log.info('Create Package Content Section')
         package_content = self.package_pcs()
 
@@ -116,7 +116,7 @@ class Packager(object):
 
         # The general section must be created last, some fields depend on prior processing
         log.info('Create General Description section')
-        general_description = self.package_gds(prj)
+        general_description = self.package_gds(project.project_config)
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -228,13 +228,11 @@ class Packager(object):
 
         return dict(artifact_dependencies=self._artifact_dependencies)
 
-    def generate_nsd(self, vendor=None):
+    def generate_nsd(self):
         """
         Compile information for the service descriptor section.
-        :param vendor:
-        :return:
         """
-        base_path = os.path.join(self._project_path, 'sources', 'nsd')
+        base_path = os.path.join(self._project.project_root, 'sources', 'nsd')
         if not os.path.isdir(base_path):
             log.error("Missing NS directory '{}'".format(base_path))
             return
@@ -262,12 +260,6 @@ class Packager(object):
         if not self._schema_validator.validate(nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
             log.error("Failed to validate Service Descriptor '{}'. Aborting package creation".format(nsd_filename))
             return
-
-        # Vendor verification
-        if vendor and nsd['vendor'] != vendor:
-            log.warning(
-                "You are adding a NS with different vendor, Project vendor={} and NS vendor={}".format(
-                    vendor, nsd['vendor']))
 
         # Cycle through VNFs and register their IDs for later dependency check
         if 'network_functions' in nsd:
@@ -301,11 +293,10 @@ class Packager(object):
         """
         Compile information for the function descriptors.
         This function
-        :return:
         """
         # Add VNFs from project source
         log.info("Packaging VNF descriptors from project source...")
-        pcs = self.generate_project_source_vnfds(os.path.join(self._project_path, 'sources', 'vnf'))
+        pcs = self.generate_project_source_vnfds(os.path.join(self._project.project_root, 'sources', 'vnf'))
 
         # Verify that all VNFs from NSD were packaged
         unpack_vnfs = self.get_unpackaged_ns_vnfs()
@@ -373,12 +364,11 @@ class Packager(object):
 
         return True
 
-    def generate_project_source_vnfds(self, base_path, vendor=None):
+    def generate_project_source_vnfds(self, base_path):
         """
         Compile information for the list of VNFs
         This function iterates over the different VNF entries
         :param base_path: base dir location of VNF descriptors
-        :param vendor: (TBD)
         :return:
         """
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)), os.listdir(base_path))
@@ -387,12 +377,12 @@ class Packager(object):
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
             if not pc_entries or len(pc_entries) == 0:
                 continue
-            for pce in pc_entries:
+            for pce in iter(pc_entries):
                 pcs.append(pce)
 
         return pcs
 
-    def generate_external_vnfds(self, base_path, vnf_ids, vendor=None):
+    def generate_external_vnfds(self, base_path, vnf_ids):
         vnf_folders = filter(lambda file: os.path.isdir(os.path.join(base_path, file)) and
                              file in vnf_ids, os.listdir(base_path))
         pcs = []
@@ -400,19 +390,18 @@ class Packager(object):
             pc_entries = self.generate_vnfd_entry(os.path.join(base_path, vnf), vnf)
             if not pc_entries or len(pc_entries) == 0:
                 continue
-            for pce in pc_entries:
+            for pce in iter(pc_entries):
                 pcs.append(pce)
 
         return pcs
 
-    def generate_vnfd_entry(self, base_path, vnf, vendor=None):
+    def generate_vnfd_entry(self, base_path, vnf):
         """
         Compile information for a specific VNF.
         The VNF descriptor is validated and added to the package.
         VDU image files, referenced in the VNF descriptor, are added to the package.
         :param base_path: The path where the VNF file is located
         :param vnf: The VNF reference path
-        :param vendor: (TBD)
         :return: The package content entries. One VNFD can have multiple entries (e.g. VDU images)
         """
         # Locate VNFD
@@ -440,11 +429,6 @@ class Packager(object):
         if not self._schema_validator.validate(vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
             log.exception("Failed to validate VNF descriptor '{}'".format(vnfd_path))
             return
-
-        # Vendor verification
-        if vendor and vnfd['vendor'] != vendor:
-            log.warning("You are adding a VNF with different group, Project vendor={} and VNF vendor={}"
-                        .format(vendor, vnfd['vendor']))
 
         # Check if this VNF exists in the ns_vnf registry. If does not, cancel its packaging
         if not self.check_in_ns_vnf(get_vnf_id(vnfd)):
@@ -505,7 +489,6 @@ class Packager(object):
                         pce.append(self.__pce_img_gen__(base_path, vnf, vdu, vdu['vm_image'], dir_p='', dir_o=''))
 
                     elif os.path.isdir(bd):
-                        img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
                         for root, dirs, files in os.walk(bd):
                             dir_o = root[len(bd):]
                             dir_p = dir_o.replace(os.path.sep, "/")
@@ -540,11 +523,11 @@ class Packager(object):
         img_format = 'raw' if not vdu['vm_image_format'] else vdu['vm_image_format']
         pce["content-type"] = "application/sonata.{}_files".format(img_format)
         pce["name"] = "/{}_files/{}{}/{}".format(img_format, vnf, dir_p, f)
-        pce["md5"] = self.__pce_img_gen_fc__(pce, img_format, vnf, f, bd, dir_o)
+        pce["md5"] = self.__pce_img_gen_fc__(img_format, vnf, f, bd, dir_o)
 
         return pce
 
-    def __pce_img_gen_fc__(self, pce, img_format, vnf, f, root, dir_o=''):
+    def __pce_img_gen_fc__(self, img_format, vnf, f, root, dir_o=''):
         fd_path = os.path.join("{}_files".format(img_format), vnf, dir_o)
         fd_path = os.path.join(self._dst_path, fd_path)
         os.makedirs(fd_path, exist_ok=True)
@@ -727,17 +710,18 @@ def main():
     else:
         ws_root = Workspace.DEFAULT_WORKSPACE_DIR
 
-    prj = args.project if args.project else os.getcwd()
+    prj_root = args.project if args.project else os.getcwd()
 
     # Validate given arguments
     path_ids = dict()
     path_ids[ws_root] = Workspace.__descriptor_name__
-    path_ids[prj] = Project.__descriptor_name__
+    path_ids[prj_root] = Project.__descriptor_name__
     if not __validate_directory__(paths=path_ids):
         return
 
     # Obtain Workspace object
     workspace = Workspace.__create_from_descriptor__(ws_root)
+    project = Project.__create_from_descriptor__(workspace, prj_root)
 
-    pck = Packager(prj, workspace, dst_path=args.destination)
+    pck = Packager(workspace, project, dst_path=args.destination)
     pck.generate_package(args.name)

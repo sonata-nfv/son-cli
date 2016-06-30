@@ -1,6 +1,7 @@
 import unittest
 from son.package.package import Packager
 from son.workspace.workspace import Workspace
+from son.workspace.workspace import Project
 
 
 class IntPDTester(unittest.TestCase):
@@ -18,7 +19,8 @@ class IntPDTester(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(IntPDTester, self).__init__(*args, **kwargs)
         ws = Workspace("")
-        self.pck = Packager(workspace=ws, prj_path='/', generate_pd=False)
+        prj = Project(ws, '/')
+        self.pck = Packager(workspace=ws, project=prj, generate_pd=False)
 
     def test_correct_gds(self):
         """ Test the correct general description section """
