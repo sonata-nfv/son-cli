@@ -24,7 +24,7 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['package/templates/*', 'workspace/samples/*']
+            'son': ['schema/tests/son-schema/*', 'workspace/samples/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators', 'requests', 'coloredlogs'],
         zip_safe=False,
