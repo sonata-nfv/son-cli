@@ -12,7 +12,14 @@ echo ""
 echo "-> Preparing environment"
 sudo apt-get update
 sudo apt-get install -y python3-pip dpkg-dev fakeroot
-sudo pip3 install setuptools py2deb
+
+# Create a dedicated python environment to avoid conflicts between pip packages
+sudo pip install virtualenv
+rm -rf son-cli-dist/*
+virtualenv son-cli-dist
+. son-cli-dist/bin/activate
+
+pip3 install py2deb
 
 
 # package project and dependencies into debs
@@ -20,6 +27,8 @@ echo "-> Creating deb packages"
 mkdir -p debs
 py2deb -r debs --no-name-prefix=sonata-cli .
 
+# deactivate python env -> no longer required
+deactivate
 
 echo "-> Running repository container"
 # point to remote docker daemon
