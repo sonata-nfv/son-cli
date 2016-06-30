@@ -14,7 +14,7 @@ RUN apt-get update \
     && echo 'Done'
 
 COPY ansible /ansible
-COPY ./dist/son-*-py3-*.whl /tmp/
+COPY ./dist/sonata_cli-*-py3-*.whl /tmp/
 COPY ./dist/son_monitor*.whl /tmp/
 
 RUN cd /ansible \
