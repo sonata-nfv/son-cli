@@ -22,7 +22,7 @@ RUN cd /ansible \
     && ansible-playbook install.yml \
     && echo 'Installing son-cli' \
     # Install the son-cli package from a local wheel
-    && pip3 install /tmp/son-*-py3-*.whl \
+    && pip3 install /tmp/sonata_cli-*-py3-*.whl \
     && echo 'Done, installed son-cli'
 
 # install son-monitor (python2 based)
