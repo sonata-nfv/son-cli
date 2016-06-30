@@ -2,7 +2,7 @@
 
 # this script is to be run at root of "son-cli" dir
 
-set -e
+set -xe
 
 echo ""
 echo "==== Build packages and instantiate debian repository ===="
@@ -12,7 +12,7 @@ echo ""
 echo "-> Preparing environment"
 sudo apt-get update
 sudo apt-get install -y python3-pip dpkg-dev fakeroot
-sudo pip3 install py2deb
+sudo pip3 install setuptools py2deb
 
 
 # package project and dependencies into debs
