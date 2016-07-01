@@ -7,7 +7,21 @@ SONATA SDK command line interface tools
 
 This set of command line tools are meant to aid the SONATA service developers on their tasks
 
-## How to develp for this project
+## How to install son-cli tools
+
+To install son-cli in a debian-based system run the following:
+
+    $ curl -sSL http://registry.sonata-nfv.eu:8080/go | sudo sh
+    $ apt-get install sonata-cli
+
+or if you don't want to pipe `curl` just do it manually:
+
+    $ apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D0DF34A30A4FE3F8
+    $ echo "deb http://registry.sonata-nfv.eu:8080 unstable main" >> /etc/apt/sources.list
+    $ apt-get update
+    $ apt-get install sonata-cli
+
+## How to develop for this project
 
 Prerequisites:
 - python 3 (3.4 used for most of the development)
