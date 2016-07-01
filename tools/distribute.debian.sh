@@ -11,7 +11,7 @@ echo ""
 # install py2deb tool
 echo "-> Preparing environment"
 sudo apt-get update
-sudo apt-get install -y python3-pip dpkg-dev fakeroot
+sudo apt-get install -y python3-pip dpkg-dev fakeroot apt-rdepends
 
 # Create a dedicated python environment to avoid conflicts between pip packages
 sudo pip install virtualenv
@@ -26,6 +26,13 @@ pip3 install py2deb
 echo "-> Creating deb packages"
 mkdir -p debs
 py2deb -r debs --no-name-prefix=sonata-cli .
+
+# package current python version into packages
+python_version=$(pip --version | grep -o "/python.*/" | tr -d '/')
+apt-rdepends "$python_version" | grep -v "^ " > python_deps.txt
+cd debs
+while read p; do apt-get download $p; done <../python_deps.txt
+cd ..
 
 # deactivate and delete python env -> no longer required
 deactivate
