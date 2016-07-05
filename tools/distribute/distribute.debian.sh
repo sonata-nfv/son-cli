@@ -46,7 +46,7 @@ echo "--> Creating debian repository container"
 export DOCKER_HOST="tcp://registry.sonata-nfv.eu:2375"
 
 # check if container is running and stop/remove it
-CONTAINER="registry.sonata-nfv.eu:5000/son-cli-debrepo"
+CONTAINER="son-cli-debrepo"
 RUNNING=$(docker inspect --format="{{ .State.Running }}" $CONTAINER 2> /dev/null) || true
 
 if [ -z ${RUNNING} ]; then
@@ -62,7 +62,7 @@ else
   docker rm "$CONTAINER"
 fi
 
-docker run --name=debrepo -dit \
+docker run --name=son-cli-debrepo -dit \
     -e URI=http://registry.sonata-nfv.eu:8080 \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
@@ -70,17 +70,17 @@ docker run --name=debrepo -dit \
 
 
 # ====== Copy generated debs to container and create repositories for each distro ======
-docker cp packages-ubuntu14.04 registry.sonata-nfv.eu:5000/son-cli-debrepo:/
-docker exec registry.sonata-nfv.eu:5000/son-cli-debrepo sh /create_repo.sh ubuntu14.04 main trusty /packages-ubuntu14.04
+docker cp packages-ubuntu14.04 son-cli-debrepo:/
+docker exec son-cli-debrepo sh /create_repo.sh ubuntu14.04 main trusty /packages-ubuntu14.04
 
 
 # ====== Start repository server ======
-docker exec -d registry.sonata-nfv.eu:5000/son-cli-debrepo aptly serve
+docker exec -d son-cli-debrepo aptly serve
 
 
 # ====== Print 'add repository' scripts
 echo "______________________________________________________________"
-docker exec registry.sonata-nfv.eu:5000/son-cli-debrepo cat /go
+docker exec son-cli-debrepo cat /go
 echo "______________________________________________________________"
 
 export DOCKER_HOST="unix:///var/run/docker.sock"
