@@ -16,7 +16,7 @@ docker build -t ubuntu14.04.build-deb -f tools/distribute/ubuntu14.04.build-deb.
 mkdir -p packages-ubuntu14.04
 
 docker rm -f ubuntu14.04.build-deb || true
-docker run -it --name ubuntu14.04.build-deb \
+docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb \
     py2deb -r deb-packages --name-prefix=son-python3 --no-name-prefix=sonata-cli .
@@ -29,7 +29,7 @@ docker build -t ubuntu16.04.build-deb -f tools/distribute/ubuntu16.04.build-deb.
 mkdir -p packages-ubuntu16.04
 
 docker rm -f ubuntu16.04.build-deb || true
-docker run -it --name ubuntu16.04.build-deb \
+docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
     py2deb -r deb-packages --name-prefix=son-python3 --no-name-prefix=sonata-cli .
