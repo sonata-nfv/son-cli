@@ -80,7 +80,7 @@ docker exec -d son-cli-debrepo aptly serve
 
 # ====== Print 'add repository' scripts
 echo "______________________________________________________________"
-docker exec son-cli-debrepo cat /go
+docker exec son-cli-debrepo cat ~/.aptly/public/go
 echo "______________________________________________________________"
 
 export DOCKER_HOST="unix:///var/run/docker.sock"
