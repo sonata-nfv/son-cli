@@ -27,8 +27,10 @@ echo "-> Creating deb packages"
 mkdir -p debs
 py2deb -r debs --no-name-prefix=sonata-cli .
 
-# deactivate python env -> no longer required
+# deactivate and delete python env -> no longer required
 deactivate
+rm -rf son-cli-dist/*
+rm -d son-cli-dist
 
 echo "-> Running repository container"
 # point to remote docker daemon
