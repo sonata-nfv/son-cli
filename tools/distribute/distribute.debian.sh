@@ -74,7 +74,7 @@ docker run --name=son-cli-debrepo -dit \
     -e URI=http://registry.sonata-nfv.eu:8080 \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
-    -v /home/docker/sonata-dist/gnupg-keys:/.gnupg
+    -v /home/docker/sonata-dist/gnupg-keys:/.gnupg \
     --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 
