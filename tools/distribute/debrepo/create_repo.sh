@@ -38,7 +38,7 @@ then
     release_sig_path=$(find ~/.aptly/public/dists -name Release.gpg | head -1)
     gpg_key_id=$(gpg --list-packets $release_sig_path | grep -oP "(?<=keyid ).+")
 
-    echo "# setup script for $URI for repository $APTLY_REPO_NAME" > ~/.aptly/public/go
+    echo "# setup script for $URI for repository $APTLY_REPO_NAME" >> ~/.aptly/public/go
 
     case "$URI" in
         https://*)

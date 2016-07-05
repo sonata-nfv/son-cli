@@ -23,8 +23,16 @@ docker run -it --name ubuntu14.04.build-deb \
 
 
 # ====== Build packages for ubuntu 16.04 ======
+echo "--> Building packages for Ubuntu 16.04 LTS"
 
+docker build -t ubuntu16.04.build-deb -f tools/distribute/ubuntu16.04.build-deb.Dockerfile .
+mkdir -p packages-ubuntu16.04
 
+docker rm -f ubuntu16.04.build-deb || true
+docker run -it --name ubuntu16.04.build-deb \
+    -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
+    ubuntu16.04.build-deb \
+    py2deb -r deb-packages --no-name-prefix=sonata-cli .
 
 
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======
@@ -70,8 +78,13 @@ docker run --name=son-cli-debrepo -dit \
 
 
 # ====== Copy generated debs to container and create repositories for each distro ======
+## ubuntu14.04
 docker cp packages-ubuntu14.04 son-cli-debrepo:/
-docker exec son-cli-debrepo sh /create_repo.sh ubuntu14.04 main trusty /packages-ubuntu14.04
+docker exec son-cli-debrepo sh /create_repo.sh ubuntu14.04 main ubuntu-trusty /packages-ubuntu14.04
+
+## ubuntu16.04
+docker cp packages-ubuntu16.04 son-cli-debrepo:/
+docker exec son-cli-debrepo sh /create_repo.sh ubuntu16.04 main ubuntu-xenial /packages-ubuntu16.04
 
 
 # ====== Start repository server ======
