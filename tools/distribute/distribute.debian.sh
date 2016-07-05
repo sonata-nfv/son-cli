@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # This script creates the debian packages for son-cli and dependencies.
 # For now, ubuntu 14.04 and ubuntu 16.04 are supported.
 # This script is to be invoked at the root dir of "son-cli"
@@ -19,7 +19,7 @@ docker rm -f ubuntu14.04.build-deb || true
 docker run -it --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb \
-    py2deb -r deb-packages --no-name-prefix=sonata-cli .
+    py2deb -r deb-packages --name-prefix=son-python3 --no-name-prefix=sonata-cli .
 
 
 # ====== Build packages for ubuntu 16.04 ======
@@ -32,7 +32,7 @@ docker rm -f ubuntu16.04.build-deb || true
 docker run -it --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
-    py2deb -r deb-packages --no-name-prefix=sonata-cli .
+    py2deb -r deb-packages --name-prefix=son-python3 --no-name-prefix=sonata-cli .
 
 
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======

@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
 if [[ $# != 4 ]]; then
@@ -15,6 +15,8 @@ aptly repo create \
     -component="$APTLY_COMPONENT" \
     -distribution="$APTLY_DISTRIBUTION" \
     $APTLY_REPO_NAME
+
+for old in ./$DEB_PACKAGE_DIR/*.deb; do new=$(echo $old | sed -e 's/\.deb$/_'$APTLY_DISTRIBUTION'.deb/'); mv -v "$old" "$new"; done
 
 aptly repo add $APTLY_REPO_NAME $DEB_PACKAGE_DIR
 
