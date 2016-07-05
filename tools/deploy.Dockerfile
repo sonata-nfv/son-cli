@@ -33,5 +33,3 @@ RUN cd /ansible \
     # Install the son-monitor package from a local wheel
     && pip install /tmp/son_monitor*.whl \
     && echo 'Done, installed son-monitor'
-
-
