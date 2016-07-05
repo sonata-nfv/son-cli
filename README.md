@@ -9,17 +9,25 @@ This set of command line tools are meant to aid the SONATA service developers on
 
 ## How to install son-cli tools
 
-To install son-cli in a debian-based system run the following:
+To install the SONATA CLI toolset in Ubuntu follow these steps:
 
-    $ curl -sSL http://registry.sonata-nfv.eu:8080/go | sudo sh
-    $ apt-get install sonata-cli
+1. Add the new GPG key
+    `sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D0DF34A30A4FE3F8`
+2. Add a source entry for your Ubuntu OS.
+    For now, supported distributions are supported:
+    - Ubuntu Trusty 14.04 (LTS)
+    `﻿﻿echo "deb http://registry.sonata-nfv.eu:8080 ubuntu-trusty main" | sudo tee -a /etc/apt/sources.list`
+    - Ubuntu Xenial 16.04 (LTS)
+    ﻿`﻿﻿echo "deb http://registry.sonata-nfv.eu:8080 ubuntu-xenial main" | sudo tee -a /etc/apt/sources.list`
+3. Update and install
+    `sudo apt-get update`
+    `sudo apt-get install sonata-cli`
 
-or if you don't want to pipe `curl` just do it manually:
-
-    $ apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D0DF34A30A4FE3F8
-    $ echo "deb http://registry.sonata-nfv.eu:8080 unstable main" >> /etc/apt/sources.list
-    $ apt-get update
-    $ apt-get install sonata-cli
+4. Test if its working by invoking:
+    `son-workspace -h`
+    `son-package -h`
+    `son-publish -h`
+    `son-push`
 
 ## How to develop for this project
 
