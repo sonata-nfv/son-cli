@@ -18,6 +18,4 @@ RUN apt-get update && \
 
 ADD create_repo.sh /create_repo.sh
 
-ADD gnupg-keys.zip /gnupg-keys.zip
-
 RUN unzip -o /gnupg-keys.zip -d /.gnupg
