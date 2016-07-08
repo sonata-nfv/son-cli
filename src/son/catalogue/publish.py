@@ -144,21 +144,29 @@ class Publisher(object):
         comp_data = yaml.dump(compd)
 
         # Publish to the catalogue servers based on the descriptor type
+        errors_publishing = False
         for cat_client in self._catalogue_clients:
-
             if descriptor_type is SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR:
                 log.debug("Publishing Package Descriptor: {}".format(filename))
-                cat_client.post_pd(comp_data)
+                if not cat_client.post_pd(comp_data):
+                    errors_publishing = True
 
             elif descriptor_type is SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR:
                 log.debug("Publishing Service Descriptor: {}"
                           .format(filename))
-                cat_client.post_ns(comp_data)
+                if not cat_client.post_ns(comp_data):
+                    errors_publishing = True
 
             elif descriptor_type is SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR:
                 log.debug("Publishing Function Descriptor: {}"
                           .format(filename))
-                cat_client.post_vnf(comp_data)
+
+                if not cat_client.post_vnf(comp_data):
+                    errors_publishing = True
+
+        if errors_publishing:
+            log.critical("The publishing of one or more components has failed")
+            exit(1)
 
 
 def main():
