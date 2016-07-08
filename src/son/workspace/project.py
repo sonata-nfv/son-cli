@@ -72,7 +72,9 @@ class Project:
 
         # Check if dir exists
         if os.path.isdir(self._prj_root):
-            print("Unable to create project at '{}'. Directory already exists.".format(self._prj_root), file=sys.stderr)
+            print("Unable to create project at '{}'. "
+                  "Directory already exists."
+                  .format(self._prj_root), file=sys.stderr)
             exit(1)
 
         os.makedirs(self._prj_root, exist_ok=False)
@@ -136,7 +138,8 @@ class Project:
         :return:
         """
         nsd_root = os.path.join(self._prj_root, 'sources', 'nsd')
-        nsd_list = [os.path.join(nsd_root, file) for file in os.listdir(nsd_root)
+        nsd_list = [os.path.join(nsd_root, file)
+                    for file in os.listdir(nsd_root)
                     if os.path.isfile(os.path.join(nsd_root, file)) and
                     file.endswith(self._workspace.descriptor_extension)]
 
@@ -172,8 +175,10 @@ class Project:
         }
         func = switcher.get(prj_type)
         if func is None:
-            log.error("Could not create sample for " + prj_type + ", unknown project type")
+            log.error("Could not create sample for "
+                      "" + prj_type + ", unknown project type")
             return
+
         func(path)
 
     @staticmethod
@@ -212,9 +217,10 @@ class Project:
     @staticmethod
     def _create_sample_vnf(path):
         """
-        Create a sample VNF descriptor (to be evoked upon project creation)
+        Create a sample VNF descriptor
+        (to be evoked upon project creation)
+
         :param path: The VNF sample directory
-        :return:
         """
         sample_vnfd = 'vnfd-sample.yml'
         sample_image = 'sample_docker'
@@ -233,9 +239,10 @@ class Project:
     @staticmethod
     def _create_sample_nsd(path):
         """
-        Create a sample NS descriptor (to be evoked upon project creation)
+        Create a sample NS descriptor
+        (to be evoked upon project creation)
+
         :param path: The NSD sample directory
-        :return:
         """
         sample_nsd = 'nsd-sample.yml'
         rp = __name__
@@ -247,14 +254,13 @@ class Project:
 
     @staticmethod
     def __is_valid__(project):
-        """
-        Checks if a given project is valid
-        :return:
-        """
+        """Checks if a given project is valid"""
         if type(project) is not Project:
             return False
 
-        if not os.path.isfile(os.path.join(project.project_root, Project.__descriptor_name__)):
+        if not os.path.isfile(os.path.join(
+                project.project_root,
+                Project.__descriptor_name__)):
             return False
 
         return True
@@ -268,15 +274,20 @@ class Project:
         """
         prj_filename = os.path.join(prj_root, Project.__descriptor_name__)
         if not os.path.isdir(prj_root) or not os.path.isfile(prj_filename):
-            log.error("Unable to load project descriptor '{}'".format(prj_filename))
+            log.error("Unable to load project descriptor '{}'"
+                      .format(prj_filename))
+
             return None
 
-        log.info("Loading Project configuration '{}'".format(prj_filename))
+        log.info("Loading Project configuration '{}'"
+                 .format(prj_filename))
+
         with open(prj_filename, 'r') as prj_file:
             prj_config = yaml.load(prj_file)
 
         if not prj_config['version'] == Project.PROJECT_VERSION:
-            log.warning("Reading a project configuration with a different version {}"
+            log.warning("Reading a project configuration "
+                        "with a different version {}"
                         .format(prj_config['version']))
 
         return Project(workspace, prj_root, config=prj_config)

@@ -54,7 +54,10 @@ class IntPDTester(unittest.TestCase):
         self.assertNotEqual(gsd, False)
 
     def test_incomplete_gds(self):
-        """ Test the returning message when the provided project has incomplete information."""
+        """
+        Test the returning message when the provided
+        project has incomplete information.
+        """
         pfd = IntPDTester.__pfd__
         pfd.pop('name')
         gsd = self.pck.package_gds(pfd)

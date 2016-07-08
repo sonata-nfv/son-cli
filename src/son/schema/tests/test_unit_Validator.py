@@ -36,16 +36,22 @@ class UnitLoadSchemaTests(unittest.TestCase):
     @patch("builtins.open")
     @patch("son.schema.validator.os.path")
     def test_load_local_schema(self, m_os_path, m_open, m_yaml):
-        # Ensure that a FileNotFoundError is raised when the file does not exist
+        # Ensure that a FileNotFoundError is raised
+        # when the file does not exist
         m_os_path.isfile.return_value = False
-        self.assertRaises(FileNotFoundError, load_local_schema, "/some/file/path")
+        self.assertRaises(
+            FileNotFoundError, load_local_schema, "/some/file/path")
 
-        # Ensure a correct schema format and a correct opening of the schema file
+        # Ensure a correct schema format and
+        # a correct opening of the schema file
         m_os_path.isfile.return_value = True
         m_open.return_value = None
         m_yaml.load.return_value = "not a dict"
-        self.assertRaises(AssertionError, load_local_schema, "/some/file/path")
-        self.assertEqual(m_open.call_args, mock.call('/some/file/path', 'r'))
+        self.assertRaises(
+            AssertionError, load_local_schema, "/some/file/path")
+
+        self.assertEqual(m_open.call_args,
+                         mock.call('/some/file/path', 'r'))
 
         # Ensure that a dictionary is allowed to be returned
         sample_dict = {'dict_key': 'this is a dict'}
@@ -56,7 +62,8 @@ class UnitLoadSchemaTests(unittest.TestCase):
         self.assertEqual(sample_dict, return_dict)
 
     @patch("son.schema.validator.yaml")
-    @patch("son.schema.validator.urllib.request.urlopen.headers.get_content_charset")
+    @patch("son.schema.validator.urllib.request.urlopen.headers."
+           "get_content_charset")
     @patch("son.schema.validator.urllib.request.urlopen.read.decode")
     @patch("son.schema.validator.urllib.request.urlopen")
     def test_load_remote_schema(self, m_urlopen, m_decode, m_cs, m_yaml):

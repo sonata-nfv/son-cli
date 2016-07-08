@@ -40,7 +40,9 @@ log = logging.getLogger(__name__)
 
 class Publisher(object):
 
-    def __init__(self, workspace, project=None, component=None, catalogue=None):
+    def __init__(self, workspace, project=None, component=None,
+                 catalogue=None):
+
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._workspace = workspace
@@ -62,13 +64,15 @@ class Publisher(object):
         """
         log.debug("Creating catalogue clients...")
 
-        # If catalogue argument was specified -> ignore default publish catalogues
+        # If catalogue argument was specified
+        # ignore default publish catalogues
         if self._catalogue:
             # Get corresponding catalogue from workspace config
             cat = self._workspace.get_catalogue_server(self._catalogue)
             print(type(cat))
             if not cat:
-                log.warning("The specified catalogue ID '{}' does not exist in workspace configuration"
+                log.warning("The specified catalogue ID '{}' "
+                            "does not exist in workspace configuration"
                             .format(self._catalogue))
                 return
 
@@ -85,10 +89,12 @@ class Publisher(object):
 
         # Ensure there are catalogues available
         if not len(self._catalogue_clients) > 0:
-            log.warning("There are no catalogue servers configured for publishing")
+            log.warning("There are no catalogue servers "
+                        "configured for publishing")
             return
 
-        log.debug("Added {} catalogue clients".format(len(self._catalogue_clients)))
+        log.debug("Added {} catalogue clients"
+                  .format(len(self._catalogue_clients)))
 
     def publish_project(self):
         """
@@ -103,9 +109,11 @@ class Publisher(object):
             return
 
         # Retrieve project NSD and VNFDs files
-        comp_list = self._project.get_ns_descriptor() + self._project.get_vnf_descriptors()
+        comp_list = self._project.get_ns_descriptor() + \
+            self._project.get_vnf_descriptors()
 
-        log.debug("The following project components will be published: {}".format(comp_list))
+        log.debug("The following project components "
+                  "will be published: {}".format(comp_list))
 
         # Publish project components
         for comp in comp_list:
@@ -113,7 +121,8 @@ class Publisher(object):
 
     def publish_component(self, filename=None):
         """
-        Publish a single component file (e.g. descriptor) to the available catalogue servers
+        Publish a single component file (e.g. descriptor)
+        to the available catalogue servers
         :param filename:
         :return:
         """
@@ -126,12 +135,14 @@ class Publisher(object):
 
         # Check if file exists
         if not os.path.isfile(filename):
-            log.error("Publish failed. File '{}' does not exist.".format(filename))
+            log.error("Publish failed. File '{}' does not exist."
+                      .format(filename))
             return
 
         # Check that catalogue clients exist
         if not len(self._catalogue_clients) > 0:
-            log.error("Publish failed. There are no catalogue clients available.")
+            log.error("Publish failed. "
+                      "There are no catalogue clients available.")
             return
 
         # Load component descriptor
@@ -172,18 +183,30 @@ class Publisher(object):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Publish a project or component to the catalogue server")
-    parser.add_argument("--workspace", help="Specify workspace. Default is located at '{}'"
-                        .format(Workspace.DEFAULT_WORKSPACE_DIR), required=False)
-    parser.add_argument("--project",
-                        help="Specify project to be published", required=False)
-    parser.add_argument("-d", "--component", help="Project component to be published.", required=False)
+    parser = argparse.ArgumentParser(
+        description="Publish a project or component to the catalogue server")
+
+    parser.add_argument(
+        "--workspace", help="Specify workspace. Default is located at '{}'"
+        .format(Workspace.DEFAULT_WORKSPACE_DIR),
+        required=False)
+
+    parser.add_argument(
+        "--project", help="Specify project to be published",
+        required=False)
+
+    parser.add_argument(
+        "-d", "--component", help="Project component to be published.",
+        required=False)
+
     parser.add_argument("-c", "--catalogue",
-                        help="Catalogue ID where to publish. Overrides defaults in workspace config.")
+                        help="Catalogue ID where to publish. "
+                             "Overrides defaults in workspace config.")
 
     args = parser.parse_args()
 
-    # Ensure that either --component or --project argument is given, but not the two simultaneously (XOR)
+    # Ensure that either --component or --project
+    # argument is given, but not the two simultaneously (XOR)
     if bool(args.component) == bool(args.project):
         parser.print_help()
         return
@@ -197,22 +220,30 @@ def main():
     # Create the Workspace object
     ws = Workspace.__create_from_descriptor__(ws_root)
     if not ws:
-        print("Could not find a SONATA SDK workspace at '{}'".format(ws_root), file=sys.stderr)
+        print("Could not find a SONATA SDK workspace at '{}'"
+              .format(ws_root),
+              file=sys.stderr)
         exit(1)
 
     if args.project:
         prj_root = os.path.expanduser(args.project)
         proj = Project(ws, prj_root)
         if not proj:
-            print("Could not find a SONATA SDK project at '{}'".format(prj_root), file=sys.stderr)
+            print("Could not find a SONATA SDK project at '{}'"
+                  .format(prj_root),
+                  file=sys.stderr)
             exit(1)
+
         pub = Publisher(ws, project=proj, catalogue=args.catalogue)
         pub.publish_project()
 
     if args.component:
         comp_file = os.path.expanduser(args.component)
         if not os.path.isfile(comp_file):
-            print("'{}' is not a valid file".format(comp_file), file=sys.stderr)
+            print("'{}' is not a valid file"
+                  .format(comp_file),
+                  file=sys.stderr)
             exit(1)
+
         pub = Publisher(ws, component=comp_file, catalogue=args.catalogue)
         pub.publish_component()

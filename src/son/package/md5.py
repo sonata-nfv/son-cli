@@ -29,7 +29,9 @@ import os
 
 
 def generate_hash(f, cs=128):
-    return __generate_hash__(f, cs) if os.path.isfile(f) else __generate_hash_path__(f, cs)
+    return __generate_hash__(f, cs) \
+        if os.path.isfile(f) \
+        else __generate_hash_path__(f, cs)
 
 
 def __generate_hash__(f, cs=128):
