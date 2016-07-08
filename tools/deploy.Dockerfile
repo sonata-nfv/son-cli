@@ -1,6 +1,7 @@
 FROM ubuntu:14.04
 
-RUN apt-get update \
+RUN apt-get clean \
+    && apt-get update \
     # Install common packages
     && apt-get install -y software-properties-common apt-transport-https ca-certificates wget \
     # Install Ansible and Git
@@ -11,6 +12,7 @@ RUN apt-get update \
     && echo 'localhost ansible_connection=local' >> /etc/ansible/hosts \
     # Pre-install python 3.4 and pip3 to speed-up the next steps
     && apt-get install -y python3.4 python3.pip \
+    && apt-get clean \
     && echo 'Done'
 
 COPY ansible /ansible
