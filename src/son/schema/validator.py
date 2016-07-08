@@ -65,30 +65,26 @@ class SchemaValidator(object):
         self._schemas_library = dict()
 
     def config_schema_locations(self):
-        self._schemas = \
-            {self.SCHEMA_PACKAGE_DESCRIPTOR:
-                {'local':
-                    os.path.join(self._schemas_local_master,
-                                 'pd-schema.yml'),
-                 'remote':
-                     self._schemas_remote_master +
-                     'package-descriptor/pd-schema.yml'},
-
-             self.SCHEMA_SERVICE_DESCRIPTOR:
-                 {'local':
-                      os.path.join(self._schemas_local_master,
-                                   'nsd-schema.yml'),
-
-                  'remote': self._schemas_remote_master +
-                    'service-descriptor/nsd-schema.yml'},
-
-             self.SCHEMA_FUNCTION_DESCRIPTOR: {
-                 'local':
-                     os.path.join(self._schemas_local_master,
-                                  'vnfd-schema.yml'),
-
-                 'remote': self._schemas_remote_master +
-                    'function-descriptor/vnfd-schema.yml'}}
+        self._schemas = {
+            self.SCHEMA_PACKAGE_DESCRIPTOR: {
+                'local': os.path.join(self._schemas_local_master,
+                                      'pd-schema.yml'),
+                'remote': self._schemas_remote_master +
+                'package-descriptor/pd-schema.yml'
+            },
+            self.SCHEMA_SERVICE_DESCRIPTOR: {
+                'local': os.path.join(self._schemas_local_master,
+                                      'nsd-schema.yml'),
+                'remote': self._schemas_remote_master +
+                'service-descriptor/nsd-schema.yml'
+            },
+            self.SCHEMA_FUNCTION_DESCRIPTOR: {
+                'local': os.path.join(self._schemas_local_master,
+                                      'vnfd-schema.yml'),
+                'remote': self._schemas_remote_master +
+                'function-descriptor/vnfd-schema.yml'
+            }
+        }
 
     def get_remote_schema(self, descriptor):
         """
