@@ -48,7 +48,11 @@ class UnitCreatePackageTests(unittest.TestCase):
         project = Project(workspace, 'prj/path')
 
         # Instantiate a Packager instance
-        packager = Packager(workspace=workspace, project=project, generate_pd=False, dst_path="dst/path")
+        packager = Packager(workspace=workspace,
+                            project=project,
+                            generate_pd=False,
+                            dst_path="dst/path")
+
         packager._package_descriptor = True
 
         # Prepare mocks
@@ -63,7 +67,8 @@ class UnitCreatePackageTests(unittest.TestCase):
         packager.generate_package("package_name")
 
         # make assertions
-        self.assertEqual(m_join.call_args_list[-1], mock.call('dst/path', 'package_name.son'))
+        self.assertEqual(m_join.call_args_list[-1],
+                         mock.call('dst/path', 'package_name.son'))
 
     def test_package_gds(self):
         """
@@ -76,7 +81,11 @@ class UnitCreatePackageTests(unittest.TestCase):
         project = Project(workspace, 'prj/path')
 
         # Instantiate a Packager instance
-        packager = Packager(workspace=workspace, project=project, generate_pd=False, dst_path="dst/path")
+        packager = Packager(workspace=workspace,
+                            project=project,
+                            generate_pd=False,
+                            dst_path="dst/path")
+
         packager._package_descriptor = True
 
         # Create fake project configuration
@@ -99,6 +108,3 @@ class UnitCreatePackageTests(unittest.TestCase):
         prj_config['name'] = 'sonata - project - sample'
 
         self.assertTrue(packager.package_gds(prj_config))
-
-
-

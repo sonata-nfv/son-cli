@@ -32,18 +32,16 @@ import validators
 
 log = logging.getLogger(__name__)
 
-catalogues = []
-
 
 class CatalogueClient(object):
 
     CAT_URI_BASE = "/"
-    CAT_URI_NS = "/network-services"                    # List all NS
-    CAT_URI_NS_ID = "/network-services/id/"             # Get a specific NS by ID
-    CAT_URI_NS_NAME = "/network-services/name/"         # Get NS list by name
-    CAT_URI_VNF = "/vnfs"                               # List all VNFs
-    CAT_URI_VNF_ID = "/vnfs/id/"                        # Get a specific VNF by id
-    CAT_URI_VNF_NAME = "/vnfs/name/"                    # GET VNF list by name
+    CAT_URI_NS = "/network-services"             # List all NS
+    CAT_URI_NS_ID = "/network-services/id/"      # Get a specific NS by ID
+    CAT_URI_NS_NAME = "/network-services/name/"  # Get NS list by name
+    CAT_URI_VNF = "/vnfs"                        # List all VNFs
+    CAT_URI_VNF_ID = "/vnfs/id/"                 # Get a specific VNF by id
+    CAT_URI_VNF_NAME = "/vnfs/name/"             # GET VNF list by name
 
     def __init__(self, base_url, auth=('', '')):
         # Assign parameters
@@ -53,7 +51,8 @@ class CatalogueClient(object):
 
         # Ensure parameters are valid
         assert validators.url(self._base_url),\
-            "Failed to init catalogue client. Invalid URL: '{}'".format(self._base_url)
+            "Failed to init catalogue client. Invalid URL: '{}'"\
+            .format(self._base_url)
 
     @property
     def base_url(self):
@@ -61,21 +60,30 @@ class CatalogueClient(object):
 
     def alive(self):
         """
-        Checks if the catalogue API server is alive and responding to requests
-        :return: True=server OK, False=server unavailable
+        Checks if the catalogue API server is alive and
+        responding to requests
+        :return: True=server OK,
+                 False=server unavailable
         """
         url = self._base_url + CatalogueClient.CAT_URI_BASE
         try:
-            response = requests.get(url, auth=self._auth, headers=self._headers)
+            response = requests.get(url,
+                                    auth=self._auth,
+                                    headers=self._headers)
 
         except requests.exceptions.InvalidURL:
-            log.warning("Invalid URL: '{}'. Please specify a valid address to a catalogue server".format(url))
+            log.warning("Invalid URL: '{}'. Please specify "
+                        "a valid address to a catalogue server".format(url))
             return False
+
         except requests.exceptions.ConnectionError:
-            log.warning("Connection Error while contacting '{}'. Error message: '{}'".format(url, sys.exc_info()))
+            log.warning("Connection Error while contacting '{}'. "
+                        "Error message: '{}'".format(url, sys.exc_info()))
             return False
+
         except:
-            log.warning("Unexpected Error connecting to '{}'. Error message: '{}'".format(url, sys.exc_info()[0]))
+            log.warning("Unexpected Error connecting to '{}'. "
+                        "Error message: '{}'".format(url, sys.exc_info()[0]))
             raise
 
         return response.status_code == requests.codes.ok
@@ -91,8 +99,10 @@ class CatalogueClient(object):
         """
         cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_NS_ID, ns_id)
         if not isinstance(cat_obj, str) and len(cat_obj) > 1:
-            log.error("Obtained multiple network services using the ID '{}'".format(ns_id))
+            log.error("Obtained multiple network "
+                      "services using the ID '{}'".format(ns_id))
             return
+
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
         return yaml.load(cat_obj)
 
@@ -102,9 +112,12 @@ class CatalogueClient(object):
         :param nsd_data:
         :return:
         """
-        response = self.__post_cat_object__(CatalogueClient.CAT_URI_NS, nsd_data)
-        if response is not None and response.status_code != requests.codes.ok:
-            log.error("Publishing failed. HTTP code: {}".format(response.status_code))
+        response = self.__post_cat_object__(
+            CatalogueClient.CAT_URI_NS, nsd_data)
+
+        if response and response.status_code != requests.codes.ok:
+            log.error("Publishing failed. "
+                      "HTTP code: {}".format(response.status_code))
             return
 
         return response
@@ -115,7 +128,8 @@ class CatalogueClient(object):
         :param ns_name: name of network service
         :return: (str) list of network services
         """
-        return self.__get_cat_object__(CatalogueClient.CAT_URI_NS_NAME, ns_name)
+        return self.__get_cat_object__(
+            CatalogueClient.CAT_URI_NS_NAME, ns_name)
 
     def get_list_all_vnf(self):
         return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF, "")
@@ -123,16 +137,18 @@ class CatalogueClient(object):
     def get_vnf(self, vnf_id):
         """
         Obtains a specific VNF
+        :param vnf_id: ID of VNF in the form 'vendor.ns_name.version'
         :return: yaml object containing VNF
-        :param vnf_id:
-        :return:
         """
-        cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_ID, vnf_id)
+        cat_obj = self.__get_cat_object__(
+            CatalogueClient.CAT_URI_VNF_ID, vnf_id)
         if not cat_obj:
             return
+
         if not isinstance(cat_obj, str) and len(cat_obj) > 1:
-            log.error("Obtained multiple VNFs using the ID '{}'".format(vnf_id))
+            log.error("Obtained multiple VNFs using ID '{}'".format(vnf_id))
             return
+
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
         return yaml.load(cat_obj)
 
@@ -142,9 +158,11 @@ class CatalogueClient(object):
         :param vnf_data:
         :return:
         """
-        response = self.__post_cat_object__(CatalogueClient.CAT_URI_VNF, vnf_data)
+        response = self.__post_cat_object__(
+            CatalogueClient.CAT_URI_VNF, vnf_data)
         if response is not None and response.status_code != requests.codes.ok:
-            log.error("Publishing failed. HTTP code: {}".format(response.status_code))
+            log.error("Publishing failed. "
+                      "HTTP code: {}".format(response.status_code))
             return
 
         return response
@@ -155,7 +173,8 @@ class CatalogueClient(object):
         :param vnf_name: name of network service
         :return: (str) list of VNFs
         """
-        return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
+        return self.__get_cat_object__(
+            CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
 
     def __get_cat_object__(self, cat_uri, obj_id):
         """
@@ -181,9 +200,13 @@ class CatalogueClient(object):
         log.debug("Object POST to: {}\n{}".format(url, obj_data))
 
         try:
-            response = requests.post(url, data=obj_data, auth=self._auth, headers=self._headers)
+            response = requests.post(url,
+                                     data=obj_data,
+                                     auth=self._auth,
+                                     headers=self._headers)
             return response
 
         except requests.exceptions.ConnectionError:
-            log.error("Connection error to server '{}'. VNF publishing failed".format(CatalogueClient.CAT_URI_VNF))
+            log.error("Connection error to server '{}'. VNF publishing "
+                      "failed".format(CatalogueClient.CAT_URI_VNF))
             return
