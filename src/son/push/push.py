@@ -114,9 +114,8 @@ def instantiate_package(platform_url, service_uuid=""):
 def _get_from_url(url):
     """
     Generic/internal function to fetch content of a given URL
-    
+
     :param url: url of the website to be queried
-    
     :returns: text response of the server
     """
     if not validators.url(url):
