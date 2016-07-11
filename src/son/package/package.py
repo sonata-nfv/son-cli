@@ -669,8 +669,8 @@ class Packager(object):
 
         if not name:
             name = self._package_descriptor['vendor'] + "." + \
-                   self._package_descriptor['name'] + "." + \
-                   self._package_descriptor['version']
+                self._package_descriptor['name'] + "." + \
+                self._package_descriptor['version']
 
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.son')
@@ -817,9 +817,7 @@ def __validate_directory__(paths):
     """
     for path, file in paths.items():
         if not os.path.isdir(path) or \
-                        file and \
-                        not os.path.isfile(os.path.join(path, file)):
-
+          file and not os.path.isfile(os.path.join(path, file)):
             print("'{}' is not a valid workspace or project directory"
                   .format(path), file=sys.stderr)
             return False

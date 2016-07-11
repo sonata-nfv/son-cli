@@ -48,4 +48,3 @@ def __generate_hash_path__(p, cs=128):
         for f in files:
             hash.update(__generate_hash__(f, cs))
     return hash.hexdigest()
-
