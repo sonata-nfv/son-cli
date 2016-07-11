@@ -816,8 +816,8 @@ def __validate_directory__(paths):
     :param paths: dictionary with path and path identifier
     """
     for path, file in paths.items():
-        if not os.path.isdir(path) or \
-          file and not os.path.isfile(os.path.join(path, file)):
+        if not os.path.isdir(path) or file and \
+                not os.path.isfile(os.path.join(path, file)):
             print("'{}' is not a valid workspace or project directory"
                   .format(path), file=sys.stderr)
             return False
