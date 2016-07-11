@@ -30,7 +30,7 @@ Early implementation of the son-push tool
 This tool connects to a REST api of the SONATA Service
 Platform Gatekeeper. As these API's are still under
 construction, functionality as well as implementation
-of this module probably change continuously. 
+of this module probably change continuously.
 
 This version currently interoperates with the dummy
 gatekeeper provided by the son-emu tool.
@@ -47,7 +47,7 @@ log = logging.getLogger(__name__)
 def upload_package(platform_url, package_file_name):
     """
     Upload package to platform
-    
+
     :param platform_url: url of the SONATA service
                          platform/gatekeeper or emulator
                          to upload package to
@@ -55,10 +55,9 @@ def upload_package(platform_url, package_file_name):
     :param package_file_name: filename including full
                               path of the package
                               to be uploaded
-    
+
     :returns: text response message of the server or
               error message
-    
     """
     import os
 
@@ -66,7 +65,7 @@ def upload_package(platform_url, package_file_name):
         return package_file_name, "is not a file."
 
     # TODO: fix potential simple typo issues like double slashes in url
-    url = platform_url+"/packages" 
+    url = platform_url+"/packages"
 
     if not validators.url(url):
         return url, "is not a valid url."
@@ -82,8 +81,8 @@ def upload_package(platform_url, package_file_name):
 
 def instantiate_package(platform_url, service_uuid=""):
     """
-    Instantiate servide on SONATA service platform or 
-    
+    Instantiate service on SONATA service platform
+
     :param platform_url: url of the SONATA service
                          platform/gatekeeper or emulator
                          to upload package to
@@ -91,18 +90,18 @@ def instantiate_package(platform_url, service_uuid=""):
     :param service_uuid: uuid of the service package
                          (requires it to be available
                          on the platform)
-    
+
     :returns: text response message of the server
     """
-    # TODO: to be removed (default choice) after testing 
+    # TODO: to be removed (default choice) after testing
     try:
-        if len(service_uuid)==0:
+        if len(service_uuid) == 0:
             service_uuid = package_list(platform_url)[0]
 
         if service_uuid not in package_list(platform_url):
             return "Given service uuid does not exist on the platform."
 
-        url = platform_url+"/instantiations" 
+        url = platform_url+"/instantiations"
 
         r = requests.post(url, json={"service_uuid": service_uuid})
 
@@ -114,7 +113,7 @@ def instantiate_package(platform_url, service_uuid=""):
 
 def _get_from_url(url):
     """
-    Generic/internal function to fetch content of a given URL 
+    Generic/internal function to fetch content of a given URL
     
     :param url: url of the website to be queried
     
