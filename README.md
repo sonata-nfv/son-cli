@@ -158,6 +158,19 @@ optional arguments:
                         workspace config.
 ```
 
+Example on how to publish a single descriptor:
+```sh
+    son-publish --workspace /home/user/workspaces/ws1 --component vnfd-firewall.yml
+```
+
+Example on how to publish all the descriptors of a project:
+```sh
+    son-publish --workspace /home/user/workspace/ws1 --project /home/user/project/prj1
+```
+These examples assume that the catalogue server address is defined at the workspace configuration.
+Otherwise, the catalogue address must be specified explicitly.
+
+
 ### son-package
 Generate a SONATA SDK package.
 
@@ -188,6 +201,16 @@ optional arguments:
 ```
 
 son-package will create a package inside the DESTINATION directory. If DESTINATION is not specified, the package will be deployed at <project root/target>.
+
+Example on how to package a project:
+```sh
+    son-package --workspace /home/user/workspace/ws1 --project /home/user/project/prj1
+```
+Example on how to package a project with custom destination and package name:
+```sh
+    son-package --workspace /home/user/workspace/ws1 --project /home/user/project/prj1 --d /home/user/packages -n sonata-demo.son
+```
+
 
 ### son-push
 Upload a SONATA SDK package to the Gatekeeper for instantiation. With this tools it is also possible to list the packages uploaded and deployed at the Platform.
@@ -232,6 +255,7 @@ The following lead developers are responsible for this repository and have admin
 
 * Tiago Batista (https://github.com/tsbatista)
 * Wouter Tavernier (https://github.com/wtaverni)
+* Luís Conceição (https://github.com/lconceicao)
 
 #### Feedback-Chanel
 * You may use the mailing list [sonata-dev@lists.atosresearch.eu](mailto:sonata-dev@lists.atosresearch.eu)
