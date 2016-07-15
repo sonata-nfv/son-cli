@@ -9,7 +9,7 @@ import os.path as path
 # http://python-packaging-user-guide.readthedocs.org/en/latest/distributing/#setup-py
 
 cwd = path.dirname(__file__)
-longdesc = codecs.open(path.join(cwd, 'README.md'), 'r', 'ascii').read()
+longdesc = codecs.open(path.join(cwd, 'README.md'), 'r', 'utf-8').read()
 
 name = 'son-monitor'
 setup(
