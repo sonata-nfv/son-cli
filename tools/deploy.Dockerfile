@@ -17,7 +17,6 @@ RUN apt-get clean \
 
 COPY ansible /ansible
 COPY ./dist/sonata_cli-*-py3-*.whl /tmp/
-COPY ./dist/son_monitor*.whl /tmp/
 
 RUN cd /ansible \
     # Start the basic Ansible setup
@@ -27,11 +26,3 @@ RUN cd /ansible \
     && pip3 install /tmp/sonata_cli-*-py3-*.whl \
     && echo 'Done, installed son-cli'
 
-# install son-monitor (python2 based)
-RUN cd /ansible \
-    # Start the basic Ansible setup
-    && ansible-playbook install_son-monitor.yml \
-    && echo 'Installing son-monitor' \
-    # Install the son-monitor package from a local wheel
-    && pip install /tmp/son_monitor*.whl \
-    && echo 'Done, installed son-monitor'
