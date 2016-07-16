@@ -1,29 +1,5 @@
 """
-Copyright (c) 2015 SONATA-NFV
-ALL RIGHTS RESERVED.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-Neither the name of the SONATA-NFV [, ANY ADDITIONAL AFFILIATION]
-nor the names of its contributors may be used to endorse or promote
-products derived from this software without specific prior written
-permission.
-This work has been performed in the framework of the SONATA project,
-funded by the European Commission under Grant number 671517 through
-the Horizon 2020 and 5G-PPP programmes. The authors would like to
-acknowledge the contributions of their colleagues of the SONATA
-partner consortium (www.sonata-nfv.eu).
-"""
-
-"""
 Performance profiling function available in the SONATA SDK
-(c) 2016 by Steven Van Rossem <steven.vanrossem@intec.ugent.be>
 
 1) via the selected vim, start a VNF and chain it to a traffic generator and sink
 
@@ -36,13 +12,9 @@ Performance profiling function available in the SONATA SDK
 
 import paramiko
 import time
+import gevent
 
-try:
-    from son.monitor import prometheus
-except:
-    import prometheus
-
-
+from son.monitor import prometheus
 import logging
 
 log = logging.getLogger(__name__)
@@ -51,7 +23,6 @@ log = logging.getLogger(__name__)
 def _create_dict(**kwargs):
     return kwargs
 
-# TODO transfer to rest API of son-emu
 class Emu_Profiler():
 
     def __init__(self, net_api, compute_api):
@@ -128,6 +99,7 @@ class Emu_Profiler():
             # logging.info('query:{0}'.format(query_cpu))
 
             output_line = self.profile(self.psrc_mgmt_ip, rate, self.psink_input_ip, self.vnf_uuid)
+            gevent.sleep(0)
             yield output_line
 
     def profile(self, mgmt_ip, rate, input_ip, vnf_uuid):
@@ -147,6 +119,7 @@ class Emu_Profiler():
         while (time.time() - start_time) < 10:
             data = prometheus.query_Prometheus(query_cpu)
             # logging.info('rate: {1} data:{0}'.format(data, rate))
+            gevent.sleep(0)
             time.sleep(1)
 
         query_cpu2 = '(sum(rate(container_cpu_usage_seconds_total{{id="/docker/{0}"}}[{1}s])))'.format(vnf_uuid, 8)

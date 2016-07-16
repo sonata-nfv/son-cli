@@ -1,0 +1,8 @@
+#!/bin/bash
+find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+rm -r part develop-eggs eggs build
+
+python3.4 bootstrap.py
+bin/buildout
+
+tools/unit_tests_and_wheel_creation.sh

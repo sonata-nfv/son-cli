@@ -3,7 +3,7 @@
     - name: updates apt
       apt: update_cache=yes
 
-    - name: install son-monitor dependencies
+    - name: install son-monitor dependecies
       apt: pkg={{item}} state=installed
       with_items:
         - python2.7

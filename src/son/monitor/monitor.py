@@ -43,188 +43,92 @@ or
 (c) 2016 by Steven Van Rossem <steven.vanrossem@intec.ugent.be>
 """
 
-try:
-    from son.monitor import prometheus
-except:
-    import prometheus
-
-try:
-    from son.monitor import profiler
-except:
-    import profiler
-
 import argparse
-import zerorpc
+
+from son.monitor.son_emu import emu
+from son.monitor.son_sp import sp
 
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
 import logging
-log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 ## parameters for the emulator VIM
 # TODO: these settings come from the deployed topology in the emulator, read from centralized config file?
-COMPUTE_API = zerorpc.Client()  # heartbeat=None, timeout=120
-COMPUTE_API.connect("tcp://127.0.0.1:4242")  # TODO hard coded for now. we'll change this later
-NET_API = zerorpc.Client()
-NET_API.connect("tcp://127.0.0.1:5151")  # TODO hard coded for now. we'll change this later
+# API from docker container
+SON_EMU_API = "http://172.17.0.1:5001"
+# API when docker network=host in son-cli, or when not started as container
+#SON_EMU_API = "http://localhost:5001"
+# API when started with docker-compose
+#SON_EMU_API = "http://son-emu:5001"
 
-
-## commands to export specific counter metrics from the emulator to prometheus
-def start_metric_emu(args):
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
-    r = NET_API.setup_metric(
-        vnf_name,
-        vnf_interface,
-        args.get("metric"))
-    pp.pprint(r)
-
-def stop_metric_emu(args):
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
-    r = NET_API.stop_metric(
-        vnf_name,
-        vnf_interface,
-        args.get("metric"))
-    pp.pprint(r)
-
-
-def setup_flow(args):
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
-    r = NET_API.setup_flow(
-        vnf_name,
-        vnf_interface,
-        args.get("metric"),
-        args.get("cookie"))
-    pp.pprint(r)
-
-
-def stop_flow(args):
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
-    r = NET_API.stop_flow(
-        vnf_name,
-        vnf_interface,
-        args.get("metric"),
-        args.get("cookie"))
-    pp.pprint(r)
-
-## command to start a profiling action
-def profile_emu(args):
-    nw_list = list()
-    if args.get("network") is not None:
-        nw_list = _parse_network(args.get("network"))
-
-    params = _create_dict(
-        network=nw_list,
-        command=args.get("docker_command"),
-        image=args.get("image"),
-        input=args.get("input"),
-        output=args.get("output"))
-
-    profiler_emu = profiler.Emu_Profiler(NET_API, COMPUTE_API)
-
-    #deploy the test service chain
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    dc_label = args.get("datacenter")
-    profiler_emu.deploy_chain(dc_label, vnf_name, params)
-
-    #generate output table
-    for output in profiler_emu.generate():
-        print(output + '\n')
-
-## command to query some metrics in prometheus
-def prometheus_query_emu(args):
-    vnf_name = _parse_vnf_name(args.get("vnf_name"))
-    vnf_interface = _parse_vnf_interface(args.get("vnf_name"))
-    dc_label = args.get("datacenter")
-    query = args.get("query")
-    vnf_status = COMPUTE_API.compute_status(dc_label, vnf_name)
-    uuid = vnf_status['id']
-    query = query.replace('<uuid>', uuid)
-
-    r = prometheus.query_Prometheus(query)
-    pp.pprint(r)
-
-
-## helper functions
-def _parse_vnf_name( vnf_name_str):
-    vnf_name = vnf_name_str.split(':')[0]
-    return vnf_name
-
-
-def _parse_vnf_interface( vnf_name_str):
-    try:
-        vnf_interface = vnf_name_str.split(':')[1]
-    except:
-        vnf_interface = None
-
-    return vnf_interface
-
-
-def _create_dict(**kwargs):
-    return kwargs
-
-
-def _parse_network(network_str):
-    '''
-    parse the options for all network interfaces of the vnf
-    :param network_str: (id=x,ip=x.x.x.x/x), ...
-    :return: list of dicts [{"id":x,"ip":"x.x.x.x/x"}, ...]
-    '''
-    nw_list = list()
-    networks = network_str[1:-1].split('),(')
-    for nw in networks:
-        nw_dict = dict(tuple(e.split('=')) for e in nw.split(','))
-        nw_list.append(nw_dict)
-
-    return nw_list
-
+# initalize the vims accessible from the SDK
+emu = emu(SON_EMU_API)
+#sp = sp()
 
 # map the command and vim selections to the correct function
 def _execute_command(args):
-    if args["command"] is not None and args.get('vim') == 'sp':
-        # call the local method with the same name as the command arg
-        function = function_mapper_sp[args["command"]]
-        function(args)
-    elif args["command"] is not None and (args.get('vim') == 'emu' or args.get('vim') is None):
-        # call the local method with the same name as the command arg
-        function = function_mapper_emu[args["command"]]
-        function(args)
-    else:
-        print("Command not implemented")
-
-
+    #try:
+        if args["command"] is not None:
+            VIM_class = eval(args.get('vim'))
+            # call the VIM class method with the same name as the command arg
+            ret = getattr(VIM_class, args["command"][0])(**args)
+            pp.pprint(ret)
+        else:
+            logging.error("Command not implemented: {0}".format(args.get("command")))
+    #except:
+    #    log.error("Unexpected error: {0}".format(sys.exc_info()[0])#)
 
 ## cli parser
 
 description = """
-    Install monitor features of the SONATA service platform/emulator or get monitor data
-    from the SONATA platform/emulator.
+    Install monitor features on or get monitor data from the SONATA platform/emulator.
     """
 examples = """Example usage:
 
-    son-monitor prometheus_query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
+    son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
     son-monitor profile --vim emu -d datacenter1 -n vnf1 -i vnf1_image --net '(id=input),(id=output)' -in input -out output
     """
 
 parser = argparse.ArgumentParser(description=description,
-                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                        formatter_class=argparse.RawTextHelpFormatter,
                         epilog=examples)
 parser.add_argument(
     "command",
-    choices=['profile', 'prometheus_query'],
+    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total'],
+    nargs=1,
     help="Monitoring feature to be executed")
 
-# map user input arguments to function names
-function_mapper_emu = {'prometheus_query':prometheus_query_emu, 'profile':profile_emu }
-function_mapper_sp = {}
+parser.add_argument(
+    "action",
+    choices=['start', 'stop'],
+    default='start',
+    nargs='?',
+    help="""Action for interface or flow metric:
+          flow_mon : export the metric
+          flow_entry : (un)set the flow entry
+          flow_total : flow_entry + flow_mon
+          Action for init:
+          start: setup the requested containers
+          stop: stop the requested containers
+          """)
+
+## arguments to initialize the environment
+parser.add_argument(
+    "--containers", "-cn", dest="containers",
+    choices=['all', 'no-son-emu'],
+    default='all',
+    nargs='*',
+    help="""Containers for for init:
+          all: cAdvisor, Prometheus DB + Pushgateway, son-emu (with default topology)
+          no-son-emu: all the above except son-emu
+          """)
 
 ## select the vim to execute the monitoring action on (default=emulator)
 parser.add_argument(
     "--vim", "-v", dest="vim",
+    default="emu",
     help="VIM where the command shold be executed (emu/sp)")
 
 ## arguments to specify a vnf
@@ -260,15 +164,35 @@ parser.add_argument(
     "--output", "-out", dest="output",
     help="output interface of the vnf to profile")
 
+## arguments specific for metric/flow installing
+parser.add_argument(
+    "--source", "-src", dest="source",
+    help="vnf name:interface of the source of the chain")
+parser.add_argument(
+    "--destination", "-dst", dest="destination",
+    help="vnf name:interface of the destination of the chain")
+parser.add_argument(
+    "--weight", "-w", dest="weight",
+    help="weight edge attribute to calculate the path")
+parser.add_argument(
+    "--match", "-ma", dest="match",
+    help="string holding extra matches for the flow entries")
+parser.add_argument(
+    "--bidirectional", "-b", dest="bidirectional",
+    action='store_true',
+    help="add/remove the flow entries from src to dst and back")
+
 ## arguments specific for metric/flow monitoring
 parser.add_argument(
-    "--metric", "-m", dest="metric",
+    "--metric", "-me", dest="metric",
+    default='tx_packets',
     help="tx_bytes, rx_bytes, tx_packets, rx_packets")
 parser.add_argument(
     "--cookie", "-c", dest="cookie",
     help="flow cookie to monitor")
 
 def main():
+
     args = vars(parser.parse_args())
 
     if args is None:
@@ -278,5 +202,5 @@ def main():
     _execute_command(args)
 
 if __name__ == "__main__":
-	main()
+    main()
 

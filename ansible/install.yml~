@@ -12,11 +12,4 @@
     - name: install pip 3.x
       apt: pkg=python3-pip state=installed
 
-    - name: install docker-compose
-      shell: {{ item }}
-      with_items:
-      - curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
-      - chmod +x /usr/local/bin/docker-compose
-
-
 
