@@ -1,9 +1,16 @@
 # son-monitor
 
-![son-monitor](https://github.com/stevenvanrossem/son-cli/raw/master/figures/Son-monitor-architecturev2.png)
-
 Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
 Generate and/or export metrics that are useful for debugging and analyzing the service performance.
+
+Below figure shows the architecture of the son-monitor tools inside the total SONATA SDK:
+- A set of monitoring functions implemented in son-emu
+- External docker containers to gather and store metrics (cAdvisor, Prometheus)
+- Metric install and retrieval functions inside son-cli
+
+![son-monitor](../../../figures/Son-monitor-architecturev2.png)
+
+
 ```
 usage: son-monitor [-h]
                    [--containers [{all,no-son-emu} [{all,no-son-emu} ...]]]

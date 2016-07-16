@@ -320,15 +320,32 @@ optional arguments:
                         tx_bytes, rx_bytes, tx_packets, rx_packets
   --cookie COOKIE, -c COOKIE
                         flow cookie to monitor
+```
 
-Example usage:
+This command starts all the related docker files (cAdvisor, Prometheus DB, PushGateway and son-emu (experimental))
+```
+son-monitor init
+```
 
-    son-monitor init
-    son-monitor son-monitor interface start -vnf vnf1 -me tx_packets
-    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
-    son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
-    son-monitor profile --vim emu -d datacenter1 -n vnf1 -i vnf1_image --net '(id=input),(id=output)' -in input -out output
+After a service has been deployed on the SDK emulator (son-emu), son-monitor can be used.
+Son-monitor uses the son-emu rest api and Prometheus.
 
+*Example1*: Expose the tx_packets metric from son-emu network switch-port where vnf1 (default 1st interface) is connected.
+The metric is exposed to the Prometheus DB.
+```
+son-monitor son-monitor interface start -vnf vnf1 -me tx_packets
+```
+
+*Example2*: Install a flow_entry in son-emu, monitor the tx_bytes on that flow_entry.
+The metric is exposed to the Prometheus DB.
+```
+son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
+```
+
+*Example3*:  Send a query to the prometheus DB to retrieve the earlier exposed metrics, or default metric exposed by cAdvisor.
+The Prometheus query language can be used.
+```
+son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 ```
 
 ## License
