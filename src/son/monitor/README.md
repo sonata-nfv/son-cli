@@ -1,6 +1,6 @@
 # son-monitor
 
-![son-monitor](https://raw.githubusercontent.com/stevenvanrossem/figures/Son-monitor-architecturev2.png)
+![son-monitor](https://github.com/stevenvanrossem/son-cli/raw/master/figures/Son-monitor-architecturev2.png)
 
 Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
 Generate and/or export metrics that are useful for debugging and analyzing the service performance.
