@@ -13,6 +13,7 @@ RUN apt-get clean \
     # Pre-install python 3.4 and pip3 to speed-up the next steps
     && apt-get install -y python3.4 python3.pip \
     && apt-get install -y libffi-dev \
+    && apt-get install -y libssl-dev \
     && apt-get clean \
     && echo 'Done'
 
