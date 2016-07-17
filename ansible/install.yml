@@ -1,4 +1,5 @@
 - hosts: localhost
+
   tasks:
     - name: updates apt
       apt: update_cache=yes
@@ -12,11 +13,16 @@
     - name: install pip 3.x
       apt: pkg=python3-pip state=installed
 
+    - shell: uname -s
+      register: var1
+
+    - shell: uname -m
+      register: var2
+
+    - name: download docker-compose
+      get_url: url=https://github.com/docker/compose/releases/download/1.6.2/docker-compose-{{ var1.stdout }}-{{ var2.stdout }} dest=/usr/local/bin/docker-compose
+
     - name: install docker-compose
-      shell: {{ item }}
+      shell: "{{ item }}"
       with_items:
-      - curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
-      - chmod +x /usr/local/bin/docker-compose
-
-
-
+        - chmod +x /usr/local/bin/docker-compose
