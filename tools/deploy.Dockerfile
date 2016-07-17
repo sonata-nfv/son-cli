@@ -12,12 +12,12 @@ RUN apt-get clean \
     && echo 'localhost ansible_connection=local' >> /etc/ansible/hosts \
     # Pre-install python 3.4 and pip3 to speed-up the next steps
     && apt-get install -y python3.4 python3.pip \
+    && apt-get install -y build-essential libssl-dev libffi-dev python-dev \
     && apt-get clean \
     && echo 'Done'
 
 COPY ansible /ansible
 COPY ./dist/sonata_cli-*-py3-*.whl /tmp/
-COPY ./dist/son_monitor*.whl /tmp/
 
 RUN cd /ansible \
     # Start the basic Ansible setup
@@ -27,11 +27,3 @@ RUN cd /ansible \
     && pip3 install /tmp/sonata_cli-*-py3-*.whl \
     && echo 'Done, installed son-cli'
 
-# install son-monitor (python2 based)
-RUN cd /ansible \
-    # Start the basic Ansible setup
-    && ansible-playbook install_son-monitor.yml \
-    && echo 'Installing son-monitor' \
-    # Install the son-monitor package from a local wheel
-    && pip install /tmp/son_monitor*.whl \
-    && echo 'Done, installed son-monitor'

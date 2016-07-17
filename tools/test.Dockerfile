@@ -12,6 +12,7 @@ RUN apt-get clean \
     && echo 'localhost ansible_connection=local' >> /etc/ansible/hosts \
     # Pre-install python 3.4 and pip3 to speed-up the next steps
     && apt-get install -y python3.4 python3.pip \
+    && apt-get install -y build-essential libssl-dev libffi-dev python-dev \
     && apt-get clean \
     && echo 'Done'
 
@@ -30,12 +31,3 @@ RUN cd /son-cli/ansible \
     # Generating the test environment
     && bin/buildout \
     && echo 'Done'
-
-
-# install son-monitor
-RUN cd /son-cli/ansible \
-    # Start the basic Ansible setup
-    && ansible-playbook install_son-monitor.yml \
-    && cd /son-cli \
-    && python setup_son-monitor.py develop \
-    && echo 'installed son-monitor'

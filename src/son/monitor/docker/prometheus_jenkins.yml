@@ -1,0 +1,28 @@
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 5s
+
+
+# A scrape configuration containing endpoints to scrape:
+
+scrape_configs:
+
+# cAdvsior started in son-emu
+  - job_name: 'cAdvisor'
+
+    scrape_interval: 1s
+
+    target_groups:
+    # son-emu is not usable because it is started with net=host, which disables the named links
+    # docker compose uses 172.18.0.1
+      - targets: ['cadvisor:8080']
+
+# Pushgateway started in SP
+  - job_name: 'PushGateway'
+
+    scrape_interval: 1s
+
+    target_groups:
+      - targets: ['pushgateway:9091']
+
+

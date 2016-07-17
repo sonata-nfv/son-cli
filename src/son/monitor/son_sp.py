@@ -21,37 +21,15 @@ acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
 
+import logging
+
+
 """
-Prometheus API helper functions
-(c) 2016 by Steven Van Rossem <steven.vanrossem@intec.ugent.be>
+This class implements the son-sp commands.
+These commands translate to the API's of the SONATA SP
 """
 
-import requests
 
-
-# set this to localhost for now
-# this is correct for son-emu started outside of a container or as a container with net=host
-#TODO if prometheus sdk DB is started outside of emulator, place these globals in an external SDK config file?
-prometheus_ip = 'localhost'
-# When started in a docker container
-#prometheus_ip = '172.17.0.1'
-# when sdk is started with docker-compose, we could use
-# prometheus_ip = 'prometheus'
-prometheus_port = '9090'
-prometheus_REST_api = 'http://{0}:{1}'.format(prometheus_ip, prometheus_port)
-
-
-def query_Prometheus(query):
-    url = prometheus_REST_api + '/' + 'api/v1/query?query=' + query
-    # logging.info('query:{0}'.format(url))
-    req = requests.get(url)
-    ret = req.json()
-    if ret['status'] == 'success':
-        # logging.info('return:{0}'.format(ret))
-        try:
-            ret = ret['data']['result'][0]['value']
-        except:
-            ret = None
-    else:
-        ret = None
-    return ret
+class sp():
+    def __init__(self):
+        logging.error("SONATA SP API not yet implemented...")

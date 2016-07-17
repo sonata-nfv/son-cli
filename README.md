@@ -9,6 +9,7 @@ This set of command line tools are meant to aid the SONATA service developers on
 - `son-publish` allows the publication of projects, services and functions to private catalogues.
 - `son-package` packages a project, containing services and functions, to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
 - `son-push` is used to upload the service package to the Service Platform Gatekeeper.
+- `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
     
 
 ## Building
@@ -17,6 +18,8 @@ To build the son-cli tools it is recommended the use of a virtual environment to
 Prerequisites:
 - python 3 (3.4 used for most of the development)
 - virtualenv
+- docker (used by son-monitor)
+- docker-compose (used by son-monitor)
 
 ### Creating a virtualenv:
 1. Install virtualenvwrapper using your distribution repositories or the pip package.
@@ -37,7 +40,7 @@ If you are using pycharm, the IDE has support both for buildout and for virtuale
 please read their fine documentation on the subject before proceeding.
 
 ### Generated binaries
-The buildout generates the binaries for the tools `son-workspace`, `son-publish`, `son-package` and `son-push`. Information on how to use the tools is detailed in Usage section bellow.
+The buildout generates the binaries for the tools `son-workspace`, `son-publish`, `son-package`, `son-push` and `son-monitor`. Information on how to use the tools is detailed in Usage section bellow.
 
 ## Dependencies
 
@@ -47,6 +50,8 @@ The son-cli tools have the following dependencies:
 * [validators](https://pypi.python.org/pypi/validators) >= 0.10.3 (BSD)
 * [requests](https://pypi.python.org/pypi/requests) >= 2.10 (Apache 2.0)
 * [coloredlogs](https://pypi.python.org/pypi/coloredlogs) >= 5.0 (MIT)
+* [paramiko](https://pypi.python.org/pypi/paramiko/1.16.0) >= 1.6 (LGPL)
+* [docker-compose](https://docs.docker.com/compose/) >= 1.6.0 (Apache 2.0)
 
 
 ## Contributing
@@ -92,6 +97,7 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
     $ son-package -h
     $ son-publish -h
     $ son-push -h
+    $ son-monitor -h
     ```
 
 ## Usage
@@ -245,6 +251,101 @@ Example usage:
     son-push http://127.0.0.1:5000 --deploy-package <uuid>
     son-push http://127.0.0.1:5000 -I
 
+```
+
+### son-monitor
+Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
+Generate and/or export metrics that are useful for debugging and analyzing the service performance.
+```
+usage: son-monitor [-h]
+                   [--containers [{all,no-son-emu} [{all,no-son-emu} ...]]]
+                   [--vim VIM] [--vnf_name VNF_NAME] [--datacenter DATACENTER]
+                   [--image IMAGE] [--dcmd DOCKER_COMMAND] [--net NETWORK]
+                   [--query QUERY] [--input INPUT] [--output OUTPUT]
+                   [--source SOURCE] [--destination DESTINATION]
+                   [--weight WEIGHT] [--match MATCH] [--bidirectional]
+                   [--metric METRIC] [--cookie COOKIE]
+
+                   {init,profile,query,interface,flow_mon,flow_entry,flow_total}
+                   [{start,stop}]
+
+    Install monitor features on or get monitor data from the SONATA platform/emulator.
+
+
+positional arguments:
+  {init,profile,query,interface,flow_mon,flow_entry,flow_total}
+                        Monitoring feature to be executed
+  {start,stop}          Action for interface or flow metric:
+                                  flow_mon : export the metric
+                                  flow_entry : (un)set the flow entry
+                                  flow_total : flow_entry + flow_mon
+                                  Action for init:
+                                  start: setup the requested containers
+                                  stop: stop the requested containers
+
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --containers [{all,no-son-emu} [{all,no-son-emu} ...]], -cn [{all,no-son-emu} [{all,no-son-emu} ...]]
+                        Containers for for init:
+                                  all: cAdvisor, Prometheus DB + Pushgateway, son-emu (with default topology)
+                                  no-son-emu: all the above except son-emu
+
+  --vim VIM, -v VIM     VIM where the command shold be executed (emu/sp)
+  --vnf_name VNF_NAME, -vnf VNF_NAME
+                        vnf name:interface to be monitored
+  --datacenter DATACENTER, -d DATACENTER
+                        Data center where the vnf is deployed
+  --image IMAGE, -i IMAGE
+                        Name of container image to be used e.g. 'ubuntu:trusty'
+  --dcmd DOCKER_COMMAND, -cmd DOCKER_COMMAND
+                        Startup command of the container e.g. './start.sh'
+  --net NETWORK         Network properties of a compute instance e.g.           '(id=input,ip=10.0.10.3/24),(id=output,ip=10.0.10.4/24)' for multiple interfaces.
+  --query QUERY, -q QUERY
+                        prometheus query
+  --input INPUT, -in INPUT
+                        input interface of the vnf to profile
+  --output OUTPUT, -out OUTPUT
+                        output interface of the vnf to profile
+  --source SOURCE, -src SOURCE
+                        vnf name:interface of the source of the chain
+  --destination DESTINATION, -dst DESTINATION
+                        vnf name:interface of the destination of the chain
+  --weight WEIGHT, -w WEIGHT
+                        weight edge attribute to calculate the path
+  --match MATCH, -ma MATCH
+                        string holding extra matches for the flow entries
+  --bidirectional, -b   add/remove the flow entries from src to dst and back
+  --metric METRIC, -me METRIC
+                        tx_bytes, rx_bytes, tx_packets, rx_packets
+  --cookie COOKIE, -c COOKIE
+                        flow cookie to monitor
+```
+
+This command starts all the related docker files (cAdvisor, Prometheus DB, PushGateway and son-emu (experimental))
+```
+son-monitor init
+```
+
+After a service has been deployed on the SDK emulator (son-emu), son-monitor can be used.
+Son-monitor uses the son-emu rest api and Prometheus.
+
+*Example1*: Expose the tx_packets metric from son-emu network switch-port where vnf1 (default 1st interface) is connected.
+The metric is exposed to the Prometheus DB.
+```
+son-monitor son-monitor interface start -vnf vnf1 -me tx_packets
+```
+
+*Example2*: Install a flow_entry in son-emu, monitor the tx_bytes on that flow_entry.
+The metric is exposed to the Prometheus DB.
+```
+son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
+```
+
+*Example3*:  Send a query to the prometheus DB to retrieve the earlier exposed metrics, or default metric exposed by cAdvisor.
+The Prometheus query language can be used.
+```
+son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 ```
 
 ## License
