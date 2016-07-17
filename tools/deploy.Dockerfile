@@ -12,8 +12,7 @@ RUN apt-get clean \
     && echo 'localhost ansible_connection=local' >> /etc/ansible/hosts \
     # Pre-install python 3.4 and pip3 to speed-up the next steps
     && apt-get install -y python3.4 python3.pip \
-    && apt-get install -y libffi-dev \
-    && apt-get install -y libssl-dev \
+    && apt-get install -y build-essential libssl-dev libffi-dev python-dev \
     && apt-get clean \
     && echo 'Done'
 
