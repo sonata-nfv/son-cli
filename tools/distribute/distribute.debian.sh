@@ -19,7 +19,7 @@ docker rm -f ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
+    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli --no-name-prefix=setuptools .
 
 
 # ====== Build packages for ubuntu 16.04 ======
