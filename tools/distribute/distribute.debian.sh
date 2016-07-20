@@ -22,7 +22,7 @@ docker run -i --name ubuntu14.04.build-deb \
     py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
 
 ## Patch to FIX conflicting versions of setuptools in Ubuntu 14.04
-docker rm -f tmp_ubuntu16.04
+docker rm -f tmp_ubuntu16.04 || true
 docker run -i --name tmp_ubuntu16.04 \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
