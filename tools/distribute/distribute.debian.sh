@@ -39,7 +39,8 @@ docker rm -f ubuntu16.04.build-deb || true
 docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
+    # Patch to Fix conflicts in setuptools after packaging
+    /bin/bash -c "py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .; rm -f deb-packages/python3-setuptools*.deb;"
 
 
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======
