@@ -26,7 +26,7 @@ docker rm -f tmp_ubuntu16.04 || true
 docker run -i --name tmp_ubuntu16.04 \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
-    /bin/bash -c "cd /son-cli/deb-packages; rm python3-setuptools*.deb; apt-get download python3-setuptools"
+    /bin/bash -c "cd /son-cli/deb-packages; rm -f python3-setuptools*.deb; apt-get download python3-setuptools python3-pkg-resources"
 ## End of patch
 
 # ====== Build packages for ubuntu 16.04 ======
