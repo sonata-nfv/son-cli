@@ -19,8 +19,15 @@ docker rm -f ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python --no-name-prefix=sonata-cli .
+    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
 
+## Patch to FIX conflicting versions of setuptools in Ubuntu 14.04
+docker rm -f tmp_ubuntu16.04
+docker run -i --name tmp_ubuntu16.04 \
+    -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
+    ubuntu16.04.build-deb \
+    /bin/bash -c "cd /son-cli/deb-packages; rm python3-setuptools*.deb; apt-get download python3-setuptools"
+## End of patch
 
 # ====== Build packages for ubuntu 16.04 ======
 echo "--> Building packages for Ubuntu 16.04 LTS"
@@ -32,7 +39,7 @@ docker rm -f ubuntu16.04.build-deb || true
 docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python --no-name-prefix=sonata-cli .
+    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
 
 
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======

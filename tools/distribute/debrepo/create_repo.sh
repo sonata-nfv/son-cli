@@ -18,10 +18,6 @@ aptly repo create \
 
 for old in ./$DEB_PACKAGE_DIR/*.deb; do new=$(echo $old | sed -e 's/\.deb$/_'$APTLY_DISTRIBUTION'.deb/'); mv -v "$old" "$new"; done
 
-# Remove conflicting packages - fix conflicts with Ubuntu repositories
-rm ./$DEB_PACKAGE_DIR/python-setuptools*.deb
-
-
 aptly repo add $APTLY_REPO_NAME $DEB_PACKAGE_DIR
 
 aptly repo show $APTLY_REPO_NAME
