@@ -97,6 +97,8 @@ def instantiate_package(platform_url, service_uuid=""):
     try:
         if len(service_uuid) == 0:
             service_uuid = package_list(platform_url)[0]
+        if service_uuid == "last":
+            service_uuid = package_list(platform_url)[0]
 
         if service_uuid not in package_list(platform_url):
             return "Given service uuid does not exist on the platform."
@@ -129,19 +131,19 @@ def _get_from_url(url):
 
 
 def get_packages(url):
-    _get_from_url(url+"/packages")
+    return _get_from_url(url+"/packages")
 
 
 def get_instances(url):
-    _get_from_url(url + "/instantiations")
+    return _get_from_url(url + "/instantiations")
 
 
 def package_list(url):
-    loads(get_packages(url))["service_uuid_list"]
+    return loads(get_packages(url)).get("service_uuid_list")
 
 
 def instance_list(url):
-    loads(get_instances(url))["service_instantiations_list"]
+    return loads(get_instances(url)).get("service_instantiations_list")
 
 
 def main():
