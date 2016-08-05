@@ -28,6 +28,7 @@ import son.monitor.profiler as profiler
 from subprocess import Popen
 import os
 import sys
+import pkg_resources
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -44,52 +45,38 @@ class emu():
 
     def __init__(self, REST_api):
         self.url = REST_api
-        self.cur_dir = os.path.dirname(os.path.abspath(__file__))
-        self.src_dir = os.path.join(sys.path[0], 'son', 'monitor')
 
-    def init(self, action, containers, **kwargs):
+
+    def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
-        if not valid_arguments(action, containers):
-            return "Function arguments not valid"
+        actions[action]()
 
-        actions[action](containers)
+    # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
+    def start_containers(self):
+        # docker-compose up -d
+        cmd = [
+            'docker-compose',
+            'up',
+            '-d'
+        ]
+        src_path = os.path.join('docker', 'docker-compose.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        cwd = os.path.dirname(srcfile)
+        logging.info('Start son-monitor containers: {0}'.format(cwd))
+        process = Popen(cmd, cwd=cwd)
+        return 'done'
 
-    def start_containers(self, containers):
-        if 'all' in containers:
-            # docker-compose up -d
-            cmd = [
-                'docker-compose',
-                'up',
-                '-d'
-            ]
-
-            cwd = os.path.join(self.src_dir, 'docker')
-            logging.info('Start son-monitor containers: {0}'.format(cwd))
-            process = Popen(cmd, cwd=cwd)
-            return 'done'
-
-        elif 'no-son-emu' in containers:
-            #docker-compose run -d --service-ports <service_name>
-            for cname in ['cadvisor', 'pushgateway', 'prometheus']:
-                cmd = [
-                    'docker-compose',
-                    'run',
-                    '-d',
-                    '--service-ports',
-                    cname
-                ]
-                cwd = os.path.join(self.src_dir, 'docker')
-                logging.info('Start container {0}'.format(cname))
-                process = Popen(cmd)
-
-    def stop_containers(self, containers):
+    # start the sdk monitoring framework
+    def stop_containers(self):
         # docker-compose down
         cmd = [
             'docker-compose',
             'down'
         ]
-        cwd = os.path.join(self.src_dir, 'docker')
+        src_path = os.path.join('docker', 'docker-compose.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        cwd = os.path.dirname(srcfile)
         logging.info('stop and remove son-monitor containers')
         process = Popen(cmd, cwd=cwd)
         return 'done'
@@ -146,6 +133,7 @@ class emu():
             weight=args.get("weight"),
             match=args.get("match"),
             bidirectional=args.get("bidirectional"),
+            priority=args.get("priority"),
             cookie=args.get("cookie"))
 
         response = actions[action]("{0}/restapi/network/{1}/{2}".format(
@@ -173,6 +161,7 @@ class emu():
             weight=kwargs.get("weight"),
             match=kwargs.get("match"),
             bidirectional=kwargs.get("bidirectional"),
+            priority=kwargs.get("priority"),
             cookie=cookie)
 
         # first add this specific flow to the emulator network
