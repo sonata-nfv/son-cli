@@ -128,8 +128,8 @@ class emu():
         vnf_dst_name = parse_vnf_name(destination)
 
         params = create_dict(
-            vnf_src_interface=parse_vnf_interface(args.get("source")),
-            vnf_dst_interface=parse_vnf_interface(args.get("destination")),
+            vnf_src_interface=parse_vnf_interface(source),
+            vnf_dst_interface=parse_vnf_interface(destination),
             weight=args.get("weight"),
             match=args.get("match"),
             bidirectional=args.get("bidirectional"),
@@ -165,10 +165,13 @@ class emu():
             cookie=cookie)
 
         # first add this specific flow to the emulator network
-        self.flow_entry(action ,vnf_src_name, vnf_dst_name, **params)
+        ret1 = self.flow_entry(action ,source, destination, **params)
         # then export its metrics (from the src_vnf/interface)
-        self.flow_mon(action, source, metric, cookie)
-        self.flow_mon(action, destination, metric, cookie)
+        ret2 = self.flow_mon(action, source, metric, cookie)
+        ret3 = self.flow_mon(action, destination, metric, cookie)
+
+        return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
+        return return_value
 
     def query(self, vnf_name, datacenter, query,**kwargs):
         vnf_name2 = parse_vnf_name(vnf_name)
