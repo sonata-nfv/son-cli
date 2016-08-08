@@ -55,7 +55,7 @@ setup(
             'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
-                          'requests', 'coloredlogs', 'paramiko'],
+                          'requests>2.4.2', 'coloredlogs', 'paramiko'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
