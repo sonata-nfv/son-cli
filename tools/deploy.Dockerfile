@@ -27,3 +27,6 @@ RUN cd /ansible \
     && pip3 install /tmp/sonata_cli-*-py3-*.whl \
     && echo 'Done, installed son-cli'
 
+# Flag to know if we ar erunnign in docker container or not
+ENV SON_CLI_IN_DOCKER 1
+

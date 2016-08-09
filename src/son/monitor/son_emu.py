@@ -29,6 +29,7 @@ from subprocess import Popen
 import os
 import sys
 import pkg_resources
+from shutil import copy, rmtree
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -45,41 +46,69 @@ class emu():
 
     def __init__(self, REST_api):
         self.url = REST_api
+        self.tmp_dir = '/tmp/son-monitor'
+        if not os.path.exists(self.tmp_dir):
+            # make local working directory
+            os.makedirs(self.tmp_dir)
+
+        self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
 
 
     def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
-        actions[action]()
+        return actions[action]()
 
     # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
     def start_containers(self):
         # docker-compose up -d
         cmd = [
             'docker-compose',
+            '-p sonmonitor',
             'up',
             '-d'
         ]
-        src_path = os.path.join('docker', 'docker-compose.yml')
+        cwd = self.tmp_dir
+        if self.docker_based:
+            # we are running son-cli in a docker container
+            logging.info('son-cli is running inside a docker container')
+            src_path = os.path.join('docker', 'docker-compose-docker.yml')
+        else:
+            # we are running son-cli locally
+            src_path = os.path.join('docker', 'docker-compose-local.yml')
         srcfile = pkg_resources.resource_filename(__name__, src_path)
-        cwd = os.path.dirname(srcfile)
+        # copy the docker compose file to a working directory
+        copy(srcfile, cwd + '/docker-compose.yml')
+        # copy the prometheus config file for use in the prometheus docker container
+        src_path = os.path.join('docker', 'prometheus_sdk.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        copy(srcfile, cwd)
         logging.info('Start son-monitor containers: {0}'.format(cwd))
         process = Popen(cmd, cwd=cwd)
-        return 'done'
+        process.wait()
+        return 'son-monitor started'
 
     # start the sdk monitoring framework
     def stop_containers(self):
-        # docker-compose down
+        # docker-compose down, remove volumes
         cmd = [
             'docker-compose',
-            'down'
+            '-p sonmonitor',
+            'down',
+            '-v'
         ]
-        src_path = os.path.join('docker', 'docker-compose.yml')
-        srcfile = pkg_resources.resource_filename(__name__, src_path)
-        cwd = os.path.dirname(srcfile)
+        cwd = self.tmp_dir
         logging.info('stop and remove son-monitor containers')
         process = Popen(cmd, cwd=cwd)
-        return 'done'
+        process.wait()
+        #try to remove tmp directory
+        try:
+            if os.path.exists(self.tmp_dir):
+                rmtree(self.tmp_dir)
+        except:
+            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
+
+        return 'son-monitor stopped'
 
     def interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
@@ -176,6 +205,9 @@ class emu():
     def query(self, vnf_name, datacenter, query,**kwargs):
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
+
+        if datacenter is None:
+            datacenter = self._find_dc(vnf_name2)
         dc_label = datacenter
         query = query
         vnf_status = get("{0}/restapi/compute/{1}/{2}".format(
@@ -213,3 +245,11 @@ class emu():
         # generate output table
         for output in profiler_emu.generate():
             print(output + '\n')
+
+    def _find_dc(self, vnf_name):
+        datacenter = None
+        vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+        for vnf in vnf_list:
+            if vnf[0] == vnf_name:
+                datacenter = vnf[1]['datacenter']
+        return datacenter

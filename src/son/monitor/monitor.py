@@ -86,8 +86,8 @@ description = """
     """
 examples = """Example usage:
 
+    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
     son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
-    son-monitor profile --vim emu -d datacenter1 -n vnf1 -i vnf1_image --net '(id=input),(id=output)' -in input -out output
     """
 
 parser = argparse.ArgumentParser(description=description,
@@ -131,6 +131,7 @@ parser.add_argument(
     help="vnf name:interface to be monitored")
 parser.add_argument(
     "--datacenter", "-d", dest="datacenter",
+    default=None,
     help="Data center where the vnf is deployed")
 
 ## arguments to deploy a vnf

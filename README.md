@@ -257,41 +257,41 @@ Example usage:
 Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
 Generate and/or export metrics that are useful for debugging and analyzing the service performance.
 ```
-usage: son-monitor [-h]
-                   [--containers [{all,no-son-emu} [{all,no-son-emu} ...]]]
-                   [--vim VIM] [--vnf_name VNF_NAME] [--datacenter DATACENTER]
-                   [--image IMAGE] [--dcmd DOCKER_COMMAND] [--net NETWORK]
-                   [--query QUERY] [--input INPUT] [--output OUTPUT]
-                   [--source SOURCE] [--destination DESTINATION]
-                   [--weight WEIGHT] [--match MATCH] [--bidirectional]
+usage: son-monitor [-h] [--vim VIM] [--vnf_name VNF_NAME]
+                   [--datacenter DATACENTER] [--image IMAGE]
+                   [--dcmd DOCKER_COMMAND] [--net NETWORK] [--query QUERY]
+                   [--input INPUT] [--output OUTPUT] [--source SOURCE]
+                   [--destination DESTINATION] [--weight WEIGHT]
+                   [--match MATCH] [--bidirectional] [--priority PRIORITY]
                    [--metric METRIC] [--cookie COOKIE]
-
+                   
                    {init,profile,query,interface,flow_mon,flow_entry,flow_total}
                    [{start,stop}]
 
     Install monitor features on or get monitor data from the SONATA platform/emulator.
-
+    
 
 positional arguments:
   {init,profile,query,interface,flow_mon,flow_entry,flow_total}
-                        Monitoring feature to be executed
-  {start,stop}          Action for interface or flow metric:
-                                  flow_mon : export the metric
-                                  flow_entry : (un)set the flow entry
-                                  flow_total : flow_entry + flow_mon
+                        Monitoring feature to be executed:
+                                 interface: export interface metric (tx/rx bytes/packets)
+                                 flow_entry : (un)set the flow entry
+                                 flow_mon : export flow_entry metric (tx/rx bytes/packets)
+                                 flow_total : flow_entry + flow_mon
+                                 init : start/stop the monitoring framework
+                                 profile : performance profiling (tba)
+                                 
+  {start,stop}          Action for interface, flow_mon, flow_entry, flow_total:
+                                  start: install the flowentry and/or export the metric
+                                  stop: delete the flowentry and/or stop exporting the metric
                                   Action for init:
-                                  start: setup the requested containers
-                                  stop: stop the requested containers
-
+                                  start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
+                                  stop: stop the monitoring framework
+                                  
 
 optional arguments:
   -h, --help            show this help message and exit
-  --containers [{all,no-son-emu} [{all,no-son-emu} ...]], -cn [{all,no-son-emu} [{all,no-son-emu} ...]]
-                        Containers for for init:
-                                  all: cAdvisor, Prometheus DB + Pushgateway, son-emu (with default topology)
-                                  no-son-emu: all the above except son-emu
-
-  --vim VIM, -v VIM     VIM where the command shold be executed (emu/sp)
+  --vim VIM, -v VIM     VIM where the command should be executed (emu/sp)
   --vnf_name VNF_NAME, -vnf VNF_NAME
                         vnf name:interface to be monitored
   --datacenter DATACENTER, -d DATACENTER
@@ -316,6 +316,8 @@ optional arguments:
   --match MATCH, -ma MATCH
                         string holding extra matches for the flow entries
   --bidirectional, -b   add/remove the flow entries from src to dst and back
+  --priority PRIORITY, -p PRIORITY
+                        priority of the installed flowrule
   --metric METRIC, -me METRIC
                         tx_bytes, rx_bytes, tx_packets, rx_packets
   --cookie COOKIE, -c COOKIE
