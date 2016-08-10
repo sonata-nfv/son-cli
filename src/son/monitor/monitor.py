@@ -65,20 +65,20 @@ SON_EMU_API = "http://172.17.0.1:5001"
 
 # initalize the vims accessible from the SDK
 emu = emu(SON_EMU_API)
-#sp = sp()
+
 
 # map the command and vim selections to the correct function
 def _execute_command(args):
-    #try:
-        if args["command"] is not None:
-            VIM_class = eval(args.get('vim'))
-            # call the VIM class method with the same name as the command arg
-            ret = getattr(VIM_class, args["command"][0])(**args)
-            pp.pprint(ret)
-        else:
-            logging.error("Command not implemented: {0}".format(args.get("command")))
-    #except:
-    #    log.error("Unexpected error: {0}".format(sys.exc_info()[0])#)
+    if args["command"] is not None:
+        VIM_class = eval(args.get('vim'))
+        # call the VIM class method with the same name as the command arg
+        ret = getattr(VIM_class, args["command"][0])(**args)
+        logging.info("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
+
+        pp.pprint(ret)
+    else:
+        logging.error("Command not implemented: {0}".format(args.get("command")))
+
 
 ## cli parser
 
@@ -87,8 +87,8 @@ description = """
     """
 examples = """Example usage:
 
+    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
     son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
-    son-monitor profile --vim emu -d datacenter1 -n vnf1 -i vnf1_image --net '(id=input),(id=output)' -in input -out output
     """
 
 parser = argparse.ArgumentParser(description=description,
@@ -98,38 +98,33 @@ parser.add_argument(
     "command",
     choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total'],
     nargs=1,
-    help="Monitoring feature to be executed")
+    help="""Monitoring feature to be executed:
+         interface: export interface metric (tx/rx bytes/packets)
+         flow_entry : (un)set the flow entry
+         flow_mon : export flow_entry metric (tx/rx bytes/packets)
+         flow_total : flow_entry + flow_mon
+         init : start/stop the monitoring framework
+         profile : performance profiling (tba)
+         """)
 
 parser.add_argument(
     "action",
     choices=['start', 'stop'],
     default='start',
     nargs='?',
-    help="""Action for interface or flow metric:
-          flow_mon : export the metric
-          flow_entry : (un)set the flow entry
-          flow_total : flow_entry + flow_mon
+    help="""Action for interface, flow_mon, flow_entry, flow_total:
+          start: install the flowentry and/or export the metric
+          stop: delete the flowentry and/or stop exporting the metric
           Action for init:
-          start: setup the requested containers
-          stop: stop the requested containers
-          """)
-
-## arguments to initialize the environment
-parser.add_argument(
-    "--containers", "-cn", dest="containers",
-    choices=['all', 'no-son-emu'],
-    default='all',
-    nargs='*',
-    help="""Containers for for init:
-          all: cAdvisor, Prometheus DB + Pushgateway, son-emu (with default topology)
-          no-son-emu: all the above except son-emu
+          start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
+          stop: stop the monitoring framework
           """)
 
 ## select the vim to execute the monitoring action on (default=emulator)
 parser.add_argument(
     "--vim", "-v", dest="vim",
     default="emu",
-    help="VIM where the command shold be executed (emu/sp)")
+    help="VIM where the command should be executed (emu/sp)")
 
 ## arguments to specify a vnf
 parser.add_argument(
@@ -137,6 +132,7 @@ parser.add_argument(
     help="vnf name:interface to be monitored")
 parser.add_argument(
     "--datacenter", "-d", dest="datacenter",
+    default=None,
     help="Data center where the vnf is deployed")
 
 ## arguments to deploy a vnf
@@ -181,6 +177,9 @@ parser.add_argument(
     "--bidirectional", "-b", dest="bidirectional",
     action='store_true',
     help="add/remove the flow entries from src to dst and back")
+parser.add_argument(
+    "--priority", "-p", dest="priority",
+    help="priority of the installed flowrule")
 
 ## arguments specific for metric/flow monitoring
 parser.add_argument(

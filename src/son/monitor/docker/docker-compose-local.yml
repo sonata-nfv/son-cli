@@ -1,4 +1,6 @@
 version: '2'
+
+
 services:
 
   pushgateway:
@@ -10,10 +12,12 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: prometheus
+    # get the prometheus config file
     volumes:
-     - ./prometheus_jenkins.yml:/etc/prometheus/prometheus.yml
+     - /tmp/son-monitor:/etc/prometheus
     ports:
      - "9090:9090"
+    command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
     links:
      - pushgateway
      - cadvisor
@@ -29,19 +33,5 @@ services:
    ports:
     - "8090:8080"
 
-  son-emu:
-    image: registry.sonata-nfv.eu:5000/son-emu
-    container_name: son-emu
-    volumes:
-     - "/var/run/docker.sock:/var/run/docker.sock"
-    network_mode: "host"
-    pid: "host"
-    privileged: true
-    ports:
-     #REST api
-     - "5001:5001"
-    entrypoint: 
-     - "/son-emu/utils/ci/entrypoint_docker-compose.sh"
-    command: [python, src/emuvim/examples/son-monitor_default_topo.py]
 
 

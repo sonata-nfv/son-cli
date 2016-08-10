@@ -28,6 +28,8 @@ import son.monitor.profiler as profiler
 from subprocess import Popen
 import os
 import sys
+import pkg_resources
+from shutil import copy, rmtree
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -44,55 +46,69 @@ class emu():
 
     def __init__(self, REST_api):
         self.url = REST_api
-        self.cur_dir = os.path.dirname(os.path.abspath(__file__))
-        self.src_dir = os.path.join(sys.path[0], 'son', 'monitor')
+        self.tmp_dir = '/tmp/son-monitor'
+        if not os.path.exists(self.tmp_dir):
+            # make local working directory
+            os.makedirs(self.tmp_dir)
 
-    def init(self, action, containers, **kwargs):
+        self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
+
+
+    def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
-        if not valid_arguments(action, containers):
-            return "Function arguments not valid"
+        return actions[action]()
 
-        actions[action](containers)
-
-    def start_containers(self, containers):
-        if 'all' in containers:
-            # docker-compose up -d
-            cmd = [
-                'docker-compose',
-                'up',
-                '-d'
-            ]
-
-            cwd = os.path.join(self.src_dir, 'docker')
-            logging.info('Start son-monitor containers: {0}'.format(cwd))
-            process = Popen(cmd, cwd=cwd)
-            return 'done'
-
-        elif 'no-son-emu' in containers:
-            #docker-compose run -d --service-ports <service_name>
-            for cname in ['cadvisor', 'pushgateway', 'prometheus']:
-                cmd = [
-                    'docker-compose',
-                    'run',
-                    '-d',
-                    '--service-ports',
-                    cname
-                ]
-                cwd = os.path.join(self.src_dir, 'docker')
-                logging.info('Start container {0}'.format(cname))
-                process = Popen(cmd)
-
-    def stop_containers(self, containers):
-        # docker-compose down
+    # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
+    def start_containers(self):
+        # docker-compose up -d
         cmd = [
             'docker-compose',
-            'down'
+            '-p sonmonitor',
+            'up',
+            '-d'
         ]
-        cwd = os.path.join(self.src_dir, 'docker')
+        cwd = self.tmp_dir
+        if self.docker_based:
+            # we are running son-cli in a docker container
+            logging.info('son-cli is running inside a docker container')
+            src_path = os.path.join('docker', 'docker-compose-docker.yml')
+        else:
+            # we are running son-cli locally
+            src_path = os.path.join('docker', 'docker-compose-local.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        # copy the docker compose file to a working directory
+        copy(srcfile, cwd + '/docker-compose.yml')
+        # copy the prometheus config file for use in the prometheus docker container
+        src_path = os.path.join('docker', 'prometheus_sdk.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        copy(srcfile, cwd)
+        logging.info('Start son-monitor containers: {0}'.format(cwd))
+        process = Popen(cmd, cwd=cwd)
+        process.wait()
+        return 'son-monitor started'
+
+    # start the sdk monitoring framework
+    def stop_containers(self):
+        # docker-compose down, remove volumes
+        cmd = [
+            'docker-compose',
+            '-p sonmonitor',
+            'down',
+            '-v'
+        ]
+        cwd = self.tmp_dir
         logging.info('stop and remove son-monitor containers')
         process = Popen(cmd, cwd=cwd)
-        return 'done'
+        process.wait()
+        #try to remove tmp directory
+        try:
+            if os.path.exists(self.tmp_dir):
+                rmtree(self.tmp_dir)
+        except:
+            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
+
+        return 'son-monitor stopped'
 
     def interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
@@ -141,11 +157,12 @@ class emu():
         vnf_dst_name = parse_vnf_name(destination)
 
         params = create_dict(
-            vnf_src_interface=parse_vnf_interface(args.get("source")),
-            vnf_dst_interface=parse_vnf_interface(args.get("destination")),
+            vnf_src_interface=parse_vnf_interface(source),
+            vnf_dst_interface=parse_vnf_interface(destination),
             weight=args.get("weight"),
             match=args.get("match"),
             bidirectional=args.get("bidirectional"),
+            priority=args.get("priority"),
             cookie=args.get("cookie"))
 
         response = actions[action]("{0}/restapi/network/{1}/{2}".format(
@@ -173,17 +190,24 @@ class emu():
             weight=kwargs.get("weight"),
             match=kwargs.get("match"),
             bidirectional=kwargs.get("bidirectional"),
+            priority=kwargs.get("priority"),
             cookie=cookie)
 
         # first add this specific flow to the emulator network
-        self.flow_entry(action ,vnf_src_name, vnf_dst_name, **params)
+        ret1 = self.flow_entry(action ,source, destination, **params)
         # then export its metrics (from the src_vnf/interface)
-        self.flow_mon(action, source, metric, cookie)
-        self.flow_mon(action, destination, metric, cookie)
+        ret2 = self.flow_mon(action, source, metric, cookie)
+        ret3 = self.flow_mon(action, destination, metric, cookie)
 
-    def query(self, vnf_name, datacenter, query,**kwargs):
+        return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
+        return return_value
+
+    def query(self, vnf_name, query, datacenter=None, **kwargs):
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
+
+        if datacenter is None:
+            datacenter = self._find_dc(vnf_name2)
         dc_label = datacenter
         query = query
         vnf_status = get("{0}/restapi/compute/{1}/{2}".format(
@@ -221,3 +245,11 @@ class emu():
         # generate output table
         for output in profiler_emu.generate():
             print(output + '\n')
+
+    def _find_dc(self, vnf_name):
+        datacenter = None
+        vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+        for vnf in vnf_list:
+            if vnf[0] == vnf_name:
+                datacenter = vnf[1]['datacenter']
+        return datacenter
