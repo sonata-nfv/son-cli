@@ -202,7 +202,7 @@ class emu():
         return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
         return return_value
 
-    def query(self, vnf_name, datacenter, query,**kwargs):
+    def query(self, vnf_name, query, datacenter=None, **kwargs):
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
 

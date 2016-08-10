@@ -74,7 +74,8 @@ def _execute_command(args):
         # call the VIM class method with the same name as the command arg
         ret = getattr(VIM_class, args["command"][0])(**args)
         logging.info("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
-        #pp.pprint(ret)
+
+        pp.pprint(ret)
     else:
         logging.error("Command not implemented: {0}".format(args.get("command")))
 
