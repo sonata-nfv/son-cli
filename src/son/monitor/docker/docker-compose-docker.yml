@@ -3,9 +3,12 @@ version: '2'
 # volume created by sdk docker-compose file
 # mounted by son-cli and prometheus to share the config file
 volumes:
-  son_monitor_data:
+  son_monitor_prometheus:
     external:
-      name: sonatasdk_son_monitor_data
+      name: sonatasdk_son_monitor_prometheus
+  son_monitor_grafana:
+    external:
+      name: sonatasdk_son_monitor_grafana
 
 services:
 
@@ -20,7 +23,7 @@ services:
     container_name: prometheus
     # get the prometheus config file
     volumes:
-     - son_monitor_data:/etc/prometheus
+     - son_monitor_prometheus:/etc/prometheus
     ports:
      - "9090:9090"
     command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
@@ -39,5 +42,14 @@ services:
    ports:
     - "8090:8080"
 
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - son_monitor_grafana:/var/lib/grafana
+    ports:
+      - 3000:3000
+    links:
+      - prometheus
 
 

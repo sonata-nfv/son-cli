@@ -29,7 +29,7 @@ from subprocess import Popen
 import os
 import sys
 import pkg_resources
-from shutil import copy, rmtree
+from shutil import copy, rmtree, copytree
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -47,9 +47,13 @@ class emu():
     def __init__(self, REST_api):
         self.url = REST_api
         self.tmp_dir = '/tmp/son-monitor'
-        if not os.path.exists(self.tmp_dir):
-            # make local working directory
-            os.makedirs(self.tmp_dir)
+        self.docker_dir = '/tmp/son-monitor/docker'
+        self.prometheus_dir = '/tmp/son-monitor/prometheus'
+        self.grafana_dir = '/tmp/son-monitor/grafana'
+        for dir in [self.docker_dir, self.prometheus_dir, self.grafana_dir]:
+            if not os.path.exists(dir):
+                # make local working directory
+                os.makedirs(dir)
 
         self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
 
@@ -68,7 +72,7 @@ class emu():
             'up',
             '-d'
         ]
-        cwd = self.tmp_dir
+
         if self.docker_based:
             # we are running son-cli in a docker container
             logging.info('son-cli is running inside a docker container')
@@ -78,13 +82,20 @@ class emu():
             src_path = os.path.join('docker', 'docker-compose-local.yml')
         srcfile = pkg_resources.resource_filename(__name__, src_path)
         # copy the docker compose file to a working directory
-        copy(srcfile, cwd + '/docker-compose.yml')
+        copy(srcfile, os.path.join(self.docker_dir, 'docker-compose.yml'))
+
         # copy the prometheus config file for use in the prometheus docker container
-        src_path = os.path.join('docker', 'prometheus_sdk.yml')
+        src_path = os.path.join('prometheus', 'prometheus_sdk.yml')
         srcfile = pkg_resources.resource_filename(__name__, src_path)
-        copy(srcfile, cwd)
-        logging.info('Start son-monitor containers: {0}'.format(cwd))
-        process = Popen(cmd, cwd=cwd)
+        copy(srcfile, self.prometheus_dir)
+
+        # copy grafana directory
+        src_path = os.path.join('grafana', 'grafana.db')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        copy(srcfile, self.grafana_dir)
+
+        logging.info('Start son-monitor containers: {0}'.format(self.docker_dir))
+        process = Popen(cmd, cwd=self.docker_dir)
         process.wait()
         return 'son-monitor started'
 
@@ -97,9 +108,8 @@ class emu():
             'down',
             '-v'
         ]
-        cwd = self.tmp_dir
         logging.info('stop and remove son-monitor containers')
-        process = Popen(cmd, cwd=cwd)
+        process = Popen(cmd, cwd=self.docker_dir)
         process.wait()
         #try to remove tmp directory
         try:
