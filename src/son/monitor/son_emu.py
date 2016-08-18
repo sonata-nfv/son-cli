@@ -24,6 +24,7 @@ partner consortium (www.sonata-nfv.eu).
 from requests import get, put, delete
 from son.monitor.utils import *
 from son.monitor.prometheus import query_Prometheus
+from son.monitor.grafana_lib import Grafana
 import son.monitor.profiler as profiler
 from subprocess import Popen
 import os
@@ -57,14 +58,33 @@ class emu():
 
         self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
 
+        self.grafana = None
+
 
     def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
-        return actions[action]()
+        return actions[action](**kwargs)
+
+    def nsd(self, action, **kwargs):
+        #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
+        actions = {'start': self.start_nsd, 'stop': self.stop_nsd}
+        return actions[action](**kwargs)
+
+    # parse the nsd file and install the grafana metrics
+    def start_nsd(self, file=None, **kwargs):
+        self.grafana = Grafana()
+        self.grafana.init_dashboard()
+        self.grafana.parse_nsd(file)
+
+        return 'nsd metrics installed'
+
+    def stop_nsd(self, **kwargs):
+        self.grafana.init_dashboard()
+
 
     # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
-    def start_containers(self):
+    def start_containers(self, **kwargs):
         # docker-compose up -d
         cmd = [
             'docker-compose',
@@ -100,7 +120,7 @@ class emu():
         return 'son-monitor started'
 
     # start the sdk monitoring framework
-    def stop_containers(self):
+    def stop_containers(self, **kwargs):
         # docker-compose down, remove volumes
         cmd = [
             'docker-compose',
@@ -208,6 +228,18 @@ class emu():
         # then export its metrics (from the src_vnf/interface)
         ret2 = self.flow_mon(action, source, metric, cookie)
         ret3 = self.flow_mon(action, destination, metric, cookie)
+        # show the metric in grafana
+        self.grafana = Grafana()
+        grafana_dict = {'tx_packets':'sonemu_tx_count_packets',
+                        'rx_packets':'sonemu_rx_count_packets',
+                        'tx_bytes':'sonemu_tx_count_bytes',
+                        'rx_bytes': 'sonemu_rx_count_bytes'
+                        }
+        query1 = "{0}{{flow_id=\"{1}\",vnf_name=\"{2}\"}}".format(grafana_dict[metric], cookie, vnf_src_name)
+        legend1 = "{0}-cookie:{2} ({1}:{3})".format(metric, vnf_src_name, cookie, parse_vnf_interface(source))
+        query2 = "{0}{{flow_id=\"{1}\",vnf_name=\"{2}\"}}".format(grafana_dict[metric], cookie, vnf_dst_name)
+        legend2 = "{0}-cookie:{2} ({1}:{3})".format(metric, vnf_dst_name, cookie, parse_vnf_interface(destination))
+        ret4 = self.grafana.add_panel([dict(desc=legend1, metric=query1), dict(desc=legend2, metric=query2)])
 
         return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
         return return_value
