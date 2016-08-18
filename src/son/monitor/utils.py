@@ -21,6 +21,9 @@ acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
 
+import yaml
+import logging
+
 ## helper functions
 def parse_vnf_name( vnf_name_str):
     vnf_name = vnf_name_str.split(':')[0]
@@ -70,3 +73,22 @@ def construct_url(base, prefix, *args):
         if valid_arguments(arg):
             url += "/" + arg
     return url
+
+
+def load_nsd(nsd_path):
+    """
+    Load the entry NSD YAML and keep it as dict.
+    :return:
+    """
+    nsd = load_yaml(nsd_path)
+    return nsd
+
+
+def load_yaml(path):
+    with open(path, "r") as f:
+        try:
+            r = yaml.load(f)
+        except yaml.YAMLError as exc:
+            logging.exception("YAML parse error")
+            r = dict()
+    return r
