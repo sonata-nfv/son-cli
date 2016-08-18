@@ -27,6 +27,7 @@ import json
 from son.monitor.utils import *
 import pkg_resources
 import os
+import copy
 from itertools import groupby
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +68,7 @@ class Grafana():
         srcfile = pkg_resources.resource_filename(__name__, src_path)
         dashboard = json.load(open(srcfile))
         ret = self.session.post(url, json={'dashboard': dashboard, 'overwrite': True})
-        logging.info('return: {0}'.format(ret))
+        logging.info('init dahsboard: {0}'.format(ret))
 
     def add_panel(self, metric_list):
         """
@@ -92,6 +93,11 @@ class Grafana():
         dashboard['rows'][row_index]['panels'].append(json.load(open(srcfile)))
         panel_index = len(dashboard['rows'][row_index]['panels']) - 1
 
+        # set panel title (first word of metric description)
+        # need to make a copy of the list, because otherwise the original metric_list seems to get corrupted
+        new_list = list(copy.deepcopy(metric_list))
+        dashboard['rows'][row_index]['panels'][panel_index]['title'] = new_list[0]['desc'].split(' ')[0]
+
         for metric in metric_list:
             # add a new target(graph) to the panel
             src_path = os.path.join('grafana', 'grafana_target.json')
@@ -104,26 +110,20 @@ class Grafana():
                                                                                                                  '\"')
             legend = metric['desc']
             dashboard['rows'][row_index]['panels'][panel_index]['targets'][target_index]['legendFormat'] = legend
+            logging.info('installed metric: {0} {1}'.format(legend, metric))
 
         url = self.construct_api_url('dashboards/db')
         ret = self.session.post(url, json={'dashboard': dashboard, 'overwrite': True})
-        logging.info('ret: {0}'.format(ret))
+        logging.info('post new dashboard: {0}'.format(ret))
 
     # find the monitor metrics in the nsd and add them to grafana
     def parse_nsd(self, nsd_path):
-        logging.info('query: {0}'.format(nsd_path))
+        logging.info('parsing nsd: {0}'.format(nsd_path))
         nsd = load_nsd(nsd_path)
         monitor_parameters = nsd['monitoring_parameters']
         # group metrics by type (the first word in the description is considered the type)
         for metric_type, metric_group in groupby(monitor_parameters, lambda x: x['desc'].split(' ')[0]):
-            logging.info('metric_group: {0}'.format(metric_group))
             self.add_panel(metric_group)
-
-            for metric in metric_group:
-                legend = metric['desc']
-                logging.info('grafana legend: {0}'.format(legend))
-                query = metric['metric']
-                logging.info('grafana query: {0}'.format(query))
 
 class TokenAuth(requests.auth.AuthBase):
     """Authentication using a Grafana API token."""
