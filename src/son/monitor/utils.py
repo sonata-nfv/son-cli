@@ -71,17 +71,8 @@ def construct_url(base, prefix, *args):
     url = '/'.join([base, prefix])
     for arg in args:
         if valid_arguments(arg):
-            url += "/" + arg
+            url += "/" + str(arg)
     return url
-
-
-def load_nsd(nsd_path):
-    """
-    Load the entry NSD YAML and keep it as dict.
-    :return:
-    """
-    nsd = load_yaml(nsd_path)
-    return nsd
 
 
 def load_yaml(path):
@@ -92,3 +83,13 @@ def load_yaml(path):
             logging.exception("YAML parse error")
             r = dict()
     return r
+
+
+def switch_tx_rx(self, metric=''):
+    # in link monitoring, tx at source means rx at destination and vice-versa
+    if 'tx' in metric:
+        metric = metric.replace('tx', 'rx')
+    elif 'rx' in metric:
+        metric = metric.replace('rx', 'tx')
+
+    return metric

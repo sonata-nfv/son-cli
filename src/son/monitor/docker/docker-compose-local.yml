@@ -3,12 +3,6 @@ version: '2'
 
 services:
 
-  pushgateway:
-    image: prom/pushgateway
-    container_name: pushgateway
-    ports:
-     - "9091:9091"
-
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -18,20 +12,6 @@ services:
     ports:
      - "9090:9090"
     command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
-    links:
-     - pushgateway
-     - cadvisor
-
-  cadvisor:
-   image: google/cadvisor
-   container_name: cadvisor
-   volumes:
-    - "/:/rootfs:ro"
-    - "/var/run:/var/run:rw"
-    - "/sys:/sys:ro"
-    - "/var/lib/docker/:/var/lib/docker:ro"
-   ports:
-    - "8090:8080"
 
   grafana:
     image: grafana/grafana
@@ -42,6 +22,3 @@ services:
       - 3000:3000
     links:
       - prometheus
-
-
-

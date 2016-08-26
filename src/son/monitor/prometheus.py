@@ -40,6 +40,30 @@ prometheus_ip = 'localhost'
 prometheus_port = '9090'
 prometheus_REST_api = 'http://{0}:{1}'.format(prometheus_ip, prometheus_port)
 
+# translate metric names to the prometheus query
+metric2total_query = {
+    "rx_packet_count": "container_network_receive_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "tx_packet_count": "container_network_transmit_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "rx_bytes_count": "container_network_receive_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "tx_bytes_count": "container_network_transmit_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}"
+}
+metric2flowquery = {
+    'tx_packet_count': 'sonemu_tx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
+    'rx_packet_count': 'sonemu_rx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
+    'tx_byte_count': 'sonemu_tx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
+    'rx_byte_count': 'sonemu_rx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}'
+}
+metric2totalflowquery = {
+    'tx_packet_count': 'sonemu_tx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'rx_packet_count': 'sonemu_rx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'tx_byte_count': 'sonemu_tx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'rx_byte_count': 'sonemu_rx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}'
+}
+
+metric2vnfquery = {
+    "cpu" : "sum(rate(container_cpu_usage_seconds_total{{name=\"mn.{0}\"}}[10s]))",
+    "mem" : "container_memory_usage_bytes{{name=\"mn.{0}\"}}"
+}
 
 def query_Prometheus(query):
     url = prometheus_REST_api + '/' + 'api/v1/query?query=' + query

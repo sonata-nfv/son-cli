@@ -23,7 +23,7 @@ partner consortium (www.sonata-nfv.eu).
 
 from requests import get, put, delete
 from son.monitor.utils import *
-from son.monitor.prometheus import query_Prometheus
+from son.monitor.prometheus import query_Prometheus, metric2total_query, metric2flowquery, metric2totalflowquery, metric2vnfquery
 from son.monitor.grafana_lib import Grafana
 import son.monitor.profiler as profiler
 from subprocess import Popen
@@ -31,6 +31,9 @@ import os
 import sys
 import pkg_resources
 from shutil import copy, rmtree, copytree
+import paramiko
+import shlex
+import select
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +45,14 @@ pp = pprint.PrettyPrinter(indent=4)
 This class implements the son-emu commands via its REST api.
 """
 
+COOKIE_START = 100
+
+metric2flow_metric = {
+    "rx_packet_count": "rx_packets",
+    "tx_packet_count": "tx_packets",
+    "rx_byte_count": "tx_bytes",
+    "tx_byte_count": "tx_bytes",
+}
 
 class emu():
 
@@ -71,6 +82,11 @@ class emu():
         actions = {'start': self.start_nsd, 'stop': self.stop_nsd}
         return actions[action](**kwargs)
 
+    def msd(self, action, **kwargs):
+        #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
+        actions = {'start': self.start_msd, 'stop': self.stop_msd}
+        return actions[action](**kwargs)
+
     # parse the nsd file and install the grafana metrics
     def start_nsd(self, file=None, **kwargs):
         self.grafana = Grafana()
@@ -82,6 +98,147 @@ class emu():
     def stop_nsd(self, **kwargs):
         self.grafana.init_dashboard()
 
+    # parse the msd file and export the metrics ffrom son-emu and show in grafana
+    def start_msd(self, file=None, **kwargs):
+
+        # Parse the msd file
+        logging.info('parsing msd: {0}'.format(file))
+        msd = load_yaml(file)
+
+        # initialize a new Grafana dashboard
+        self.grafana = Grafana()
+        dashboard_name = msd['dashboard']
+        self.grafana.init_dashboard(title=dashboard_name)
+
+        # Install the defined vnf metrics
+        vnf_metrics = msd['vnf_metrics']
+        for metric_group in vnf_metrics:
+            graph_list = []
+            if metric_group['vnf_ids'] is None:
+                # no vnfs need to be monitored
+                break
+            title = metric_group['desc']
+            for vnf_id in metric_group['vnf_ids']:
+                graph_dict = {}
+                metric_type = metric_group['type']
+                if metric_type not in metric2vnfquery:
+                    logging.info("No query found for metric type: {0}".format(metric_type))
+                    break
+                query = metric2vnfquery[metric_type].format(vnf_id)
+                graph_dict = dict(desc=vnf_id, metric=query)
+                graph_list.append(graph_dict)
+
+            self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=dashboard_name)
+
+        # install the link metrics
+        cookie = COOKIE_START
+        for nsd_link in msd['nsd_links']:
+            graph_list = []
+            if nsd_link['metrics'] is None:
+                # no vnfs need to be monitored
+                break
+            title = nsd_link['desc']
+            metric_type = nsd_link['metric_type']
+            source = nsd_link['source']
+            destination = nsd_link['destination']
+            if 'rx' in metric_type:
+                vnf_name = parse_vnf_name(destination)
+                vnf_interface = parse_vnf_interface(destination)
+            elif 'tx' in metric_type:
+                vnf_name = parse_vnf_name(source)
+                vnf_interface = parse_vnf_interface(source)
+
+            for metric in nsd_link['metrics']:
+                graph_dict = {}
+
+                if metric['type'] == "total":
+                    query = metric2total_query[metric_type].format(
+                        vnf_name, vnf_interface)
+                    graph_dict = dict(desc=metric['desc'], metric=query)
+                elif metric['type'] == "flow_total":
+                    flow_metric = metric2flow_metric[metric_type]
+                    self.interface('start', vnf_name + ':' + vnf_interface, flow_metric)
+                    query = metric2totalflowquery[metric_type].format(vnf_name, vnf_interface)
+                    graph_dict = dict(desc=metric['desc'], metric=query)
+                elif metric['type'] == "flow":
+                    flow_metric = metric2flow_metric[metric_type]
+                    source = nsd_link['source']
+                    destination = nsd_link['destination']
+                    match = metric['match']
+                    #install the flow and export the metric
+                    self.flow_total('start', source, destination, flow_metric, cookie, match=match, bidirectional=False, priority=100)
+                    query = metric2flowquery[metric_type].format(cookie, vnf_name, vnf_interface)
+                    graph_dict = dict(desc=metric['desc'], metric=query)
+                    cookie += 1
+
+                graph_list.append(graph_dict)
+
+            self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=dashboard_name, graph_type='bars')
+
+        # execute the SAP commands
+        for sap in msd['saps']:
+            sap_docker_name = 'mn.' + sap['sap_name']
+            for cmd in sap['commands']:
+                if sap['method'] == 'son-emu-VM-ssh':
+                    cmd = 'sudo docker exec -it ' + sap_docker_name + ' ' + cmd
+                    process = self.ssh_cmd(cmd, username='steven', password='test')
+                elif sap['method'] == 'son-emu-local':
+                    process = self.docker_exec_cmd(cmd, sap_docker_name)
+
+        return 'msd metrics installed'
+
+    def stop_msd(self, file=None, **kwargs):
+        logging.info('parsing msd: {0}'.format(file))
+        msd = load_yaml(file)
+
+        # clear the dashboard
+        self.grafana = Grafana()
+        dashboard_name = msd['dashboard']
+        self.grafana.del_dashboard(title=dashboard_name)
+
+        # delete all installed flow_metrics
+        cookie = COOKIE_START
+        for nsd_link in msd['nsd_links']:
+            graph_list = []
+            if nsd_link['metrics'] is None:
+                # no vnfs need to be monitored
+                break
+            title = nsd_link['desc']
+            metric_type = nsd_link['metric_type']
+            source = nsd_link['source']
+            destination = nsd_link['destination']
+            if 'rx' in metric_type:
+                vnf_name = parse_vnf_name(destination)
+                vnf_interface = parse_vnf_interface(destination)
+            elif 'tx' in metric_type:
+                vnf_name = parse_vnf_name(source)
+                vnf_interface = parse_vnf_interface(source)
+
+            # delete the flows, identified by their cookie
+            for metric in nsd_link['metrics']:
+                if metric['type'] == "flow_total":
+                    flow_metric = metric2flow_metric[metric_type]
+                    self.interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+                elif metric['type'] == "flow":
+                    flow_metric = metric2flow_metric[metric_type]
+                    source = nsd_link['source']
+                    destination = nsd_link['destination']
+                    # install the flow and export the metric
+                    self.flow_total('stop', source, destination, flow_metric, cookie)
+                    cookie += 1
+
+        # kill all the SAP commands
+        for sap in msd['saps']:
+            sap_docker_name = 'mn.' + sap['sap_name']
+            for cmd in sap['commands']:
+                if sap['method'] == 'son-emu-VM-ssh':
+                    cmd = 'sudo docker exec -it ' + sap_docker_name + " pkill '" + cmd + "'"
+                    process = self.ssh_cmd(cmd, username='steven', password='test')
+                elif sap['method'] == 'son-emu-local':
+                    cmd = "pkill '" + cmd + "'"
+                    process = self.docker_exec_cmd(cmd, sap_docker_name)
+
+        return 'msd metrics deleted'
 
     # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
     def start_containers(self, **kwargs):
@@ -117,6 +274,7 @@ class emu():
         logging.info('Start son-monitor containers: {0}'.format(self.docker_dir))
         process = Popen(cmd, cwd=self.docker_dir)
         process.wait()
+
         return 'son-monitor started'
 
     # start the sdk monitoring framework
@@ -139,6 +297,29 @@ class emu():
             logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
 
         return 'son-monitor stopped'
+
+    def ssh_cmd(self, cmd, host='localhost', port=22, username='vagrant', password='vagrant'):
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # ssh.connect(mgmt_ip, username='steven', password='test')
+        ssh.connect(host, port=port, username=username, password=password)
+        logging.info("executing command: {0}".format(cmd))
+        stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
+
+    def docker_exec_cmd(self, cmd, docker_name):
+        cmd_list = shlex.split(cmd)
+        cmd = [
+            'docker',
+            'exec',
+            '-it',
+            docker_name
+        ]
+        cmd = cmd + cmd_list
+        logging.info("executing command: {0}".format(cmd))
+        process = Popen(cmd)
+        #process.wait()
+        return process
+
 
     def interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
@@ -225,21 +406,18 @@ class emu():
 
         # first add this specific flow to the emulator network
         ret1 = self.flow_entry(action ,source, destination, **params)
-        # then export its metrics (from the src_vnf/interface)
-        ret2 = self.flow_mon(action, source, metric, cookie)
-        ret3 = self.flow_mon(action, destination, metric, cookie)
-        # show the metric in grafana
-        self.grafana = Grafana()
-        grafana_dict = {'tx_packets':'sonemu_tx_count_packets',
-                        'rx_packets':'sonemu_rx_count_packets',
-                        'tx_bytes':'sonemu_tx_count_bytes',
-                        'rx_bytes': 'sonemu_rx_count_bytes'
-                        }
-        query1 = "{0}{{flow_id=\"{1}\",vnf_name=\"{2}\"}}".format(grafana_dict[metric], cookie, vnf_src_name)
-        legend1 = "{0}-cookie:{2} ({1}:{3})".format(metric, vnf_src_name, cookie, parse_vnf_interface(source))
-        query2 = "{0}{{flow_id=\"{1}\",vnf_name=\"{2}\"}}".format(grafana_dict[metric], cookie, vnf_dst_name)
-        legend2 = "{0}-cookie:{2} ({1}:{3})".format(metric, vnf_dst_name, cookie, parse_vnf_interface(destination))
-        ret4 = self.grafana.add_panel([dict(desc=legend1, metric=query1), dict(desc=legend2, metric=query2)])
+        # then export its metrics (from the src and dst vnf_interface)
+        if kwargs.get("bidirectional") == True:
+            ret3 = self.flow_mon(action, destination, metric, cookie)
+            ret2 = self.flow_mon(action, source, metric, cookie)
+
+        elif 'rx' in metric:
+            ret3 = self.flow_mon(action, destination, metric, cookie)
+            ret2 = ''
+
+        elif 'tx' in metric:
+            ret2 = self.flow_mon(action, source, metric, cookie)
+            ret3 = ''
 
         return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
         return return_value
@@ -295,3 +473,9 @@ class emu():
             if vnf[0] == vnf_name:
                 datacenter = vnf[1]['datacenter']
         return datacenter
+
+    # find the public ip address where we can log into the node
+    def _find_public_ip(self, vnf_name):
+        dc_label = self._find_dc(vnf_name)
+        vnf_status = get("{0}/restapi/compute/{1}/{2}".format(self.url, dc_label, vnf_name)).json()
+        return vnf_status['docker_network']
