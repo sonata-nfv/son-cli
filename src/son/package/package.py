@@ -155,6 +155,12 @@ class Packager(object):
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
+
+        if not package_content:
+            log.error("Failed to package Package Content Section. "
+                      "Could not find a network service and/or its "
+                      "referenced function descriptors")
+            return
         self._package_descriptor.update(package_content)
         self._package_descriptor.update(package_resolver)
         self._package_descriptor.update(package_dependencies)
@@ -224,14 +230,14 @@ class Packager(object):
         nsd = self.generate_nsd()
         if not nsd or len(nsd) == 0:
             log.error("Failed to package service descriptor")
-            return False
+            return None
         pcs += nsd
 
         # Load and add the function descriptors
         vnfds = self.generate_vnfds()
         if not vnfds or len(vnfds) == 0:
             log.error("Failed to package function descriptors")
-            return False
+            return None
         pcs += vnfds
 
         return dict(package_content=pcs)
