@@ -73,7 +73,7 @@ def _execute_command(args):
         VIM_class = eval(args.get('vim'))
         # call the VIM class method with the same name as the command arg
         ret = getattr(VIM_class, args["command"][0])(**args)
-        logging.info("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
+        logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
 
         pp.pprint(ret)
     else:
@@ -96,7 +96,7 @@ parser = argparse.ArgumentParser(description=description,
                         epilog=examples)
 parser.add_argument(
     "command",
-    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total'],
+    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)
@@ -104,6 +104,7 @@ parser.add_argument(
          flow_mon : export flow_entry metric (tx/rx bytes/packets)
          flow_total : flow_entry + flow_mon
          init : start/stop the monitoring framework
+         msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
          profile : performance profiling (tba)
          """)
 
@@ -118,6 +119,9 @@ parser.add_argument(
           Action for init:
           start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
           stop: stop the monitoring framework
+          Action for nsd:
+          start: start the monitoring metrics from the nsd
+          stop: start the monitoring metrics from the nsd
           """)
 
 ## select the vim to execute the monitoring action on (default=emulator)
@@ -152,7 +156,7 @@ parser.add_argument(
     "--query", "-q", dest="query",
     help="prometheus query")
 
-## arguments specific for vnf profling
+## arguments specific for vnf profiling
 parser.add_argument(
     "--input", "-in", dest="input",
     help="input interface of the vnf to profile")
@@ -189,6 +193,9 @@ parser.add_argument(
 parser.add_argument(
     "--cookie", "-c", dest="cookie",
     help="flow cookie to monitor")
+parser.add_argument(
+    "--file", "-f", dest="file",
+    help="service descriptor file describing monitoring rules")
 
 def main():
 

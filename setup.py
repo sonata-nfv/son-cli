@@ -52,10 +52,11 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*']
+            'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*', 'monitor/grafana/*.db',
+                    'monitor/prometheus/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
-                          'requests>2.4.2', 'coloredlogs', 'paramiko'],
+                          'requests>2.4.2', 'coloredlogs', 'cryptography<=1.2.1', 'paramiko'],
         zip_safe=False,
         entry_points={
             'console_scripts': [

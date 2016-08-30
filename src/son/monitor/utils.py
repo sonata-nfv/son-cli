@@ -21,6 +21,9 @@ acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
 
+import yaml
+import logging
+
 ## helper functions
 def parse_vnf_name( vnf_name_str):
     vnf_name = vnf_name_str.split(':')[0]
@@ -68,5 +71,25 @@ def construct_url(base, prefix, *args):
     url = '/'.join([base, prefix])
     for arg in args:
         if valid_arguments(arg):
-            url += "/" + arg
+            url += "/" + str(arg)
     return url
+
+
+def load_yaml(path):
+    with open(path, "r") as f:
+        try:
+            r = yaml.load(f)
+        except yaml.YAMLError as exc:
+            logging.exception("YAML parse error")
+            r = dict()
+    return r
+
+
+def switch_tx_rx(self, metric=''):
+    # in link monitoring, tx at source means rx at destination and vice-versa
+    if 'tx' in metric:
+        metric = metric.replace('tx', 'rx')
+    elif 'rx' in metric:
+        metric = metric.replace('rx', 'tx')
+
+    return metric
