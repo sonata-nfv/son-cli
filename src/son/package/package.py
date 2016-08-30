@@ -160,7 +160,9 @@ class Packager(object):
             log.error("Failed to package Package Content Section. "
                       "Could not find a network service and/or its "
                       "referenced function descriptors")
+            self._package_descriptor = None
             return
+
         self._package_descriptor.update(package_content)
         self._package_descriptor.update(package_resolver)
         self._package_descriptor.update(package_dependencies)
