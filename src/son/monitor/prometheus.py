@@ -61,8 +61,17 @@ metric2totalflowquery = {
 }
 
 metric2vnfquery = {
-    "cpu" : "sum(rate(container_cpu_usage_seconds_total{{name=\"mn.{0}\"}}[10s]))",
-    "mem" : "container_memory_usage_bytes{{name=\"mn.{0}\"}}"
+    "cpu" : "sum(rate(container_cpu_usage_seconds_total{{name=\"mn.{0}\"}}[3s]))*100",
+    "mem" : "container_memory_usage_bytes{{name=\"mn.{0}\"}}",
+    'tx_packet_rate': 'rate(sonemu_tx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
+    'rx_packet_rate': 'rate(sonemu_rx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
+    'tx_byte_rate': 'rate(sonemu_tx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
+    'rx_byte_rate': 'rate(sonemu_rx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
+}
+
+profile2vnfquery = {
+    "jitter" : "sonemu_jitter_ms{vnf_name=\"profile_sink\"}",
+    "packet_loss": "sonemu_packet_loss_percent{vnf_name=\"profile_sink\"}"
 }
 
 def query_Prometheus(query):
