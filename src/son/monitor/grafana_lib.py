@@ -29,6 +29,8 @@ import pkg_resources
 import os
 import copy
 from itertools import groupby
+from time import sleep
+
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -70,6 +72,7 @@ class Grafana():
         if title is not None:
             dashboard["title"] = title
         ret = self.session.post(url, json={'dashboard': dashboard, 'overwrite': True})
+        sleep(2)
         logging.info('init dahsboard: {0}'.format(ret))
 
     def del_dashboard(self, title=None):
@@ -122,8 +125,10 @@ class Grafana():
             # add a new target(graph) to the panel
             src_path = os.path.join('grafana', 'grafana_target.json')
             srcfile = pkg_resources.resource_filename(__name__, src_path)
-            dashboard['rows'][row_index]['panels'][panel_index]['targets'].append(json.load(open(srcfile)))
-            target_index = len(dashboard['rows'][row_index]['panels'][panel_index]['targets']) - 1
+            new_target = json.load(open(srcfile))
+            target_index = len(dashboard['rows'][row_index]['panels'][panel_index]['targets'])
+            new_target['refId'] = chr(ord('A') + target_index)
+            dashboard['rows'][row_index]['panels'][panel_index]['targets'].append(new_target)
 
             query = metric['metric']
             dashboard['rows'][row_index]['panels'][panel_index]['targets'][target_index]['expr'] = query.replace('"',
