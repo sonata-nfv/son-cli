@@ -52,7 +52,7 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*', 'monitor/grafana/*.db',
+            'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*', 'monitor/grafana/*',
                     'monitor/prometheus/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
