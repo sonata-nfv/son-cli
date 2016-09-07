@@ -179,7 +179,7 @@ parser.add_argument(
     help="string holding extra matches for the flow entries")
 parser.add_argument(
     "--bidirectional", "-b", dest="bidirectional",
-    action='store_true',
+    action='store_false',
     help="add/remove the flow entries from src to dst and back")
 parser.add_argument(
     "--priority", "-p", dest="priority",
