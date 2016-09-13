@@ -246,17 +246,20 @@ class emu():
             for metric in nsd_link['metrics']:
                 graph_dict = {}
 
+                # an interface metric exported from cAdvisor
                 if metric['type'] == "total":
                     if action == 'stop': continue
                     query = metric2total_query[metric_type].format(
                         vnf_name, vnf_interface)
                     graph_dict = dict(desc=metric['desc'], metric=query)
+                # an interface metric as an interface packet counter from the son-emu network switch
                 elif metric['type'] == "flow_total":
                     flow_metric = metric2flow_metric[metric_type]
                     self.interface(action, vnf_name + ':' + vnf_interface, flow_metric)
                     if action == 'stop' : continue
                     query = metric2totalflowquery[metric_type].format(vnf_name, vnf_interface)
                     graph_dict = dict(desc=metric['desc'], metric=query)
+                # a metric as a custom flow counter from the son-emu network switch
                 elif metric['type'] == "flow":
                     flow_metric = metric2flow_metric[metric_type]
                     source = nsd_link['source']
