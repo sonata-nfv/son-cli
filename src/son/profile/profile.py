@@ -24,17 +24,73 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
+import os
+import tempfile
+import argparse
+import logging
+import coloredlogs
+LOG = logging.getLogger(__name__)
+
+
+class ProfileManager(object):
+
+    def __init__(self, args):
+        self.args = args
+        coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
+
+        LOG.info("SONATA profiling tool initialized")
+        LOG.debug("Arguments: %r" % self.args)
+
 
 def parse_args():
-    import argparse
 
     parser = argparse.ArgumentParser(
         description="Manage and control VNF and service profiling experiments.")
 
     parser.add_argument(
-        "--debug",
-        help="increases logging level to debug",
+        "-v",
+        "--verbose",
+        help="Increases logging level to debug.",
         required=False,
+        default=False,
+        dest="verbose",
+        action="store_true")
+
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="PED file to be used for profiling run",
+        required=True,
+        dest="config")
+
+    parser.add_argument(
+        "--work-dir",
+        help="Dictionary for generated artifacts, e.g., profiling packages. Will use a temporary folder as default.",
+        required=False,
+        default=tempfile.mkdtemp(),
+        dest="work_dir")
+
+    parser.add_argument(
+        "--output-dir",
+        help="Folder to collect measurements. Default: Current directory.",
+        required=False,
+        default=os.getcwd(),
+        dest="output_dir")
+
+    parser.add_argument(
+        "--no-generation",
+        help="Skip profiling package generation step.",
+        required=False,
+        default=False,
+        dest="no_generation",
+        action="store_true")
+
+    parser.add_argument(
+        "--no-execution",
+        help="Skip profiling execution step.",
+        required=False,
+        default=False,
+        dest="no_execution",
         action="store_true")
 
     return parser.parse_args()
@@ -42,4 +98,4 @@ def parse_args():
 
 def main():
     args = parse_args()
-    print("son-profile")
+    p = ProfileManager(args)
