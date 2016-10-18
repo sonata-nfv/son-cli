@@ -26,6 +26,8 @@
 
 import logging
 import coloredlogs
+import itertools as it
+from son.profile.macro import rewrite_parameter_macros_to_lists
 LOG = logging.getLogger(__name__)
 
 
@@ -41,7 +43,54 @@ class Experiment(object):
         one run configuration for each parameter combination
         to be tested.
         """
-        pass
+        # convert parameter macros from PED file to plain lists
+        for rl in self.resource_limitations:
+            rewrite_parameter_macros_to_lists(rl)
+        # aggregate all parameters to used in the experiment to a flat dict for further processing
+        parameter_dict = self._get_configuration_space_as_dict()
+        print(parameter_dict)
+        # explore entire parameter space by calculating the Cartesian product over the given dict
+        # TODO
+
+    def _get_configuration_space_as_dict(self):
+        """
+        Output: dict
+        {"function1:parameter1" : [0.1, 0.2, ...],
+         "functionN:parameterN" : [0.1, ...],
+         "function1:parameter1" : [0.1],
+         "functionN:parameterN" : [0.1, 0.2, ...],
+         "functionN:repetitions" : [1, 2, 3]}
+        """
+        r = dict()
+        for rl in self.resource_limitations:
+            name = rl.get("function")
+            for k, v in rl.items():
+                if k == "function":
+                    continue
+                if not isinstance(v, list):
+                    v = [v]
+                r["%s:%s" % (name, k)] = v
+            # add additional parameters (unrolled as lists!)
+            r["%s:%s" % (name, "repetitions")] = list(range(0, self.repetitions))
+        return r
+
+    @staticmethod
+    def _compute_cartesian_product(p_dict):
+        """
+        Compute Cartesian product on parameter dict:
+        In:
+            {"number": [1,2,3], "color": ["orange","blue"] }
+        Out:
+            [ {"number": 1, "color": "orange"},
+              {"number": 1, "color": "blue"},
+              {"number": 2, "color": "orange"},
+              {"number": 2, "color": "blue"},
+              {"number": 3, "color": "orange"},
+              {"number": 3, "color": "blue"}
+            ]
+        """
+        p_names = sorted(p_dict)
+        return [dict(zip(p_names, prod)) for prod in it.product(*(p_dict[n] for n in p_names))]
 
 
 class ServiceExperiment(Experiment):
@@ -56,3 +105,10 @@ class FunctionExperiment(Experiment):
     def __init__(self, definition):
         super().__init__(definition)
         LOG.debug("Created function experiment: %r" % self.name)
+
+
+class RunConfiguration(object):
+
+    def __init__(self, run_id, configuration):
+        # populate object from dict
+        self.__dict__.update(configuration)

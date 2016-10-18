@@ -24,40 +24,56 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
-import os
-import unittest
-from son.profile.experiment import Experiment
+import logging
+import coloredlogs
+import numpy as np
+import re
+LOG = logging.getLogger(__name__)
 
 
-class UnitProfileTests(unittest.TestCase):
-
-    def test_ped_file_processing(self):
-        # TODO implement real test
-        self.assertTrue(True)
+# default step size for loop macro
+DEFAULT_STEP = 1.0
 
 
-class UnitExperimentTests(unittest.TestCase):
+def rewrite_parameter_macros_to_lists(d):
 
-    def test_cartesian_product(self):
+    for k, v in d.items():
+        if is_macro(v):
+            d[k] = macro_to_list(v)
 
-        def _dict_is_in_list(d, l):
-            for d1 in l:
-                if d1 == d:
-                    return True
-            return False
 
-        INPUT = {"x": [1, 2, 3], "y": ["value1", "value2"]}
-        OUTPUT = [
-            {"x": 1, "y": "value1"},
-            {"x": 1, "y": "value2"},
-            {"x": 2, "y": "value1"},
-            {"x": 2, "y": "value2"},
-            {"x": 3, "y": "value1"},
-            {"x": 3, "y": "value2"}
-        ]
-        # calculate Cartesian product
-        result = Experiment._compute_cartesian_product(INPUT)
-        # check if results are as expected
-        self.assertEqual(len(result), len(OUTPUT))
-        for d in result:
-            self.assertTrue(_dict_is_in_list(d, OUTPUT))
+def is_macro(s):
+        if isinstance(s, str):
+            if "${" in s:  # TODO improve: use regex
+                return True
+        return False
+
+
+def macro_to_list(m):
+    if "to" in m:
+        # loop macro
+        return loop_macro_to_list(m)
+    else:
+        # list macro
+        return list_macro_to_list(m)
+
+
+def loop_macro_to_list(m):
+    r = list()
+    m = m.strip("${}")
+    m = re.split('to|step', m)
+    m = [float(i) for i in m]
+    step = DEFAULT_STEP
+    if len(m) > 2:
+        step = m[2]
+    # unroll the given loop to a list of values
+    for i in np.arange(m[0], m[1], step):
+        r.append(i)
+    return r
+
+
+def list_macro_to_list(m):
+    m = m.strip("${}")
+    m = re.split(',', m)
+    m = [float(i) for i in m]
+    return m
