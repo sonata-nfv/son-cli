@@ -26,7 +26,7 @@
 
 import logging
 import coloredlogs
-import numpy as np
+#import numpy as np
 import re
 LOG = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def loop_macro_to_list(m):
     if len(m) > 2:
         step = m[2]
     # unroll the given loop to a list of values
-    for i in np.arange(m[0], m[1], step):
+    for i in frange(m[0], m[1], step):
         r.append(i)
     return r
 
@@ -77,3 +77,12 @@ def list_macro_to_list(m):
     m = re.split(',', m)
     m = [float(i) for i in m]
     return m
+
+
+def frange(start, stop, step):
+    x = start
+    while True:
+        if x >= stop:
+            return
+        yield x
+        x += step

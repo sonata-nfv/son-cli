@@ -36,6 +36,8 @@ class Experiment(object):
     def __init__(self, definition):
         # populate object from YAML definition
         self.__dict__.update(definition)
+        # attributes
+        self.run_configurations = list()
 
     def populate(self):
         """
@@ -50,7 +52,11 @@ class Experiment(object):
         parameter_dict = self._get_configuration_space_as_dict()
         print(parameter_dict)
         # explore entire parameter space by calculating the Cartesian product over the given dict
-        # TODO
+        parameter_space_list = Experiment._compute_cartesian_product(parameter_dict)
+        # create a run configuration object for each calculated configuration to test
+        for i in range(0, len(parameter_space_list)):
+            self.run_configurations.append(RunConfiguration(i, parameter_space_list[i]))
+        LOG.info("Populated experiment: %r with %d configurations to test." % (self.name, len(self.run_configurations)))
 
     def _get_configuration_space_as_dict(self):
         """
@@ -59,7 +65,7 @@ class Experiment(object):
          "functionN:parameterN" : [0.1, ...],
          "function1:parameter1" : [0.1],
          "functionN:parameterN" : [0.1, 0.2, ...],
-         "functionN:repetitions" : [1, 2, 3]}
+         "repetition" : [1, 2, 3]}
         """
         r = dict()
         for rl in self.resource_limitations:
@@ -70,8 +76,8 @@ class Experiment(object):
                 if not isinstance(v, list):
                     v = [v]
                 r["%s:%s" % (name, k)] = v
-            # add additional parameters (unrolled as lists!)
-            r["%s:%s" % (name, "repetitions")] = list(range(0, self.repetitions))
+        # add additional parameters (unrolled as lists!)
+        r["repetition"] = list(range(0, self.repetitions))
         return r
 
     @staticmethod
@@ -110,5 +116,6 @@ class FunctionExperiment(Experiment):
 class RunConfiguration(object):
 
     def __init__(self, run_id, configuration):
-        # populate object from dict
-        self.__dict__.update(configuration)
+        self.run_id = run_id
+        # TODO translate this to dict with simpler keys?
+        self.configuration = configuration
