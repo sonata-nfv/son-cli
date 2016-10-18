@@ -18,7 +18,7 @@ service_package: "./sonata-fw-vtc-service.son"
 # Firs type of experiments: Service level experiments
 #
 service_experiments:
-  - name: "total service throughput"
+  - name: "service_throughput"
     description: "iperf test for entire service"
     repetitions: 3
     time_limit: "120"
@@ -68,7 +68,7 @@ service_experiments:
 # Second type of experiments: VNF level experiments (individually test each VNF)
 #
 function_experiments:
-  - name: "fw throughput"
+  - name: "func_fw_throughput"
     description: "iperf test for fw vnf"
     repetitions: 3
     time_limit: "120"
@@ -95,7 +95,7 @@ function_experiments:
         cpu_bw: 0.2
       - function: "mp.output"
         cpu_bw: 0.2
-  - name: "vtc throughput"
+  - name: "func_vtc_throughput"
     description: "iperf test for vtc vnf"
     repetitions: 3
     time_limit: "120"
