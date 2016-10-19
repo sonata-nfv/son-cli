@@ -64,7 +64,8 @@ setup(
                 'son-package=son.package.package:main',
                 'son-publish=son.catalogue.publish:main',
                 'son-push=son.push.push:main',
-                'son-monitor=son.monitor.monitor:main'
+                'son-monitor=son.monitor.monitor:main',
+                'son-profile=son.profile.profile:main'
             ],
         },
         test_suite='son',

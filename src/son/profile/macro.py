@@ -1,0 +1,88 @@
+#  Copyright (c) 2015 SONATA-NFV, Paderborn University
+# ALL RIGHTS RESERVED.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Neither the name of the SONATA-NFV, UBIWHERE
+# nor the names of its contributors may be used to endorse or promote
+# products derived from this software without specific prior written
+# permission.
+#
+# This work has been performed in the framework of the SONATA project,
+# funded by the European Commission under Grant number 671517 through
+# the Horizon 2020 and 5G-PPP programmes. The authors would like to
+# acknowledge the contributions of their colleagues of the SONATA
+# partner consortium (www.sonata-nfv.eu).
+
+import logging
+import coloredlogs
+#import numpy as np
+import re
+LOG = logging.getLogger(__name__)
+
+
+# default step size for loop macro
+DEFAULT_STEP = 1.0
+
+
+def rewrite_parameter_macros_to_lists(d):
+
+    for k, v in d.items():
+        if is_macro(v):
+            d[k] = macro_to_list(v)
+
+
+def is_macro(s):
+        if isinstance(s, str):
+            if "${" in s:  # TODO improve: use regex
+                return True
+        return False
+
+
+def macro_to_list(m):
+    if "to" in m:
+        # loop macro
+        return loop_macro_to_list(m)
+    else:
+        # list macro
+        return list_macro_to_list(m)
+
+
+def loop_macro_to_list(m):
+    r = list()
+    m = m.strip("${}")
+    m = re.split('to|step', m)
+    m = [float(i) for i in m]
+    step = DEFAULT_STEP
+    if len(m) > 2:
+        step = m[2]
+    # unroll the given loop to a list of values
+    for i in frange(m[0], m[1], step):
+        r.append(i)
+    return r
+
+
+def list_macro_to_list(m):
+    m = m.strip("${}")
+    m = re.split(',', m)
+    m = [float(i) for i in m]
+    return m
+
+
+def frange(start, stop, step):
+    x = start
+    while True:
+        if x >= stop:
+            return
+        yield x
+        x += step
