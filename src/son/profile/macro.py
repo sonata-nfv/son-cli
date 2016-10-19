@@ -26,7 +26,7 @@
 
 import logging
 import coloredlogs
-#import numpy as np
+# import numpy as np
 import re
 LOG = logging.getLogger(__name__)
 
@@ -43,10 +43,10 @@ def rewrite_parameter_macros_to_lists(d):
 
 
 def is_macro(s):
-        if isinstance(s, str):
-            if "${" in s:  # TODO improve: use regex
-                return True
-        return False
+    if isinstance(s, str):
+        if "${" in s:  # TODO improve: use regex
+            return True
+    return False
 
 
 def macro_to_list(m):
@@ -80,6 +80,7 @@ def list_macro_to_list(m):
 
 
 def frange(start, stop, step):
+    # TODO ugly. Replace by numpy.arange or linspace.
     x = start
     while True:
         if x >= stop:
