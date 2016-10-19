@@ -3,6 +3,8 @@ FROM    ubuntu:14.04
 RUN     apt-get update \
         ## install required packages
         && apt-get install -y python3-pip dpkg-dev fakeroot \
+        && apt-get install -y python3-dev python3-pycparser \
+        && apt-get install -y build-essential libssl-dev libffi-dev \
         ## install py2deb package converter
         && pip3 install py2deb \
         ## generate utf8 locale, otherwise py2deb will result in error!

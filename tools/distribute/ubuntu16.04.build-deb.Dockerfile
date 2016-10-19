@@ -3,6 +3,8 @@ FROM    ubuntu:16.04
 RUN     apt-get update \
         ## install required packages
         && apt-get install -y python3-pip dpkg-dev fakeroot \
+        && apt-get install -y python3-dev python3-pycparser \
+        && apt-get install -y build-essential libssl-dev libffi-dev \
         ## install py2deb package converter
         && pip3 install --upgrade pip \
         && pip3 install py2deb \
