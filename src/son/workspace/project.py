@@ -49,7 +49,6 @@ class Project:
         self._descriptor_extension = workspace.default_descriptor_extension
         self._prj_config = config
 
-
     @property
     def project_root(self):
         return self._prj_root
@@ -57,6 +56,10 @@ class Project:
     @property
     def project_config(self):
         return self._prj_config
+
+    @property
+    def descriptor_extension(self):
+        return self._descriptor_extension
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))

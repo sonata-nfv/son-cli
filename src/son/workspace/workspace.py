@@ -69,12 +69,10 @@ class Workspace:
         self.default_descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
-        self._catalogue_servers = [{'id': 'cat1',
-                                    'url': 'http://cat1url.com:1234',
-                                    'publish': 'yes'},
-                                   {'id': 'cat2',
-                                    'url': 'http://cat2url.com:1234',
-                                    'publish': 'no'}]
+        self._catalogue_servers = [{'id': 'son-catalogue',
+                                    'url':
+                                        'http://catalogue.sonata-nfv.eu:4012',
+                                    'publish': 'yes'}]
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
