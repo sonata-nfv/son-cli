@@ -373,7 +373,7 @@ class emu():
                 rl, wl, xl = select.select([stdout.channel], [], [], 0.0)
                 if len(rl) > 0:
                     # Print data from stdout
-                    logging.info(stdout.channel.recv(1024))
+                    logging.info(stdout.channel.recv(1024).decode("utf-8"))
                     timer = 0
             else:
                 timer += 1
@@ -450,7 +450,10 @@ class emu():
             match=args.get("match"),
             bidirectional=args.get("bidirectional"),
             priority=args.get("priority"),
-            cookie=args.get("cookie"))
+            cookie=args.get("cookie"),
+            skip_vlan_tag=True,
+            monitor=args.get("monitor"),
+            monitor_placement=args.get("monitor_placement") )
 
         response = actions[action]("{0}/restapi/network/{1}/{2}".format(
                     self.url,
@@ -471,6 +474,13 @@ class emu():
         vnf_src_name = parse_vnf_name(source)
         vnf_dst_name = parse_vnf_name(destination)
 
+        monitor_placement = None
+        if 'rx' in metric:
+            monitor_placement = 'rx'
+        elif 'tx' in metric:
+            monitor_placement = 'tx'
+
+
         params = create_dict(
             vnf_src_interface=parse_vnf_interface(source),
             vnf_dst_interface=parse_vnf_interface(destination),
@@ -478,7 +488,10 @@ class emu():
             match=kwargs.get("match"),
             bidirectional=kwargs.get("bidirectional"),
             priority=kwargs.get("priority"),
-            cookie=cookie)
+            cookie=cookie,
+            skip_vlan_tag=True,
+            monitor=True,
+            monitor_placement=monitor_placement)
 
         # first add this specific flow to the emulator network
         ret1 = self.flow_entry(action ,source, destination, **params)
@@ -550,8 +563,34 @@ class emu():
                 datacenter = vnf[1]['datacenter']
         return datacenter
 
+    def _find_dc_interface(self, vnf_name, vnf_interface):
+        datacenter = None
+        vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+        network = []
+        dc_portname = None
+        for vnf in vnf_list:
+            if vnf[0] == vnf_name:
+                network = vnf[1]['network']
+                break
+        for intf_dict in network:
+            if intf_dict['intf_name'] == vnf_interface:
+                dc_portname = intf_dict['dc_portname']
+                break
+        return dc_portname
+
     # find the public ip address where we can log into the node
     def _find_public_ip(self, vnf_name):
         dc_label = self._find_dc(vnf_name)
         vnf_status = get("{0}/restapi/compute/{1}/{2}".format(self.url, dc_label, vnf_name)).json()
         return vnf_status['docker_network']
+
+    # start tcpdump for this interface
+    def dump(self, vnf_name, **kwargs):
+        vnf_name2 = parse_vnf_name(vnf_name)
+        vnf_interface = parse_vnf_interface(vnf_name)
+        dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
+        print(dc_portname)
+        Popen(['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', 'dump ' + vnf_name, '-hold', '-e', "tcpdump -i {0}".format(dc_portname)])
+
+
+

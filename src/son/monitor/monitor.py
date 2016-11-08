@@ -96,7 +96,7 @@ parser = argparse.ArgumentParser(description=description,
                         epilog=examples)
 parser.add_argument(
     "command",
-    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd'],
+    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)
@@ -106,6 +106,7 @@ parser.add_argument(
          init : start/stop the monitoring framework
          msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
          profile : performance profiling (tba)
+         dump: start tcpdump for specified interface
          """)
 
 parser.add_argument(
