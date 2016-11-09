@@ -26,8 +26,10 @@
 
 import os
 import yaml
+import networkx as nx
 
 from son.workspace.workspace import Workspace, Project
+
 
 class UndirectedGraph(object):
 
@@ -45,9 +47,12 @@ class Validator(object):
 
     def _build_service_graph(self):
 
+        # init service network graph
+        sg = nx.Graph()
+
         # load project service descriptor
         nsd_file = self._project.get_ns_descriptor()
-        with open(nsd_file) as _file:
+        with open(nsd_file, 'r') as _file:
             nsd = yaml.load(_file)
             assert nsd is not None
 
@@ -55,7 +60,7 @@ class Validator(object):
         prj_vnfds = {}
         vnfd_files = self._project.get_vnf_descriptors()
         for vnfd_file in vnfd_files:
-            with open(vnfd_file) as _file:
+            with open(vnfd_file, 'r') as _file:
                 vnfd = yaml.load(_file)
                 assert vnfd is not None
                 vnf_combo_id = vnfd['vendor'] + '.' + vnfd['name'] + '.' + \
@@ -69,6 +74,18 @@ class Validator(object):
                            '.' + func['vnf_version']
             if vnf_combo_id in prj_vnfds.keys():
                 ref_vnfds[func['vnf_id']] = prj_vnfds[vnf_combo_id]
+
+        # add connection points as nodes to the service graph
+        for cp in nsd['connection_points']:
+            if cp['type'] is 'interface':
+                sg.add_node(cp['id'])
+        for vnf_id in ref_vnfds.keys():
+            for cp in ref_vnfds[vnf_id]['connection_points']:
+                if cp['type'] is 'interface':
+                    sg.add_node(vnf_id + ':' + cp['id'])
+
+        # temp
+        print(sg.nodes())
 
 
 def main():
@@ -85,9 +102,23 @@ def main():
 
     parser.add_argument(
         "--project",
-        help="create a new package based on the project at the specified "
-             "location. If not specified will assume current directory '{}'"
+        help="Validate the project at the specified location. "
+             "If not specified will assume current directory '{}'"
              .format(os.getcwd()),
         required=False)
 
+    args = parser.parse_args()
 
+    if args.workspace:
+        ws_root = args.workspace
+    else:
+        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+
+    prj_root = args.project if args.project else os.getcwd()
+
+    # Obtain Workspace object
+    workspace = Workspace.__create_from_descriptor__(ws_root)
+    project = Project.__create_from_descriptor__(workspace, prj_root)
+
+    val = Validator(project)
+    val.validate()
