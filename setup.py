@@ -52,11 +52,13 @@ setup(
         namespace_packages=['son', ],
         include_package_data=True,
         package_data= {
-            'son': ['schema/tests/son-schema/*', 'workspace/samples/*', 'monitor/docker/*', 'monitor/grafana/*',
+            'son': ['schema/tests/son-schema/*', 'workspace/samples/*',
+                    'monitor/docker/*', 'monitor/grafana/*',
                     'monitor/prometheus/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
-                          'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko', 'termcolor', 'tabulate'],
+                          'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
+                          'termcolor', 'tabulate', 'networkx'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
@@ -65,7 +67,8 @@ setup(
                 'son-publish=son.catalogue.publish:main',
                 'son-push=son.push.push:main',
                 'son-monitor=son.monitor.monitor:main',
-                'son-profile=son.profile.profile:main'
+                'son-profile=son.profile.profile:main',
+                'son-validate=son.validate.validate:main'
             ],
         },
         test_suite='son',
