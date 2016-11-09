@@ -72,4 +72,4 @@ bin/
 .idea
 
 # ignore son-validate, for now
-validate/
+#validate/
