@@ -98,10 +98,10 @@ class CreateWorkspaceTests(unittest.TestCase):
 
         # Create an invalid config descriptor for workspace
         conf_d = {
-            'version': '0.01',
+            'version': Workspace.WORKSPACE_VERSION,
             'catalogue_servers': "['http://10.10.1.101:4011',"
                                  "'http://10.10.1.102:4011']",
-            'descriptor_extension': 'yml',
+            'default_descriptor_extension': 'yml',
             'schemas_local_master': '~/.son-schema',
             'schemas_remote_master': 'https://raw.githubusercontent.com/'
                                      'sonata-nfv/son-schema/master/',

@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 
 class Workspace:
-    WORKSPACE_VERSION = "0.01"
+    WORKSPACE_VERSION = "0.02"
 
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
@@ -53,7 +53,7 @@ class Workspace:
     CONFIG_STR_PROJECTS_DIR = "projects_dir"
     CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
     CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
-    CONFIG_STR_DESCRIPTOR_EXTENSION = "descriptor_extension"
+    CONFIG_STR_DESCRIPTOR_EXTENSION = "default_descriptor_extension"
     CONFIG_STR_CATALOGUE_SERVERS = "catalogue_servers"
     CONFIG_STR_LOGGING_LEVEL = "log_level"
 
@@ -66,15 +66,13 @@ class Workspace:
         self.ws_name = ws_name
         self.dirs = dict()
         self.schemas = dict()
-        self.descriptor_extension = ""
+        self.default_descriptor_extension = ""
         self.load_default_config()
         # Catalogue servers
-        self._catalogue_servers = [{'id': 'cat1',
-                                    'url': 'http://cat1url.com:1234',
-                                    'publish': 'yes'},
-                                   {'id': 'cat2',
-                                    'url': 'http://cat2url.com:1234',
-                                    'publish': 'no'}]
+        self._catalogue_servers = [{'id': 'son-catalogue',
+                                    'url':
+                                        'http://catalogue.sonata-nfv.eu:4012',
+                                    'publish': 'yes'}]
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
@@ -100,7 +98,7 @@ class Workspace:
         self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
 
         # Extension for YAML - schema/descriptor files
-        self.descriptor_extension = "yml"
+        self.default_descriptor_extension = "yml"
 
     def create_dirs(self):
         """
@@ -161,7 +159,7 @@ class Workspace:
                  self.log_level,
 
                  self.CONFIG_STR_DESCRIPTOR_EXTENSION:
-                 self.descriptor_extension
+                 self.default_descriptor_extension
                  }
 
         ws_file_path = os.path.join(self.ws_root,
@@ -198,9 +196,10 @@ class Workspace:
 
         if not ws_config[Workspace.CONFIG_STR_VERSION] == \
                 Workspace.WORKSPACE_VERSION:
-            log.warning("Reading a workspace configuration "
-                        "with a different version {}"
-                        .format(ws_config[Workspace.CONFIG_STR_VERSION]))
+            log.error("Reading a workspace configuration "
+                      "with a different version {}"
+                      .format(ws_config[Workspace.CONFIG_STR_VERSION]))
+            return
 
         ws = Workspace(ws_root,
                        ws_name=ws_config[Workspace.CONFIG_STR_NAME],
