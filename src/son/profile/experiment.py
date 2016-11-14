@@ -50,7 +50,7 @@ class Experiment(object):
             rewrite_parameter_macros_to_lists(rl)
         # aggregate all parameters to used in the experiment to a flat dict for further processing
         parameter_dict = self._get_configuration_space_as_dict()
-        print(parameter_dict)
+        # print(parameter_dict)
         # explore entire parameter space by calculating the Cartesian product over the given dict
         parameter_space_list = Experiment._compute_cartesian_product(parameter_dict)
         # create a run configuration object for each calculated configuration to test
