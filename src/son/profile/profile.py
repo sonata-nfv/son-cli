@@ -30,10 +30,15 @@ import argparse
 import logging
 import coloredlogs
 import yaml
+import zipfile
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 
 LOG = logging.getLogger(__name__)
+
+# configurations
+SON_PKG_INPUT_DIR = "input"  # location of input package contents in args.work_dir
+SON_PKG_OUTPUT_DIR = "output"  # location of generated package contents and packages in args.work_dir
 
 
 class ProfileManager(object):
@@ -44,6 +49,7 @@ class ProfileManager(object):
         # arguments
         self.args = args
         self.args.config = os.path.join(os.getcwd(), self.args.config)
+        self.son_pkg_input_dir = os.path.join(self.args.work_dir, SON_PKG_INPUT_DIR)
         # logging setup
         coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
         LOG.info("SONATA profiling tool initialized")
@@ -51,6 +57,9 @@ class ProfileManager(object):
         # try to load PED file
         self.ped = self._load_ped_file(self.args.config)
         self._validate_ped_file(self.ped)
+        # unzip *.son package to be profiled and load its contents
+        self._extract_son_package(self.ped, self.son_pkg_input_dir)
+        # TODO load package contents
         # load and populate experiments
         self.service_experiments, self.function_experiments = self._generate_experiments(self.ped)
 
@@ -67,17 +76,32 @@ class ProfileManager(object):
         except:
             LOG.error("Couldn't load PED file %r. Abort." % ped_path)
             exit(1)
+        # add path annotation to ped file (simpler handling of referenced artifacts)
+        yml["ped_path"] = ped_path
         LOG.info("Loaded PED file %r." % ped_path)
         return yml
 
     @staticmethod
-    def _validate_ped_file(ped_data):
+    def _extract_son_package(input_ped, input_path):
+        # locate referenced *.son file
+        pkg_name = input_ped.get("service_package", "service.son")
+        son_path = os.path.join(os.path.dirname(input_ped.get("ped_path", "/")), pkg_name)
+        if not os.path.exists(son_path):
+            raise BaseException("Couldn't find referenced SONATA package: %r" % son_path)
+        # extract *.son file and put it into WORK_DIR
+        LOG.debug("Unzipping: %r to %r" % (son_path, input_path))
+        with zipfile.ZipFile(son_path, "r") as z:
+            z.extractall(input_path)
+        LOG.info("Loaded input package: %r" % pkg_name)
+
+    @staticmethod
+    def _validate_ped_file(input_ped):
         try:
-            if "service_package" not in ped_data:
+            if "service_package" not in input_ped:
                 raise BaseException("No service_package field found.")
-            if "service_experiments" not in ped_data:
+            if "service_experiments" not in input_ped:
                 raise BaseException("No service_experiments field found.")
-            if "function_experiments" not in ped_data:
+            if "function_experiments" not in input_ped:
                 raise BaseException("No function_experiments field found.")
             # TODO extend this when PED format is finally fixed
         except:
