@@ -27,16 +27,58 @@
 import logging
 import zipfile
 import os
+from son.profile.helper import load_yaml, relative_path
 
 
 LOG = logging.getLogger(__name__)
 
 
-class Package(object):
-    pass
+class SonataPackage(object):
+    """
+    Reflects a SONATA service package and its contents, like NSD and VNFDs.
+    """
+
+    def __init__(self, manifest, nsd, vnfd_list):
+        self.manifest = manifest
+        self.nsd = nsd
+        self.vnfd_list = vnfd_list
+
+    @staticmethod
+    def load(pkg_path):
+        """
+        Loads the service package contents from the given path.
+        :param pkg_path: path to a folder with service package contents.
+        :return: SonataPackage object.
+        """
+        # load manifest
+        manifest = load_yaml(
+            os.path.join(pkg_path, "META-INF/MANIFEST.MF"))
+        # load nsd
+        nsd = load_yaml(
+            os.path.join(
+                pkg_path,
+                relative_path(manifest.get("entry_service_template"))))
+        # load vnfds
+        vnfd_list = list()
+        for ctx in manifest.get("package_content"):
+            if "function_descriptor" in ctx.get("content-type"):
+                vnfd_list.append(
+                    load_yaml(
+                        os.path.join(pkg_path,
+                                     relative_path(ctx.get("name")))))
+        LOG.info("Loaded SONATA service package contents (%d VNFDs)." % len(vnfd_list))
+        # create SonataPackage object
+        return SonataPackage(manifest, nsd, vnfd_list)
 
 
 def extract_son_package(input_ped, input_path):
+    """
+    Unzips a SONATA service package and stores all its contents
+    in the given folder.
+    :param input_ped: PED file that references a *.son package.
+    :param input_path: Path to which the package contents are extracted.
+    :return:
+    """
     # locate referenced *.son file
     pkg_name = input_ped.get("service_package", "service.son")
     son_path = os.path.join(os.path.dirname(input_ped.get("ped_path", "/")), pkg_name)
@@ -46,6 +88,6 @@ def extract_son_package(input_ped, input_path):
     LOG.debug("Unzipping: %r to %r" % (son_path, input_path))
     with zipfile.ZipFile(son_path, "r") as z:
         z.extractall(input_path)
-    LOG.info("Loaded input package: %r" % pkg_name)
+    LOG.info("Extracted SONATA service package: %r" % pkg_name)
 
 

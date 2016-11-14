@@ -29,10 +29,10 @@ import tempfile
 import argparse
 import logging
 import coloredlogs
-import yaml
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
-from son.profile.sonpkg import extract_son_package
+from son.profile.sonpkg import extract_son_package, SonataPackage
+from son.profile.helper import load_yaml
 
 LOG = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class ProfileManager(object):
         self._validate_ped_file(self.ped)
         # unzip *.son package to be profiled and load its contents
         extract_son_package(self.ped, self.son_pkg_input_dir)
-        # TODO load package contents
+        self.son_pkg_input = SonataPackage.load(self.son_pkg_input_dir)
         # load and populate experiments
         self.service_experiments, self.function_experiments = self._generate_experiments(self.ped)
 
@@ -77,12 +77,9 @@ class ProfileManager(object):
         """
         yml = None
         try:
-            with open(ped_path, "r") as f:
-                try:
-                    yml = yaml.load(f)
-                except yaml.YAMLError as ex:
-                    LOG.exception("YAML error in PED file. Abort.")
-                    exit(1)
+            yml = load_yaml(ped_path)
+            if yml is None:
+                raise BaseException("PED file YMAL error.")
         except:
             LOG.error("Couldn't load PED file %r. Abort." % ped_path)
             exit(1)
