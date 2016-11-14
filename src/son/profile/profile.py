@@ -31,7 +31,7 @@ import logging
 import coloredlogs
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
-from son.profile.sonpkg import extract_son_package, SonataPackage
+from son.profile.sonpkg import extract_son_package, SonataServicePackage
 from son.profile.helper import load_yaml
 
 LOG = logging.getLogger(__name__)
@@ -39,8 +39,9 @@ LOG = logging.getLogger(__name__)
 """
 Configurations:
 """
-SON_PKG_INPUT_DIR = "input"  # location of input package contents in args.work_dir
-SON_PKG_OUTPUT_DIR = "output"  # location of generated package contents and packages in args.work_dir
+SON_PKG_INPUT_DIR = "input_service"  # location of input package contents in args.work_dir
+SON_PKG_SERVICE_DIR = "output_services"  # location of generated services in args.work_dir
+SON_PKG_OUTPUT_DIR = "output_packages"  # location of generated packages in args.work_dir
 
 
 class ProfileManager(object):
@@ -55,6 +56,8 @@ class ProfileManager(object):
         self.args = args
         self.args.config = os.path.join(os.getcwd(), self.args.config)
         self.son_pkg_input_dir = os.path.join(self.args.work_dir, SON_PKG_INPUT_DIR)
+        self.son_pkg_service_dir = os.path.join(self.args.work_dir, SON_PKG_SERVICE_DIR)
+        self.son_pkg_output_dir = os.path.join(self.args.work_dir, SON_PKG_OUTPUT_DIR)
         # logging setup
         coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
         LOG.info("SONATA profiling tool initialized")
@@ -64,9 +67,13 @@ class ProfileManager(object):
         self._validate_ped_file(self.ped)
         # unzip *.son package to be profiled and load its contents
         extract_son_package(self.ped, self.son_pkg_input_dir)
-        self.son_pkg_input = SonataPackage.load(self.son_pkg_input_dir)
-        # load and populate experiments
-        self.service_experiments, self.function_experiments = self._generate_experiments(self.ped)
+        self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
+        # load and populate experiment specifications
+        self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
+        # generate experiment services (modified NSDs, VNFDs for each experiment run)
+        self.generate_experiment_services()
+        # package experiment services
+        self.package_experiment_services()
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -108,7 +115,7 @@ class ProfileManager(object):
             LOG.exception("PED file verification error:")
 
     @staticmethod
-    def _generate_experiments(input_ped):
+    def _generate_experiment_specifications(input_ped):
         """
         Create experiment objects based on the contents of the PED file.
         :param input_ped: ped dictionary
@@ -131,10 +138,23 @@ class ProfileManager(object):
 
         return service_experiments, function_experiments
 
-    def generate_profiling_services(self):
-        pass
+    def generate_experiment_services(self):
+        """
+        Generate SONATA service projects for each experiment and its configurations. The project is based
+        on the contents of the service package referenced in the PED file and loaded to self.son_pkg_input.
+        The generated project files are stored in self.args.work_dir.
+        :return:
+        """
+        # generate service objects
+        for e in self.service_experiments:
+            e.generate_sonata_services(self.son_pkg_input)
+        for e in self.function_experiments:
+            e.generate_sonata_services(self.son_pkg_input)
+        # write services to disk
+        # TODO write services to disk
 
-    def package_profiling_services(self):
+    def package_experiment_services(self):
+        # TODO use son-package to pack all previously generated service projects
         pass
 
 

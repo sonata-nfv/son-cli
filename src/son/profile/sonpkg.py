@@ -27,28 +27,34 @@
 import logging
 import zipfile
 import os
+import copy
 from son.profile.helper import load_yaml, relative_path
 
 
 LOG = logging.getLogger(__name__)
 
 
-class SonataPackage(object):
+class SonataServicePackage(object):
     """
     Reflects a SONATA service package and its contents, like NSD and VNFDs.
     """
 
-    def __init__(self, manifest, nsd, vnfd_list):
+    def __init__(self, pkg_path, manifest, nsd, vnfd_list):
+        self.pkg_path = pkg_path
         self.manifest = manifest
         self.nsd = nsd
         self.vnfd_list = vnfd_list
+        self.metadata = dict()  # profiling specific information
+
+    def __repr__(self):
+        return self.manifest.get("name")
 
     @staticmethod
     def load(pkg_path):
         """
         Loads the service package contents from the given path.
         :param pkg_path: path to a folder with service package contents.
-        :return: SonataPackage object.
+        :return: SonataServicePackage object.
         """
         # load manifest
         manifest = load_yaml(
@@ -67,8 +73,35 @@ class SonataPackage(object):
                         os.path.join(pkg_path,
                                      relative_path(ctx.get("name")))))
         LOG.info("Loaded SONATA service package contents (%d VNFDs)." % len(vnfd_list))
-        # create SonataPackage object
-        return SonataPackage(manifest, nsd, vnfd_list)
+        # create SonataServicePackage object
+        return SonataServicePackage(pkg_path, manifest, nsd, vnfd_list)
+
+    def copy(self):
+        """
+        Create a real copy of this service object.
+        :return: object
+        """
+        return copy.deepcopy(self)
+
+    def annotate(self, run_cfg):
+        """
+        Add profiling specific annotations to this service.
+        :param run_cfg:
+        :return:
+        """
+        self.metadata["run_id"] = run_cfg.run_id
+        self.metadata["repetition"] = run_cfg.configuration.get("repetition")
+        # TODO: We should store these somewhere in the final service package as "meta data" in a way that it does not affect the deployment of the package.
+
+    def write(self, out_path):
+        """
+        Write all files needed to describe this service (NSD, VNFDs).
+        :param pkg_path: destination folder
+        :return:
+        """
+        pkg_path = out_path
+        LOG.info("Written service %r to %r" % (self, pkg_path))
+
 
 
 def extract_son_package(input_ped, input_path):
