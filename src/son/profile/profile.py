@@ -30,18 +30,23 @@ import argparse
 import logging
 import coloredlogs
 import yaml
-import zipfile
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
+from son.profile.sonpkg import extract_son_package
 
 LOG = logging.getLogger(__name__)
 
-# configurations
+"""
+Configurations:
+"""
 SON_PKG_INPUT_DIR = "input"  # location of input package contents in args.work_dir
 SON_PKG_OUTPUT_DIR = "output"  # location of generated package contents and packages in args.work_dir
 
 
 class ProfileManager(object):
+    """
+    Main component class.
+    """
 
     def __init__(self, args):
         self.service_experiments = list()
@@ -58,13 +63,18 @@ class ProfileManager(object):
         self.ped = self._load_ped_file(self.args.config)
         self._validate_ped_file(self.ped)
         # unzip *.son package to be profiled and load its contents
-        self._extract_son_package(self.ped, self.son_pkg_input_dir)
+        extract_son_package(self.ped, self.son_pkg_input_dir)
         # TODO load package contents
         # load and populate experiments
         self.service_experiments, self.function_experiments = self._generate_experiments(self.ped)
 
     @staticmethod
     def _load_ped_file(ped_path):
+        """
+        Loads the specified PED file.
+        :param ped_path: path to file
+        :return: dictionary
+        """
         yml = None
         try:
             with open(ped_path, "r") as f:
@@ -82,20 +92,13 @@ class ProfileManager(object):
         return yml
 
     @staticmethod
-    def _extract_son_package(input_ped, input_path):
-        # locate referenced *.son file
-        pkg_name = input_ped.get("service_package", "service.son")
-        son_path = os.path.join(os.path.dirname(input_ped.get("ped_path", "/")), pkg_name)
-        if not os.path.exists(son_path):
-            raise BaseException("Couldn't find referenced SONATA package: %r" % son_path)
-        # extract *.son file and put it into WORK_DIR
-        LOG.debug("Unzipping: %r to %r" % (son_path, input_path))
-        with zipfile.ZipFile(son_path, "r") as z:
-            z.extractall(input_path)
-        LOG.info("Loaded input package: %r" % pkg_name)
-
-    @staticmethod
     def _validate_ped_file(input_ped):
+        """
+        Semantic validation of PED file contents.
+        Check for all things we need to have in PED file.
+        :param input_ped: ped dictionary
+        :return: None
+        """
         try:
             if "service_package" not in input_ped:
                 raise BaseException("No service_package field found.")
@@ -109,6 +112,11 @@ class ProfileManager(object):
 
     @staticmethod
     def _generate_experiments(input_ped):
+        """
+        Create experiment objects based on the contents of the PED file.
+        :param input_ped: ped dictionary
+        :return: service experiments list, function experiments list
+        """
         service_experiments = list()
         function_experiments = list()
 
@@ -126,9 +134,6 @@ class ProfileManager(object):
 
         return service_experiments, function_experiments
 
-    def _load_son_package(self, son_path):
-        pass
-
     def generate_profiling_services(self):
         pass
 
@@ -137,7 +142,10 @@ class ProfileManager(object):
 
 
 def parse_args():
-
+    """
+    CLI interface definition.
+    :return:
+    """
     parser = argparse.ArgumentParser(
         description="Manage and control VNF and service profiling experiments.")
 
@@ -191,5 +199,9 @@ def parse_args():
 
 
 def main():
+    """
+    Program entry point
+    :return: None
+    """
     args = parse_args()
-    p = ProfileManager(args)
+    ProfileManager(args)
