@@ -46,8 +46,11 @@ class Validator(object):
         coloredlogs.install(level=workspace.log_level)
 
         self._schema_validator = SchemaValidator(self._workspace)
+        self._nsd_file = None
         self._nsd = None
+        self._vnfd_files = {}
         self._vnfds = {}
+
 
     def validate(self):
         """
@@ -84,9 +87,7 @@ class Validator(object):
 
         if len(nsd_files) > 1:
             log.error("Found multiple service descriptors in project '{0}': "
-                      "{1}"
-                      .format(self._project.project_root,
-                              nsd_files))
+                      "{1}".format(self._project.project_root, nsd_files))
             return
 
         entry_nsd_file = nsd_files[0]
@@ -96,9 +97,11 @@ class Validator(object):
                 log.error("Couldn't read service descriptor file: '{0}'"
                           .format(entry_nsd_file))
                 return
+            self._nsd_file = entry_nsd_file
 
         # read VNFD files in project source
         prj_vnfds = {}
+        prj_vnfd_files = {}
         vnfd_files = self._project.get_vnf_descriptors()
         if vnfd_files:
             for vnfd_file in vnfd_files:
@@ -118,6 +121,7 @@ class Validator(object):
                         return
 
                     prj_vnfds[vnf_combo_id] = vnfd
+                    prj_vnfd_files[vnf_combo_id] = vnfd_file
 
         if not prj_vnfds:
             log.warning("Project source does not contain VNF descriptors")
@@ -140,6 +144,7 @@ class Validator(object):
                           .format(vnf_combo_id))
                 return
             self._vnfds[vnf['vnf_id']] = prj_vnfds.pop(vnf_combo_id)
+            self._vnfd_files[vnf['vnf_id']] = prj_vnfd_files.pop(vnf_combo_id)
 
         if len(prj_vnfds) > 0:
             log.warning("The following VNFs are present in project sources "
@@ -152,6 +157,27 @@ class Validator(object):
         Validate a the syntax of a service and all of its descriptors.
         :return:
         """
+
+        log.debug("Validate syntax of Service Descriptor file '{0}'"
+                  .format(self._nsd_file))
+        if not self._schema_validator.validate(
+              self._nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
+            log.error("Bad Service Descriptor file: '{0}'"
+                      .format(self._nsd_file))
+            return
+
+        log.debug("Validate syntax of Function Descriptor files:")
+        for vnfd in self._vnfds.keys():
+            log.debug("... '{0}'".format(self._vnfd_files[vnfd]))
+            if not self._schema_validator.validate(
+                  self._vnfds[vnfd],
+                    SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
+                log.error("Bad Function Descriptor file: {0}"
+                          .format(self._vnfd_files[vnfd]))
+                return
+
+
+
 
         return True
 
@@ -210,6 +236,8 @@ class Validator(object):
                     return
 
             sg.add_edge(cp_ref[0], cp_ref[1])
+
+
 
     def _find_service_graph_cycles(self):
         """
