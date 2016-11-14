@@ -46,6 +46,8 @@ class Validator(object):
         coloredlogs.install(level=workspace.log_level)
 
         self._schema_validator = SchemaValidator(self._workspace)
+        self._nsd = None
+        self._vnfds = {}
 
     def validate(self):
         """
@@ -53,18 +55,105 @@ class Validator(object):
         It performs the syntax and network topology validation of a service.
         :return:
         """
+        success = True
+
+        # load and correlate project descriptors
+        log.info("Loading project descriptors")
+        if not self._load_project_descriptors():
+            return False
+
         # validate syntax
-        self._validate_service_syntax()
+        log.info("Validating syntax of descriptors")
+        if not self._validate_service_syntax():
+            return False
 
         # validate topology
-        self._validate_service_graph()
+        log.info("Validating service network topology")
+        if not self._validate_service_graph():
+            return False
+
+        log.info("SUCCESS")
+        return True
+
+    def _load_project_descriptors(self):
+
+        # load project service descriptor (NSD)
+        nsd_files = self._project.get_ns_descriptor()
+        if not nsd_files:
+            return
+
+        if len(nsd_files) > 1:
+            log.error("Found multiple service descriptors in project '{0}': "
+                      "{1}"
+                      .format(self._project.project_root,
+                              nsd_files))
+            return
+
+        entry_nsd_file = nsd_files[0]
+        with open(entry_nsd_file, 'r') as _file:
+            self._nsd = yaml.load(_file)
+            if not self._nsd:
+                log.error("Couldn't read service descriptor file: '{0}'"
+                          .format(entry_nsd_file))
+                return
+
+        # read VNFD files in project source
+        prj_vnfds = {}
+        vnfd_files = self._project.get_vnf_descriptors()
+        if vnfd_files:
+            for vnfd_file in vnfd_files:
+                with open(vnfd_file, 'r') as _file:
+                    vnfd = yaml.load(_file)
+                    if not vnfd:
+                        log.error("Couldn't read VNF descriptor file: '{0}'"
+                                  .format(vnfd_file))
+                        return
+
+                    vnf_combo_id = vnfd['vendor'] + '.' + vnfd['name'] + '.' \
+                        + vnfd['version']
+
+                    if vnf_combo_id in prj_vnfds:
+                        log.error("Duplicate VNF descriptor in file: '{0}'"
+                                  .format(vnfd_file))
+                        return
+
+                    prj_vnfds[vnf_combo_id] = vnfd
+
+        if not prj_vnfds:
+            log.warning("Project source does not contain VNF descriptors")
+
+        # read NSD file and get its referenced function descriptors (VNFDS)
+        self._vnfds = {}
+
+        if len(self._nsd['network_functions']) > 0 and len(prj_vnfds) == 0:
+            log.error("Service descriptor '{0}' references function "
+                      "descriptors (VNFs) but none were found in project "
+                      "sources."
+                      .format(entry_nsd_file))
+            return
+
+        for vnf in self._nsd['network_functions']:
+            vnf_combo_id = vnf['vnf_vendor'] + '.' + vnf['vnf_name'] + \
+                           '.' + vnf['vnf_version']
+            if vnf_combo_id not in prj_vnfds.keys():
+                log.error("Referenced VNF descriptor '{0}' could not be found"
+                          .format(vnf_combo_id))
+                return
+            self._vnfds[vnf['vnf_id']] = prj_vnfds.pop(vnf_combo_id)
+
+        if len(prj_vnfds) > 0:
+            log.warning("The following VNFs are present in project sources "
+                        "but are not referenced in the service descriptor: {0}"
+                        .format(prj_vnfds.keys()))
+        return True
 
     def _validate_service_syntax(self):
         """
         Validate a the syntax of a service and all of its descriptors.
         :return:
         """
-        pass
+
+        return True
 
     def _validate_service_graph(self):
         """
@@ -77,6 +166,8 @@ class Validator(object):
         # check for forwarding cycles
         self._find_service_graph_cycles()
 
+        return True
+
     def _build_service_graph(self):
         """
         Build the network graph of a service.
@@ -88,43 +179,18 @@ class Validator(object):
         # init service network graph
         sg = nx.Graph()
 
-        # load project service descriptor
-        nsd_file = self._project.get_ns_descriptor()[0]
-        with open(nsd_file, 'r') as _file:
-            nsd = yaml.load(_file)
-            assert nsd is not None
-
-        # load all project function descriptors
-        prj_vnfds = {}
-        vnfd_files = self._project.get_vnf_descriptors()
-        for vnfd_file in vnfd_files:
-            with open(vnfd_file, 'r') as _file:
-                vnfd = yaml.load(_file)
-                assert vnfd is not None
-                vnf_combo_id = vnfd['vendor'] + '.' + vnfd['name'] + '.' + \
-                               vnfd['version']
-                prj_vnfds[vnf_combo_id] = vnfd
-
-        # assign vnf descriptors referenced in the service descriptor
-        ref_vnfds = {}
-        for func in nsd['network_functions']:
-            vnf_combo_id = func['vnf_vendor'] + '.' + func['vnf_name'] + \
-                           '.' + func['vnf_version']
-            if vnf_combo_id in prj_vnfds.keys():
-                ref_vnfds[func['vnf_id']] = prj_vnfds[vnf_combo_id]
-
         # add connection points as nodes to the service graph
-        for cp in nsd['connection_points']:
+        for cp in self._nsd['connection_points']:
             if cp['type'] == 'interface':
                 sg.add_node(cp['id'], attr_dict={'used': False})
-        for vnf_id in ref_vnfds.keys():
-            for cp in ref_vnfds[vnf_id]['connection_points']:
+        for vnf_id in self._vnfds.keys():
+            for cp in self._vnfds[vnf_id]['connection_points']:
                 if cp['type'] == 'interface':
                     sg.add_node(vnf_id + ':' + cp['id'], attr_dict={'used':
                                                                     False})
 
         # add edges to the graph
-        for vlink in nsd['virtual_links']:
+        for vlink in self._nsd['virtual_links']:
             ctype = vlink['connectivity_type']
             if ctype != 'E-Line':  # TODO: add support for 'E-Tree'
                 continue
