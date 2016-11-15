@@ -32,7 +32,7 @@ import coloredlogs
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.sonpkg import extract_son_package, SonataServicePackage
-from son.profile.helper import load_yaml
+from son.profile.helper import read_yaml
 
 LOG = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class ProfileManager(object):
         """
         yml = None
         try:
-            yml = load_yaml(ped_path)
+            yml = read_yaml(ped_path)
             if yml is None:
                 raise BaseException("PED file YMAL error.")
         except:
@@ -145,13 +145,18 @@ class ProfileManager(object):
         The generated project files are stored in self.args.work_dir.
         :return:
         """
+        all_services = list()
         # generate service objects
         for e in self.service_experiments:
-            e.generate_sonata_services(self.son_pkg_input)
+            all_services += e.generate_sonata_services(self.son_pkg_input)
         for e in self.function_experiments:
-            e.generate_sonata_services(self.son_pkg_input)
+            all_services += e.generate_sonata_services(self.son_pkg_input)
+        LOG.info("Generated %d services." % len(all_services))
         # write services to disk
-        # TODO write services to disk
+        for s in all_services:
+            s.write(self.son_pkg_service_dir)
+        LOG.info("Wrote %d services to disk." % len(all_services))
+
 
     def package_experiment_services(self):
         # TODO use son-package to pack all previously generated service projects

@@ -26,19 +26,33 @@
 
 import itertools as it
 import yaml
+import os
 import logging
 
 LOG = logging.getLogger(__name__)
 
 
-def load_yaml(path):
+def read_yaml(path):
     yml = None
     with open(path, "r") as f:
             try:
                 yml = yaml.load(f)
             except yaml.YAMLError as ex:
-                LOG.exception("YAML errorin %r." % path)
+                LOG.exception("YAML error while reading %r." % path)
     return yml
+
+
+def write_yaml(path, data):
+    with open(path, "w") as f:
+        try:
+            yaml.dump(data, f, default_flow_style=False)
+        except yaml.YAMLError as ex:
+            LOG.exception("YAML error while writing %r" % path)
+
+
+def ensure_dir(d):
+    if not os.path.exists(d):
+        os.makedirs(d)
 
 
 def relative_path(path):
