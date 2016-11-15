@@ -28,7 +28,7 @@ import logging
 import zipfile
 import os
 import copy
-from son.profile.helper import load_yaml, relative_path
+from son.profile.helper import read_yaml, write_yaml, relative_path, ensure_dir
 
 
 LOG = logging.getLogger(__name__)
@@ -57,10 +57,10 @@ class SonataServicePackage(object):
         :return: SonataServicePackage object.
         """
         # load manifest
-        manifest = load_yaml(
+        manifest = read_yaml(
             os.path.join(pkg_path, "META-INF/MANIFEST.MF"))
         # load nsd
-        nsd = load_yaml(
+        nsd = read_yaml(
             os.path.join(
                 pkg_path,
                 relative_path(manifest.get("entry_service_template"))))
@@ -69,7 +69,7 @@ class SonataServicePackage(object):
         for ctx in manifest.get("package_content"):
             if "function_descriptor" in ctx.get("content-type"):
                 vnfd_list.append(
-                    load_yaml(
+                    read_yaml(
                         os.path.join(pkg_path,
                                      relative_path(ctx.get("name")))))
         LOG.info("Loaded SONATA service package contents (%d VNFDs)." % len(vnfd_list))
@@ -83,12 +83,13 @@ class SonataServicePackage(object):
         """
         return copy.deepcopy(self)
 
-    def annotate(self, run_cfg):
+    def annotate(self, exname, run_cfg):
         """
         Add profiling specific annotations to this service.
         :param run_cfg:
         :return:
         """
+        self.metadata["exname"] = exname
         self.metadata["run_id"] = run_cfg.run_id
         self.metadata["repetition"] = run_cfg.configuration.get("repetition")
         # TODO: We should store these somewhere in the final service package as "meta data" in a way that it does not affect the deployment of the package.
@@ -99,9 +100,45 @@ class SonataServicePackage(object):
         :param pkg_path: destination folder
         :return:
         """
-        pkg_path = out_path
-        LOG.info("Written service %r to %r" % (self, pkg_path))
+        pkg_path = os.path.join(out_path, self.pkg_name())
+        # create output folder
+        ensure_dir(pkg_path)
+        # write project yml
+        write_yaml(os.path.join(pkg_path, "project.yml"), self.get_project_descriptor())
+        # write nsd
+        nsd_dir = os.path.join(pkg_path, "sources/nsd")
+        ensure_dir(nsd_dir)
+        write_yaml(os.path.join(nsd_dir,  "%s.yml" % self.nsd.get("name")), self.nsd)
+        # write all vnfds
+        vnf_dir = os.path.join(pkg_path, "sources/vnf")
+        for vnfd in self.vnfd_list:
+            d = os.path.join(vnf_dir, vnfd.get("name"))
+            ensure_dir(d)
+            write_yaml(os.path.join(d, "%s.yml" % vnfd.get("name")), vnfd)
+        LOG.debug("Written service %r to %r" % (self, pkg_path))
 
+    def get_project_descriptor(self):
+        """
+        We need to create a project.yml from the contents of the MANIFEST file to be able
+        to re-package the generated services using the son-package tool.
+        :return: dictionary with project.yml information
+        """
+        d = dict()
+        d["catalogues"] = "[personal]"
+        d["publish_to"] = "[personal]"
+        d["description"] = self.manifest.get("description")
+        d["maintainer"] = self.manifest.get("maintainer")
+        d["name"] = self.manifest.get("name")
+        d["vendor"] = self.manifest.get("vendor")
+        d["version"] = self.manifest.get("version")
+        return d
+
+    def pkg_name(self):
+        """
+        Generate name used for generated service project folder and package.
+        :return: string
+        """
+        return "%s_%05d" % (self.metadata.get("exname"), self.metadata.get("run_id"))
 
 
 def extract_son_package(input_ped, input_path):

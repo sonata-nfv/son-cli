@@ -90,7 +90,7 @@ class Experiment(object):
         services = list()
         for r in self.run_configurations:
             s = son_pkg_input.copy()
-            s.annotate(r)
+            s.annotate(self.name, r)
             self.modify_nsd(s, r)
             self.modify_vnfds(s, r)
             services.append(s)
