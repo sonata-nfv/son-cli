@@ -26,19 +26,60 @@
 
 import os
 import unittest
-from son.profile.experiment import Experiment
+from son.profile.helper import compute_cartesian_product
+from son.profile.profile import ProfileManager, parse_args, extract_son_package
+
+
+TEST_PED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misc/example_ped1.yml")
 
 
 class UnitProfileTests(unittest.TestCase):
 
-    def test_ped_file_processing(self):
+    def test_input_package_unzipping(self):
+        """
+        Loads test PED file and tries to extract the linked *.son package.
+        Checks if the basic package structure is available in the work_dir after extraction.
+        :return:
+        """
+        args = parse_args(["-c", TEST_PED_FILE, "-v"])
+        p = ProfileManager(args)
+        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
+        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "META-INF")))
+        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "META-INF/MANIFEST.MF")))
+        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "function_descriptors")))
+        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "service_descriptors")))
+
+    def test_input_package_content_loading(self):
+        # TODO implement real test
+        self.assertTrue(True)
+
+    def test_experiment_specification_population(self):
+        # TODO implement real test
+        self.assertTrue(True)
+
+    def test_output_service_generation(self):
+        # TODO implement real test
+        self.assertTrue(True)
+
+    def test_output_service_write_to_disk(self):
+        # TODO implement real test
+        self.assertTrue(True)
+
+    def test_output_service_packaging(self):
         # TODO implement real test
         self.assertTrue(True)
 
 
-class UnitExperimentTests(unittest.TestCase):
+class UnitHelperTests(unittest.TestCase):
 
     def test_cartesian_product(self):
+        """
+        Test the function which computes the cartesian product
+        of a dictionary of lists.
+        This one is used to explore the complete parameter space specifeid
+        in a PED file.
+        :return:
+        """
 
         def _dict_is_in_list(d, l):
             for d1 in l:
@@ -56,7 +97,7 @@ class UnitExperimentTests(unittest.TestCase):
             {"x": 3, "y": "value2"}
         ]
         # calculate Cartesian product
-        result = Experiment._compute_cartesian_product(INPUT)
+        result = compute_cartesian_product(INPUT)
         # check if results are as expected
         self.assertEqual(len(result), len(OUTPUT))
         for d in result:

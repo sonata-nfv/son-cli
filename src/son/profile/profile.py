@@ -62,6 +62,12 @@ class ProfileManager(object):
         coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
         LOG.info("SONATA profiling tool initialized")
         LOG.debug("Arguments: %r" % self.args)
+
+    def run(self):
+        """
+        Run son-profile
+        :return:
+        """
         # try to load PED file
         self.ped = self._load_ped_file(self.args.config)
         self._validate_ped_file(self.ped)
@@ -163,7 +169,7 @@ class ProfileManager(object):
         pass
 
 
-def parse_args():
+def parse_args(manual_args=None):
     """
     CLI interface definition.
     :return:
@@ -217,6 +223,8 @@ def parse_args():
         dest="no_execution",
         action="store_true")
 
+    if manual_args is not None:
+        return parser.parse_args(manual_args)
     return parser.parse_args()
 
 
@@ -226,4 +234,5 @@ def main():
     :return: None
     """
     args = parse_args()
-    ProfileManager(args)
+    p = ProfileManager(args)
+    p.run()

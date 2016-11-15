@@ -115,7 +115,7 @@ class SonataServicePackage(object):
             d = os.path.join(vnf_dir, vnfd.get("name"))
             ensure_dir(d)
             write_yaml(os.path.join(d, "%s.yml" % vnfd.get("name")), vnfd)
-        LOG.debug("Written service %r to %r" % (self, pkg_path))
+        # LOG.debug("Written service %r to %r" % (self, pkg_path))
 
     def get_project_descriptor(self):
         """
