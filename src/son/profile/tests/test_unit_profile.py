@@ -28,9 +28,12 @@ import os
 import unittest
 from son.profile.helper import compute_cartesian_product
 from son.profile.profile import ProfileManager, parse_args, extract_son_package
+from son.profile.sonpkg import SonataServicePackage
 
 
+# get path to our test files
 TEST_PED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misc/example_ped1.yml")
+TEST_SON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misc/sonata-fw-vtc-service.son")
 
 
 class UnitProfileTests(unittest.TestCase):
@@ -50,20 +53,58 @@ class UnitProfileTests(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "service_descriptors")))
 
     def test_input_package_content_loading(self):
-        # TODO implement real test
-        self.assertTrue(True)
+        """
+        Loads contents of test package and checks if the SonataServicePackage object is
+        correctly created.
+        :return:
+        """
+        args = parse_args(["-c", TEST_PED_FILE, "-v"])
+        p = ProfileManager(args)
+        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
+        pkg = SonataServicePackage.load(p.son_pkg_input_dir)
+        self.assertEqual(pkg.manifest.get("name"), "sonata-fw-vtc-service")
+        self.assertEqual(pkg.nsd.get("name"), "sonata-fw-vtc-service")
+        self.assertEqual(len(pkg.vnfd_list), 2)
 
     def test_experiment_specification_population(self):
-        # TODO implement real test
-        self.assertTrue(True)
+        """
+        Generates experiment specifications from PED file.
+        Checks if the generated data structure are populated like expected.
+        :return:
+        """
+        args = parse_args(["-c", TEST_PED_FILE, "-v"])
+        p = ProfileManager(args)
+        service_experiments, function_experiments = p._generate_experiment_specifications(
+            p._load_ped_file(p.args.config))
+        self.assertEqual(len(service_experiments), 1)
+        self.assertEqual(len(function_experiments), 2)
+        for se in service_experiments:
+            self.assertGreaterEqual(len(se.run_configurations), 24)
+        for fe in function_experiments:
+            self.assertGreaterEqual(len(fe.run_configurations), 48)
 
     def test_output_service_generation(self):
-        # TODO implement real test
-        self.assertTrue(True)
-
-    def test_output_service_write_to_disk(self):
-        # TODO implement real test
-        self.assertTrue(True)
+        """
+        Checks if service project files are created.
+        :return:
+        """
+        args = parse_args(["-c", TEST_PED_FILE, "-v"])
+        p = ProfileManager(args)
+        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
+        p.son_pkg_input = SonataServicePackage.load(p.son_pkg_input_dir)
+        p.service_experiments, p.function_experiments = p._generate_experiment_specifications(
+            p._load_ped_file(p.args.config))
+        p.generate_experiment_services()
+        self.assertTrue(os.path.exists(
+            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000")))
+        self.assertTrue(os.path.exists(
+            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/project.yml")))
+        self.assertTrue(os.path.exists(
+            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/nsd/sonata-fw-vtc-service.yml")))
+        self.assertTrue(os.path.exists(
+            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/vnf/fw-vnf/fw-vnf.yml")))
+        self.assertTrue(os.path.exists(
+            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/vnf/vtc-vnf/vtc-vnf.yml")))
 
     def test_output_service_packaging(self):
         # TODO implement real test
