@@ -45,12 +45,14 @@ class Validator(object):
         self._project = project
         coloredlogs.install(level=workspace.log_level)
 
-        self._schema_validator = SchemaValidator(self._workspace)
+        # keep project descriptors
         self._nsd_file = None
         self._nsd = None
         self._vnfd_files = {}
         self._vnfds = {}
 
+        # syntax validation
+        self._schema_validator = SchemaValidator(self._workspace)
 
     def validate(self):
         """
@@ -176,9 +178,6 @@ class Validator(object):
                           .format(self._vnfd_files[vnfd]))
                 return
 
-
-
-
         return True
 
     def _validate_service_graph(self):
@@ -187,10 +186,10 @@ class Validator(object):
         :return:
         """
         # build service network graph
-        self._build_service_graph()
+        sg = self._build_service_graph()
 
         # check for forwarding cycles
-        self._find_service_graph_cycles()
+        Validator.__find_graph_cycles__(sg, sg.nodes()[0])
 
         return True
 
@@ -201,50 +200,96 @@ class Validator(object):
         paths.
         :return:
         """
-
-        # init service network graph
+        # service network graph
         sg = nx.Graph()
 
         # add connection points as nodes to the service graph
-        for cp in self._nsd['connection_points']:
-            if cp['type'] == 'interface':
-                sg.add_node(cp['id'], attr_dict={'used': False})
+        for cxp in self._nsd['connection_points']:
+            if cxp['type'] == 'interface':
+                sg.add_node(cxp['id'], attr_dict={'group': None})
         for vnf_id in self._vnfds.keys():
-            for cp in self._vnfds[vnf_id]['connection_points']:
-                if cp['type'] == 'interface':
-                    sg.add_node(vnf_id + ':' + cp['id'], attr_dict={'used':
-                                                                    False})
+            for cxp in self._vnfds[vnf_id]['connection_points']:
+                if cxp['type'] == 'interface':
+                    sg.add_node(vnf_id + ':' + cxp['id'],
+                                attr_dict={'group': vnf_id})
 
-        # add edges to the graph
+        # eliminate all connection points associated with bridged (E-LAN) links
+        for vlink in self._nsd['virtual_links']:
+            if vlink['connectivity_type'] != 'E-LAN':
+                continue
+
+            cxpoints = vlink['connection_points_reference']
+            for cxp in cxpoints:
+                sg.remove_node(cxp)
+
+        # add edges between functions to the graph
         for vlink in self._nsd['virtual_links']:
             ctype = vlink['connectivity_type']
             if ctype != 'E-Line':  # TODO: add support for 'E-Tree'
                 continue
 
-            cp_ref = vlink['connection_points_reference']
-            if len(cp_ref) != 2:
-                log.error("[virtual_link id: '{}'] E-Line must only comprise 2"
-                          " connection points"
+            cxp_ref = vlink['connection_points_reference']
+            if len(cxp_ref) != 2:
+                log.error("The virtual link '{0}' of type 'E-Line' must only "
+                          "comprise 2 connection points"
                           .format(vlink['id']))
                 return
 
-            for cp in cp_ref:
-                if not sg.has_node(cp):
-                    log.error("[virtual_link id: '{}'] The following "
-                              "connection point is not defined: {}"
-                              .format(vlink['id'], cp))
+            for cxp in cxp_ref:
+                if not sg.has_node(cxp):
+                    log.error("The connection point '{0}' defined in "
+                              "virtual link '{1}' is not defined."
+                              .format(cxp, vlink['id']))
                     return
+            sg.add_edge(cxp_ref[0], cxp_ref[1])
 
-            sg.add_edge(cp_ref[0], cp_ref[1])
+        # add edges between nodes of the same group TODO: go deeper into VDUs
+        for node_x in sg.nodes(data=True):
+            print(node_x)
+            if not node_x[1]['group']:
+                continue
 
+            for node_y in sg.nodes(data=True):
+                if node_x[0] == node_y[0]:
+                    continue
+                if node_x[1]['group'] == node_y[1]['group']:
+                    print("adding edge: {0} <> {1}".format(node_x[0],
+                                                           node_y[0]))
+                    sg.add_edge(node_x[0], node_y[0])
 
+        return sg
 
-    def _find_service_graph_cycles(self):
-        """
-        Check if network graph has simple cycles.
-        :return:
-        """
-        pass
+    @staticmethod
+    def __find_graph_cycles__(graph, node, prev_node=None, backtrace=None):
+
+        if not backtrace:
+            backtrace = []
+
+        # get node's neighbors
+        neighbors = graph.neighbors(node)
+
+        # remove previous node from neighbors
+        if prev_node:
+            neighbors.pop(neighbors.index(prev_node))
+
+        # ensure node has neighbors
+        if not len(neighbors) > 0:
+            return None
+
+        # check is this node was already visited
+        if node in backtrace:
+            cycle = backtrace[backtrace.index(node):]
+            return cycle
+
+        # mark this node as visited and trace it
+        backtrace.append(node)
+
+        # iterate through neighbor nodes
+        for neighbor in neighbors:
+            return Validator.__find_graph_cycles__(graph, neighbor,
+                                                   prev_node=node,
+                                                   backtrace=backtrace)
+        return backtrace
 
 
 def main():
