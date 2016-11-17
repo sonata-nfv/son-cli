@@ -29,6 +29,9 @@ import zipfile
 import os
 import copy
 from son.profile.helper import read_yaml, write_yaml, relative_path, ensure_dir
+from son.workspace.project import Project
+from son.workspace.workspace import Workspace
+from son.package.package import Packager
 
 
 LOG = logging.getLogger(__name__)
@@ -39,8 +42,8 @@ class SonataServicePackage(object):
     Reflects a SONATA service package and its contents, like NSD and VNFDs.
     """
 
-    def __init__(self, pkg_path, manifest, nsd, vnfd_list):
-        self.pkg_path = pkg_path
+    def __init__(self, pkg_service_path, manifest, nsd, vnfd_list):
+        self.pkg_service_path = pkg_service_path
         self.manifest = manifest
         self.nsd = nsd
         self.vnfd_list = vnfd_list
@@ -94,28 +97,52 @@ class SonataServicePackage(object):
         self.metadata["repetition"] = run_cfg.configuration.get("repetition")
         # TODO: We should store these somewhere in the final service package as "meta data" in a way that it does not affect the deployment of the package.
 
-    def write(self, out_path):
+    def write(self, service_project_path):
         """
         Write all files needed to describe this service (NSD, VNFDs).
-        :param pkg_path: destination folder
+        :param service_project_path: destination folder
         :return:
         """
-        pkg_path = os.path.join(out_path, self.pkg_name())
+        # update package path to reflect new location
+        self.pkg_service_path = os.path.join(service_project_path, self.pkg_name())
         # create output folder
-        ensure_dir(pkg_path)
+        ensure_dir(self.pkg_service_path)
         # write project yml
-        write_yaml(os.path.join(pkg_path, "project.yml"), self.get_project_descriptor())
+        write_yaml(os.path.join(self.pkg_service_path, "project.yml"), self.get_project_descriptor())
         # write nsd
-        nsd_dir = os.path.join(pkg_path, "sources/nsd")
+        nsd_dir = os.path.join(self.pkg_service_path, "sources/nsd")
         ensure_dir(nsd_dir)
         write_yaml(os.path.join(nsd_dir,  "%s.yml" % self.nsd.get("name")), self.nsd)
         # write all vnfds
-        vnf_dir = os.path.join(pkg_path, "sources/vnf")
+        vnf_dir = os.path.join(self.pkg_service_path, "sources/vnf")
         for vnfd in self.vnfd_list:
             d = os.path.join(vnf_dir, vnfd.get("name"))
             ensure_dir(d)
             write_yaml(os.path.join(d, "%s.yml" % vnfd.get("name")), vnfd)
-        # LOG.debug("Written service %r to %r" % (self, pkg_path))
+        # LOG.debug("Written service %r to %r" % (self, slef.pkg_service_path))
+
+    def pack(self, output_path):
+        """
+        Use son-package to pack the given packet.
+        :param output_path: resulting packages are placed in output_path
+        :return:
+        """
+        pkg_destination_path = os.path.join(output_path, self.pkg_name())
+        # obtain workspace
+        # TODO have workspace dir as command line argument
+        workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
+        if workspace is None:
+            LOG.error("Couldn't initialize workspace: %r. Abort." % Workspace.DEFAULT_WORKSPACE_DIR)
+            exit(1)
+        # obtain project
+        project = Project.__create_from_descriptor__(workspace, self.pkg_service_path)
+        if project is None:
+            LOG.error("Packager couldn't load service project: %r. Abort." % self.pkg_service_path)
+            exit(1)
+        # initialize and run packager
+        pck = Packager(workspace, project, dst_path=pkg_destination_path)
+        pck.generate_package(os.path.join(output_path, self.pkg_name()))
+        LOG.debug("Packaged service %r to %r" % (self, os.path.join(pkg_destination_path, self.pkg_name()) + ".son"))
 
     def get_project_descriptor(self):
         """

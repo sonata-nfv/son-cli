@@ -77,9 +77,9 @@ class ProfileManager(object):
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
         # generate experiment services (modified NSDs, VNFDs for each experiment run)
-        self.generate_experiment_services()
+        services = self.generate_experiment_services()
         # package experiment services
-        self.package_experiment_services()
+        self.package_experiment_services(services)
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -149,24 +149,30 @@ class ProfileManager(object):
         Generate SONATA service projects for each experiment and its configurations. The project is based
         on the contents of the service package referenced in the PED file and loaded to self.son_pkg_input.
         The generated project files are stored in self.args.work_dir.
-        :return:
+        :return: list of service objects
         """
-        all_services = list()
+        services = list()
         # generate service objects
         for e in self.service_experiments:
-            all_services += e.generate_sonata_services(self.son_pkg_input)
+            services += e.generate_sonata_services(self.son_pkg_input)
         for e in self.function_experiments:
-            all_services += e.generate_sonata_services(self.son_pkg_input)
-        LOG.info("Generated %d services." % len(all_services))
+            services += e.generate_sonata_services(self.son_pkg_input)
+        LOG.info("Generated %d services." % len(services))
         # write services to disk
-        for s in all_services:
+        for s in services:
             s.write(self.son_pkg_service_dir)
-        LOG.info("Wrote %d services to disk." % len(all_services))
+        LOG.info("Wrote %d services to disk." % len(services))
+        return services
 
-
-    def package_experiment_services(self):
-        # TODO use son-package to pack all previously generated service projects
-        pass
+    def package_experiment_services(self, services):
+        """
+        Use son-package to package all previously generated service projects.
+        :param services: list of service objects.
+        :return:
+        """
+        for s in services:
+            s.pack(self.son_pkg_output_dir)
+        LOG.info("Packaged %d services." % len(services))
 
 
 def parse_args(manual_args=None):

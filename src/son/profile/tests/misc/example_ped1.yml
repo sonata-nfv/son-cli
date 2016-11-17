@@ -20,7 +20,7 @@ service_package: "./sonata-fw-vtc-service.son"
 service_experiments:
   - name: "service_throughput"
     description: "iperf test for entire service"
-    repetitions: 2
+    repetitions: 1
     time_limit: "120"
     # NSD to be used (SONATA-like vendor.name.version reference)
     service: "eu.sonata-nfv.sonata-fw-vtc-service.0.1"
@@ -48,7 +48,7 @@ service_experiments:
       - function: "eu.sonata-nfv.vtc-vnf.0.1"
         cpu_bw: "${0.05 to 0.1 step 0.05}"
         cpu_cores: 1
-        mem_max: "${256, 512}" 
+        mem_max: "${256, 512}"
         mem_swap_max: null
         io_bw: null
       - function: "mp.input"
@@ -90,14 +90,14 @@ function_experiments:
     resource_limitations:  # shortened (fields are optional)
       # again: SONATA-like references
       - function: "eu.sonata-nfv.fw-vnf.0.1"
-        cpu_bw: "${0.01 to 0.3 step 0.01}" # Omnet++ style parameter study macros
+        cpu_bw: "${0.01 to 0.03 step 0.01}" # Omnet++ style parameter study macros
       - function: "mp.input"
         cpu_bw: 0.2
       - function: "mp.output"
         cpu_bw: 0.2
   - name: "func_vtc_throughput"
     description: "iperf test for vtc vnf"
-    repetitions: 2
+    repetitions: 1
     time_limit: "120"
     # VNFD to be used (SONATA-like vendor.name.version reference)
     function: "eu.sonata-nfv.vtc-vnf.0.1"
@@ -118,10 +118,10 @@ function_experiments:
       # again: SONATA-like references
       - function: "eu.sonata-nfv.fw-vnf.0.1"
         cpu_bw: 0.4
-        mem_max: "${64, 256, 512}"
+        mem_max: "${64}"
       - function: "mp.input"
         cpu_bw: 0.2
-        mem_max: "${16 to 24}"
+        mem_max: "${16 to 18}"
       - function: "mp.output"
         cpu_bw: 0.2
         mem_max: 512
