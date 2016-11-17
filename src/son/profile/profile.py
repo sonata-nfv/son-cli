@@ -171,7 +171,11 @@ class ProfileManager(object):
         :return:
         """
         for s in services:
-            s.pack(self.son_pkg_output_dir)
+            son_pkg_path = s.pack(self.son_pkg_output_dir)
+            # reset loglevel (ugly, but workspace and packaging tool overwrite it)
+            coloredlogs.install(level="DEBUG" if self.args.verbose else "INFO")
+            LOG.debug(
+                "Packaged service %r to %r" % (s, son_pkg_path))
         LOG.info("Packaged %d services." % len(services))
 
 

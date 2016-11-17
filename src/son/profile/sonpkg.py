@@ -28,6 +28,7 @@ import logging
 import zipfile
 import os
 import copy
+import coloredlogs
 from son.profile.helper import read_yaml, write_yaml, relative_path, ensure_dir
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
@@ -125,7 +126,7 @@ class SonataServicePackage(object):
         """
         Use son-package to pack the given packet.
         :param output_path: resulting packages are placed in output_path
-        :return:
+        :return: package path
         """
         pkg_destination_path = os.path.join(output_path, self.pkg_name())
         # obtain workspace
@@ -142,7 +143,7 @@ class SonataServicePackage(object):
         # initialize and run packager
         pck = Packager(workspace, project, dst_path=pkg_destination_path)
         pck.generate_package(os.path.join(output_path, self.pkg_name()))
-        LOG.debug("Packaged service %r to %r" % (self, os.path.join(pkg_destination_path, self.pkg_name()) + ".son"))
+        return os.path.join(output_path, self.pkg_name()) + ".son"
 
     def get_project_descriptor(self):
         """
