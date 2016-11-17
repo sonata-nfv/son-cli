@@ -213,7 +213,7 @@ parser.add_argument(
     help="flow cookie to monitor")
 parser.add_argument(
     "--file", "-f", dest="file",
-    help="service descriptor file describing monitoring rules")
+    help="service descriptor file describing monitoring rules or pcap dump file")
 
 def main():
 

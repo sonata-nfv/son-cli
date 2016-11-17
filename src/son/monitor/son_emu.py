@@ -84,7 +84,6 @@ class emu():
 
         self.grafana = None
 
-
     def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
@@ -592,12 +591,50 @@ class emu():
         return vnf_status['docker_network']
 
     # start tcpdump for this interface
-    def dump(self, vnf_name, **kwargs):
-        vnf_name2 = parse_vnf_name(vnf_name)
-        vnf_interface = parse_vnf_interface(vnf_name)
-        dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
-        print(dc_portname)
-        Popen(['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', 'dump ' + vnf_name, '-hold', '-e', "tcpdump -i {0}".format(dc_portname)])
+    def dump(self, action, vnf_name, file, **kwargs):
+
+        if action == 'stop':
+            #kill tcpdump
+            Popen(['pkill', '-9', 'tcpdump'])
+            return 'tcpdump stopped'
+
+        elif action == 'start':
+            vnf_name2 = parse_vnf_name(vnf_name)
+            vnf_interface = parse_vnf_interface(vnf_name)
+            dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
+            log_string = "dump {0} at {1}".format(vnf_name, dc_portname)
+            logging.info(log_string)
+
+            # Popen(['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', log_string, '-hold', '-e', "tcpdump -i {0}".format(dc_portname)])
+
+            process = self._tcpdump(dc_portname, file=file, title=log_string)
+            logging.info("Close tcpdump window to stop capturing or do son-monitor dump stop")
+            # process.wait()
+            #self.tcpdump_processes.append({"interface": dc_portname, "process": process})
+
+            #logging.info(self.tcpdump_processes)
+            #to_terminate = [process['process'] for process in self.tcpdump_processes if process['interface'] == dc_portname]
+            #for process in to_terminate:
+            #    process.terminate()
+            return 'tcpdump started'
+
+
+
+    def _tcpdump(self, interface, file=None, options='', title='tcpdump'):
+
+        tcpdump_cmd = "tcpdump -i {0} ".format(interface) + options
+
+        pcap_option = ' '
+        if file:
+            # start tcpdump in background
+            pcap_option = ' -w {0} -U'.format(file)
+            tcpdump_cmd = tcpdump_cmd + pcap_option 
+            return Popen(shlex.split(tcpdump_cmd))
+        else:
+            #start tcpdump in xterm
+            xterm_cmd = "xterm -xrm 'XTerm.vt100.allowTitleOps: false' -T {0} -hold -e {1}".format("'"+title+"'", tcpdump_cmd)
+            #logging.info(xterm_cmd)
+            return Popen(shlex.split(xterm_cmd))
 
     # start an xterm for the specfified vnfs
     def xterm(self, vnf_names, **kwargs):
@@ -615,5 +652,6 @@ class emu():
                    '-e', terminal_cmd]
             Popen(cmd)
 
+        return 'xterms started for {0}'.format(vnf_names)
 
 
