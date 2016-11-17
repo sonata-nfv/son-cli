@@ -38,6 +38,7 @@ class Experiment(object):
         self.__dict__.update(definition)
         # attributes
         self.run_configurations = list()
+        self.generated_services = list()
 
     def populate(self):
         """
@@ -94,6 +95,7 @@ class Experiment(object):
             self.modify_nsd(s, r)
             self.modify_vnfds(s, r)
             services.append(s)
+        self.generated_services += services
         return services
 
     def modify_nsd(self, service, run_cfg):

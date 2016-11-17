@@ -29,6 +29,9 @@ import tempfile
 import argparse
 import logging
 import coloredlogs
+import time
+from termcolor import colored
+from tabulate import tabulate
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.sonpkg import extract_son_package, SonataServicePackage
@@ -50,8 +53,10 @@ class ProfileManager(object):
     """
 
     def __init__(self, args):
+        self.start_time = time.time()
         self.service_experiments = list()
         self.function_experiments = list()
+        self.generated_services = list()
         # arguments
         self.args = args
         self.args.config = os.path.join(os.getcwd(), self.args.config)
@@ -77,9 +82,11 @@ class ProfileManager(object):
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
         # generate experiment services (modified NSDs, VNFDs for each experiment run)
-        services = self.generate_experiment_services()
+        self.generated_services = self.generate_experiment_services()
         # package experiment services
-        self.package_experiment_services(services)
+        self.package_experiment_services()
+        # print generation statistics
+        self.print_generation_and_packaging_statistics()
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -164,19 +171,61 @@ class ProfileManager(object):
         LOG.info("Wrote %d services to disk." % len(services))
         return services
 
-    def package_experiment_services(self, services):
+    def package_experiment_services(self):
         """
         Use son-package to package all previously generated service projects.
         :param services: list of service objects.
         :return:
         """
-        for s in services:
+        for s in self.generated_services:
             son_pkg_path = s.pack(self.son_pkg_output_dir)
             # reset loglevel (ugly, but workspace and packaging tool overwrite it)
             coloredlogs.install(level="DEBUG" if self.args.verbose else "INFO")
             LOG.debug(
                 "Packaged service %r to %r" % (s, son_pkg_path))
-        LOG.info("Packaged %d services." % len(services))
+        LOG.info("Packaged %d services." % len(self.generated_services))
+
+    def print_generation_and_packaging_statistics(self):
+
+        def b(txt):
+            return colored(txt, attrs=['bold'])
+
+        def get_pkg_time(e):
+            return sum([s.pack_time for s in e.generated_services])
+
+        def get_pkg_size(e):
+            return sum([float(s.pkg_file_size) / 1024 for s in e.generated_services])
+
+        def generate_table():
+            rows = list()
+            # header
+            rows.append([b("Experiment"), b("Num. Pkg."), b("Pkg. Time (s)"), b("Pkg. Sizes (kB)")])
+            # body
+            sum_pack_time = 0.0
+            sum_file_size = 0.0
+            for e in self.service_experiments:
+                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
+                sum_pack_time += get_pkg_time(e)
+                sum_file_size += get_pkg_size(e)
+            for e in self.function_experiments:
+                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
+                sum_pack_time += get_pkg_time(e)
+                sum_file_size += get_pkg_size(e)
+            # footer
+            rows.append([b("Total"), b(len(self.generated_services)), b(sum_pack_time), b(sum_file_size)])
+            return rows
+
+        print(b("-" * 80))
+        print(b("SONATA Profiler: Experiment Package Generation Report"))
+        print(b("-" * 80))
+        print("")
+        print(tabulate(generate_table(), headers="firstrow", tablefmt="orgtbl"))
+        print("")
+        print("Temporary service projects path: %s" % b(self.son_pkg_service_dir))
+        print("Generated service packages path: %s" % b(self.son_pkg_output_dir))
+        print("Total time: %s" % b("%.4f" % (time.time() - self.start_time)))
+        print("")
+
 
 
 def parse_args(manual_args=None):

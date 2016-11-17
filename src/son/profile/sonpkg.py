@@ -28,7 +28,7 @@ import logging
 import zipfile
 import os
 import copy
-import coloredlogs
+import time
 from son.profile.helper import read_yaml, write_yaml, relative_path, ensure_dir
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
@@ -45,10 +45,13 @@ class SonataServicePackage(object):
 
     def __init__(self, pkg_service_path, manifest, nsd, vnfd_list):
         self.pkg_service_path = pkg_service_path
+        self.pkg_package_path = None
+        self.pkg_file_size = 0
         self.manifest = manifest
         self.nsd = nsd
         self.vnfd_list = vnfd_list
         self.metadata = dict()  # profiling specific information
+        self.pack_time = 0
 
     def __repr__(self):
         return self.manifest.get("name")
@@ -128,6 +131,7 @@ class SonataServicePackage(object):
         :param output_path: resulting packages are placed in output_path
         :return: package path
         """
+        start_time = time.time()
         pkg_destination_path = os.path.join(output_path, self.pkg_name())
         # obtain workspace
         # TODO have workspace dir as command line argument
@@ -143,7 +147,10 @@ class SonataServicePackage(object):
         # initialize and run packager
         pck = Packager(workspace, project, dst_path=pkg_destination_path)
         pck.generate_package(os.path.join(output_path, self.pkg_name()))
-        return os.path.join(output_path, self.pkg_name()) + ".son"
+        self.pkg_package_path = os.path.join(output_path, self.pkg_name()) + ".son"
+        self.pkg_file_size = os.path.getsize(self.pkg_package_path)
+        self.pack_time = time.time() - start_time
+        return self.pkg_package_path
 
     def get_project_descriptor(self):
         """
