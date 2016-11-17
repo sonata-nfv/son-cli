@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 
 class Project:
 
-    PROJECT_VERSION = "0.3"
+    PROJECT_VERSION = "0.4"
 
     __descriptor_name__ = 'project.yml'
 
@@ -46,6 +46,7 @@ class Project:
         coloredlogs.install(level=workspace.log_level)
         self._prj_root = prj_root
         self._workspace = workspace
+        self._descriptor_extension = workspace.default_descriptor_extension
         self._prj_config = config
 
     @property
@@ -55,6 +56,10 @@ class Project:
     @property
     def project_config(self):
         return self._prj_config
+
+    @property
+    def descriptor_extension(self):
+        return self._descriptor_extension
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))
@@ -125,7 +130,8 @@ class Project:
             'maintainer': 'Name, Company, Contact',
             'description': 'Some description about this sample',
             'catalogues': ['personal'],
-            'publish_to': ['personal']
+            'publish_to': ['personal'],
+            'descriptor_extension': self._descriptor_extension
         }
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
@@ -141,7 +147,7 @@ class Project:
         nsd_list = [os.path.join(nsd_root, file)
                     for file in os.listdir(nsd_root)
                     if os.path.isfile(os.path.join(nsd_root, file)) and
-                    file.endswith(self._workspace.descriptor_extension)]
+                    file.endswith(self._descriptor_extension)]
 
         if len(nsd_list) == 0:
             log.error("Project does not contain a NS Descriptor")
@@ -286,8 +292,9 @@ class Project:
             prj_config = yaml.load(prj_file)
 
         if not prj_config['version'] == Project.PROJECT_VERSION:
-            log.warning("Reading a project configuration "
-                        "with a different version {}"
-                        .format(prj_config['version']))
+            log.error("Reading a project configuration "
+                      "with a different version {}"
+                      .format(prj_config['version']))
+            return
 
         return Project(workspace, prj_root, config=prj_config)

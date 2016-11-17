@@ -73,7 +73,13 @@ def upload_package(platform_url, package_file_name):
     try:
         with open(package_file_name, 'rb') as pkg_file:
             r = requests.post(url, files={'package': pkg_file})
-            return r.text
+            if r.status_code == 201:
+                msg = "Upload succeeded"
+            elif r.status_code == 409:
+                msg = "Package already exists"
+            else:
+                msg = "Upload error"
+            return "%s (%d): %r" % (msg, r.status_code, r.text)
 
     except Exception as e:
         return "Service package upload failed. " + e

@@ -56,7 +56,7 @@ setup(
                     'monitor/prometheus/*', 'monitor/*']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
-                          'requests>2.4.2', 'coloredlogs', 'paramiko'],
+                          'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
@@ -64,7 +64,8 @@ setup(
                 'son-package=son.package.package:main',
                 'son-publish=son.catalogue.publish:main',
                 'son-push=son.push.push:main',
-                'son-monitor=son.monitor.monitor:main'
+                'son-monitor=son.monitor.monitor:main',
+                'son-profile=son.profile.profile:main'
             ],
         },
         test_suite='son',

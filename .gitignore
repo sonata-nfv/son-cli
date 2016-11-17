@@ -70,3 +70,6 @@ bin/
 
 # ide trash
 .idea
+
+# ignore son-validate, for now
+validate/
