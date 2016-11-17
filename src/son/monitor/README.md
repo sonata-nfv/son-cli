@@ -101,7 +101,14 @@ son-monitor xterm [-n vnf_names]
 After a service has been deployed on the SDK emulator (son-emu), son-monitor can be used.
 Son-monitor uses the son-emu rest api and Prometheus.
 
-This command installs the metrics defined in a monitorign specific descriptor file 
+This command sniffs al the packets on a vnf interface 
+(if no output is specified, tcpdump is started in an xterm window)
+```
+son-monitor dump -vnf vnf_name:interface [-f filename.pcap]
+son-monitor dump stop
+```
+
+This command installs the metrics defined in a monitoring specific descriptor file 
 and starts all the related docker files (Grafana, Prometheus DB). A new Grafana dashboard is started where the defined metrics are shown.
 This is the recommended usage for son-monitor.
 ```

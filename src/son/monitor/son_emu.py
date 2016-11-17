@@ -628,7 +628,7 @@ class emu():
         if file:
             # start tcpdump in background
             pcap_option = ' -w {0} -U'.format(file)
-            tcpdump_cmd = tcpdump_cmd + pcap_option 
+            tcpdump_cmd = tcpdump_cmd + pcap_option
             return Popen(shlex.split(tcpdump_cmd))
         else:
             #start tcpdump in xterm
