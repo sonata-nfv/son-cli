@@ -57,14 +57,21 @@ logging.basicConfig(level=logging.INFO)
 ## parameters for the emulator VIM
 # TODO: these settings come from the deployed topology in the emulator, read from centralized config file?
 # API from docker container
-SON_EMU_API = "http://172.17.0.1:5001"
+SON_EMU_IP = '172.17.0.1'
+SON_EMU_REST_API_PORT = 5001
+SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 # API when docker network=host in son-cli, or when not started as container
 #SON_EMU_API = "http://localhost:5001"
 # API when started with docker-compose
 #SON_EMU_API = "http://son-emu:5001"
 
+# specify if son-emu is runnign in a seperate VM that has ssh login
+SON_EMU_IN_VM = False
+SON_EMU_USER = 'steven' # 'vagrant'
+SONE_EMU_PASSW = 'test' # 'vagrant'
+
 # initalize the vims accessible from the SDK
-emu = emu(SON_EMU_API)
+emu = emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
 
 
 # map the command and vim selections to the correct function
@@ -94,9 +101,10 @@ examples = """Example usage:
 parser = argparse.ArgumentParser(description=description,
                         formatter_class=argparse.RawTextHelpFormatter,
                         epilog=examples)
+# positional  arguments
 parser.add_argument(
     "command",
-    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump'],
+    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)
@@ -106,7 +114,8 @@ parser.add_argument(
          init : start/stop the monitoring framework
          msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
          profile : performance profiling (tba)
-         dump: start tcpdump for specified interface
+         dump: start tcpdump for specified interface (save as .pcap)
+         xterm: start an xterminal for specific vnf(s)
          """)
 
 parser.add_argument(
@@ -123,7 +132,15 @@ parser.add_argument(
           Action for nsd:
           start: start the monitoring metrics from the nsd
           stop: start the monitoring metrics from the nsd
+          Action for xterm:
+          vnf names to start an xterm for
           """)
+# vnf names to start an xterm for
+parser.add_argument(
+    "--vnf_names", "-n", dest="vnf_names",
+    default="",
+    nargs='*',
+    help="vnf names to open an xterm for")
 
 ## select the vim to execute the monitoring action on (default=emulator)
 parser.add_argument(

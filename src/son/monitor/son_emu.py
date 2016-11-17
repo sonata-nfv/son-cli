@@ -62,7 +62,7 @@ metric2flow_metric = {
 
 class emu():
 
-    def __init__(self, REST_api):
+    def __init__(self, REST_api, ip='localhost', vm=False, user=None, password=None):
         self.url = REST_api
         self.tmp_dir = '/tmp/son-monitor'
         self.docker_dir = '/tmp/son-monitor/docker'
@@ -74,6 +74,13 @@ class emu():
                 os.makedirs(dir)
 
         self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
+
+        # remote son-emu parameters
+        self.son_emu_ip = ip
+        self.emu_in_vm = vm
+        self.ssh_user = user
+        self.ssh_password = password
+
 
         self.grafana = None
 
@@ -170,7 +177,7 @@ class emu():
                     else:
                         cmd = 'sudo docker exec -it ' + sap_docker_name + ' ' + cmd
 
-                    thread = Thread(target=self.ssh_cmd, kwargs=dict(cmd=cmd, username='steven', password='test'))
+                    thread = Thread(target=self.ssh_cmd, kwargs=dict(cmd=cmd, username=self.ssh_user, password=self.ssh_password))
                     thread.start()
                     if wait:
                         thread.join()
@@ -320,7 +327,7 @@ class emu():
         process.wait()
 
         # Wait a while for containers to be completely started
-        sleep(2)
+        sleep(4)
         return 'son-monitor started'
 
     # start the sdk monitoring framework
@@ -357,7 +364,7 @@ class emu():
 
         return 'son-monitor stopped'
 
-    def ssh_cmd(self, cmd, host='localhost', port=22, username='vagrant', password='vagrant'):
+    def ssh_cmd(self, cmd, host='localhost', port=22, username=None, password=None):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         # ssh.connect(mgmt_ip, username='steven', password='test')
@@ -591,6 +598,22 @@ class emu():
         dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
         print(dc_portname)
         Popen(['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', 'dump ' + vnf_name, '-hold', '-e', "tcpdump -i {0}".format(dc_portname)])
+
+    # start an xterm for the specfified vnfs
+    def xterm(self, vnf_names, **kwargs):
+        # start xterm for all vnfs
+        if len(vnf_names) == 0:
+            vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+            vnf_names = [vnf[0] for vnf in vnf_list]
+
+        for vnf_name in vnf_names:
+            terminal_cmd = "docker exec -it mn.{0} /bin/bash".format(vnf_name)
+            if self.emu_in_vm:
+                terminal_cmd = "./ssh_login.exp {0} {1} {2} '{3}'".format(self.son_emu_ip, self.ssh_user,
+                                                                       self.ssh_password, terminal_cmd)
+            cmd = ['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
+                   '-e', terminal_cmd]
+            Popen(cmd)
 
 
 
