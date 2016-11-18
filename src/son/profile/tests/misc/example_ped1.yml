@@ -116,7 +116,7 @@ function_experiments:
     # resource configurations to be tested during profiling run (defined per VNF)
     resource_limitations: # shortened (fields are optional)
       # again: SONATA-like references
-      - function: "eu.sonata-nfv.fw-vnf.0.1"
+      - function: "eu.sonata-nfv.vtc-vnf.0.1"
         cpu_bw: 0.4
         mem_max: "${64}"
       - function: "mp.input"

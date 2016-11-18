@@ -175,6 +175,21 @@ class SonataServicePackage(object):
         """
         return "%s_%05d" % (self.metadata.get("exname"), self.metadata.get("run_id"))
 
+    def find_vnfd(self, fun_id):
+        """
+        Tries to find VNFD using vendor name version string.
+        :param fun_id: VNFD identifier
+        :return: VNFD structure
+        """
+        for vnfd in self.vnfd_list:
+            if self.get_id(vnfd) == fun_id:
+                return vnfd
+        return None
+
+    def get_id(self, d):
+        return "%s.%s.%s" % (d.get("vendor"), d.get("name"), d.get("version"))
+
+
 
 def extract_son_package(input_ped, input_path):
     """

@@ -108,7 +108,30 @@ class Experiment(object):
         pass
 
     def modify_vnfds(self, service, run_cfg):
-        # TODO: apply resource limitations to VNFDs
+        """
+        TODO
+        :param service: the service with the VNFDs to be modified
+        :param run_cfg: the specific configuration to be applied
+        :return:
+        """
+        def get_cfg_by_fun(fun_id):
+            """
+            Hepler to get config for a specific function.
+            """
+            r = dict()
+            for k, v in run_cfg.configuration.items():
+                kk = k.split(":")
+                if kk[0] == fun_id:
+                    r[kk[1]] = v
+            return r
+
+        for vnfd in service.vnfd_list:
+            cfg = get_cfg_by_fun(service.get_id(vnfd))
+            if len(cfg) > 0:
+                # apply the resource limitations to the VNFD
+                self.apply_resourcelimits_to_vnfd(vnfd, cfg)
+
+    def apply_resourcelimits_to_vnfd(self, vnfd, cfg):
         pass
 
 
