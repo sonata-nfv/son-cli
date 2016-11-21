@@ -1,5 +1,5 @@
 # from https://github.com/github/gitignore/blob/master/Python.gitignore
-
+venv/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
