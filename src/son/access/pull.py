@@ -29,6 +29,7 @@ import requests
 import yaml
 import sys
 import validators
+from json import loads
 
 log = logging.getLogger(__name__)
 
@@ -48,14 +49,14 @@ class Pull:
     """
 
     def __init__(self):
-        pass
+        platform_url = "http://sp.int3.sonata-nfv.eu:32001/"
     pass
 
 
-class CatalogueClient(object):
+class PullCatalogueClient(object):
     """
     Modified CatalogueClient class to communicate to SP Catalogue component
-    through son-gtkapi on SP Gatekeeper
+    through son-gtkapi on SP Gatekeeper (only descriptors)
     """
 
     CAT_URI_BASE = "/"
@@ -116,7 +117,6 @@ class CatalogueClient(object):
 
     def get_list_all_ns(self):
         return self.__get_cat_object__(CatalogueClient.CAT_URI_NS, "")
-
 
     def get_ns(self, ns_id):
         """
