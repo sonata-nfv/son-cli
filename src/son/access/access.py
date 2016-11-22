@@ -38,6 +38,18 @@ from models.models import User
 log = logging.getLogger(__name__)
 
 
+class mcolors:
+     OKGREEN = '\033[92m'
+     FAIL = '\033[91m'
+     ENDC = '\033[0m'
+
+
+     def disable(self):
+         self.OKGREEN = ''
+         self.FAIL = ''
+         self.ENDC = ''
+
+
 class AccessClient:
 
     def __init__(self):

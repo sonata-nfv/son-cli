@@ -34,6 +34,18 @@ from json import loads
 log = logging.getLogger(__name__)
 
 
+class mcolors:
+     OKGREEN = '\033[92m'
+     FAIL = '\033[91m'
+     ENDC = '\033[0m'
+
+
+     def disable(self):
+         self.OKGREEN = ''
+         self.FAIL = ''
+         self.ENDC = ''
+
+
 class Push:
     """
     This is an updated implementation of the son-push tool
@@ -189,11 +201,15 @@ def upload_package(platform_url, package_file_name):
     if not os.path.isfile(package_file_name):
         return package_file_name, "is not a file."
 
+    # Packages on GK
     url = platform_url + "/packages"
+    # son-packages on catalogue
+    #url = platform_url + "/son-packages"
 
     if not validators.url(url):
         return url, "is not a valid url."
 
+    print mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC
     try:
         with open(package_file_name, 'rb') as pkg_file:
             r = requests.post(url, files={'package': pkg_file})
@@ -243,7 +259,7 @@ def instantiate_package(platform_url, service_uuid=""):
         return "Service could not be instantiated. " + e
 '''
 
-'''
+
 def _get_from_url(url):
     """
     Generic/internal function to fetch content of a given URL
@@ -264,21 +280,23 @@ def _get_from_url(url):
 def get_packages(url):
     return _get_from_url(url+"/packages")
 
-
+'''
 def get_instances(url):
     return _get_from_url(url + "/instantiations")
 
+'''
 
 def package_list(url):
     return loads(get_packages(url)).get("service_uuid_list")
 
-
+'''
 def instance_list(url):
     return loads(get_instances(url)).get("service_instantiations_list")
 '''
 
 def main():
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
+    print mcolors.OKGREEN + "Running PUSH\n", mcolors.ENDC
 
     description = """
     Push packages to the SONATA service platform/emulator or list
@@ -287,8 +305,8 @@ def main():
     examples = """Example usage:
 
     son-push http://127.0.0.1:5000 -U sonata-demo.son
-    son-push http://127.0.0.1:5000 --list-packages
-    son-push http://127.0.0.1:5000 --deploy-package <uuid>
+    son-push http://127.0.0.1:5000 --list_packages
+    son-push http://127.0.0.1:5000 --deploy_package <uuid>
     son-push http://127.0.0.1:5000 -I
     """
     parser = ArgumentParser(
@@ -323,14 +341,19 @@ def main():
     if not args.platform_url:
         print("Platform url is required.")
 
-    #if args.list_packages:
-    #    print(get_packages(args.platform_url))
+    if args.list_packages:
+        print mcolors.OKGREEN + "PUSH - Getting Package list...\n", mcolors.ENDC
+        print(get_packages(args.platform_url))
 
     #if args.list_instances:
     #    print(get_instances(args.platform_url))
 
     if args.upload_package:
+        print mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC
         print(upload_package(args.platform_url, args.upload_package))
 
     #if args.deploy_package_uuid:
     #    print(instantiate_package(args.platform_url, args.deploy_package_uuid))
+
+if __name__ == '__main__':
+    main()

@@ -1,4 +1,3 @@
-
 """
 This mock tool tries to emulate Gatekeeper responses on the
 User Management component that is still under development.
@@ -90,6 +89,13 @@ def login():
     else:
         return make_response(jsonify({'error': 'Invalid username or password'}), 401)
 
+
+def main():
+    app.run(
+        host='127.0.0.1',
+        port=5001,
+        debug=False
+    )
 
 if __name__ == '__main__':
     app.run(

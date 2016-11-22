@@ -34,6 +34,18 @@ from json import loads
 log = logging.getLogger(__name__)
 
 
+class mcolors:
+     OKGREEN = '\033[92m'
+     FAIL = '\033[91m'
+     ENDC = '\033[0m'
+
+
+     def disable(self):
+         self.OKGREEN = ''
+         self.FAIL = ''
+         self.ENDC = ''
+
+
 class Pull:
     """
     Early implementation of the retrieving tool. it will be a
