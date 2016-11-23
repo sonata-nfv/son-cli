@@ -71,5 +71,5 @@ bin/
 # ide trash
 .idea
 
-# ignore son-validate, for now
-#validate/
+# ignore graphml files
+*.graphml

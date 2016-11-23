@@ -114,8 +114,7 @@ class Validator(object):
                                   .format(vnfd_file))
                         return
 
-                    vnf_combo_id = vnfd['vendor'] + '.' + vnfd['name'] + '.' \
-                        + vnfd['version']
+                    vnf_combo_id = self._get_vnf_combo_id(vnfd)
 
                     if vnf_combo_id in prj_vnfds:
                         log.error("Duplicate VNF descriptor in file: '{0}'"
@@ -139,8 +138,9 @@ class Validator(object):
             return
 
         for vnf in self._nsd['network_functions']:
-            vnf_combo_id = vnf['vnf_vendor'] + '.' + vnf['vnf_name'] + \
-                           '.' + vnf['vnf_version']
+            vnf_combo_id = self._build_vnf_combo_id(vnf['vnf_vendor'],
+                                                    vnf['vnf_name'],
+                                                    vnf['vnf_version'])
             if vnf_combo_id not in prj_vnfds.keys():
                 log.error("Referenced VNF descriptor '{0}' could not be found"
                           .format(vnf_combo_id))
@@ -187,9 +187,11 @@ class Validator(object):
         """
         # build service network graph
         sg = self._build_service_graph()
+        if not sg:
+            return
 
         # check for forwarding cycles
-        Validator.__find_graph_cycles__(sg, sg.nodes()[0])
+        Validator._find_graph_cycles(sg, sg.nodes()[0])
 
         return True
 
@@ -206,28 +208,83 @@ class Validator(object):
         # add connection points as nodes to the service graph
         for cxp in self._nsd['connection_points']:
             if cxp['type'] == 'interface':
-                sg.add_node(cxp['id'], attr_dict={'group': None})
+                sg.add_node(cxp['id'], attr_dict={'level': 0})
         for vnf_id in self._vnfds.keys():
             for cxp in self._vnfds[vnf_id]['connection_points']:
                 if cxp['type'] == 'interface':
                     sg.add_node(vnf_id + ':' + cxp['id'],
-                                attr_dict={'group': vnf_id})
+                                attr_dict={'level': 1, 'parents': vnf_id})
 
         # eliminate all connection points associated with bridged (E-LAN) links
         for vlink in self._nsd['virtual_links']:
             if vlink['connectivity_type'] != 'E-LAN':
                 continue
-
             cxpoints = vlink['connection_points_reference']
             for cxp in cxpoints:
                 sg.remove_node(cxp)
 
         # add edges between functions to the graph
-        for vlink in self._nsd['virtual_links']:
-            ctype = vlink['connectivity_type']
-            if ctype != 'E-Line':  # TODO: add support for 'E-Tree'
-                continue
+        if not Validator._assign_edges(sg, 'ns', self._nsd):
+            return
 
+        # add VDU nodes and edges between them, within each function
+        for vnf_id in self._vnfds.keys():
+            vnfd = self._vnfds[vnf_id]
+
+            # add VDU connection points as nodes
+            for vdu in vnfd['virtual_deployment_units']:
+                for cxp in vdu['connection_points']:
+                    if cxp['type'] == 'interface':
+                        cxp_id = vnf_id + '-' + cxp['id']
+                        log.debug("Adding node '{0}'".format(cxp_id))
+                        sg.add_node(cxp_id, attr_dict={'level': 2,
+                                                       'parents':
+                                                           vnf_id + '.' +
+                                                           vdu['id']})
+
+            # eliminate all connection points associated with E-LAN links
+            for vlink in vnfd['virtual_links']:
+                if vlink['connectivity_type'] != 'E-LAN':
+                    continue
+                cxpoints = vlink['connection_points_reference']
+                for cxp in cxpoints:
+                    if vnf_id + '-' + cxp in sg.nodes():
+                        sg.remove_node(vnf_id + '-' + cxp)
+
+            # add edges based on virtual links of the VNF
+            if not Validator._assign_edges(sg, vnf_id, vnfd, level=2):
+                return
+
+            # add edges within VDU interfaces (VDUs cannot be decomposed)
+            for node_x in sg.nodes(data=True):
+                n_x = node_x[0]
+                attr_x = dict(node_x[1])
+                print(attr_x)
+                if attr_x['level'] != 2:
+                    continue
+                for node_y in sg.nodes(data=True):
+                    n_y = node_y[0]
+                    attr_y = dict(node_y[1])
+                    if attr_y['level'] != 2 or n_x == n_y:
+                        continue
+                    if attr_x['parents'] == attr_y['parents']:
+                        log.debug("Adding intra VDU edge: {0}<->{1}"
+                                  .format(n_x, n_y))
+                        sg.add_edge(n_x, n_y, attr_dict={'scope': 'intra'})
+
+        # temporarily export to the graph
+        nx.write_graphml(sg, 'sample.graphml')
+
+        return sg
+
+    @staticmethod
+    def _assign_edges(graph, descriptor_id, descriptor, level=1):
+        for vlink in descriptor['virtual_links']:
+            print("--> level: {}".format(level))
+            ctype = vlink['connectivity_type']
+            # TODO: add support for 'E-Tree': topology not defined in schema!
+            if ctype != 'E-Line':
+                continue
             cxp_ref = vlink['connection_points_reference']
             if len(cxp_ref) != 2:
                 log.error("The virtual link '{0}' of type 'E-Line' must only "
@@ -235,32 +292,39 @@ class Validator(object):
                           .format(vlink['id']))
                 return
 
-            for cxp in cxp_ref:
-                if not sg.has_node(cxp):
-                    log.error("The connection point '{0}' defined in "
-                              "virtual link '{1}' is not defined."
-                              .format(cxp, vlink['id']))
-                    return
-            sg.add_edge(cxp_ref[0], cxp_ref[1])
+            for idx, cxp in enumerate(cxp_ref):
 
-        # add edges between nodes of the same group TODO: go deeper into VDUs
-        for node_x in sg.nodes(data=True):
-            print(node_x)
-            if not node_x[1]['group']:
-                continue
-
-            for node_y in sg.nodes(data=True):
-                if node_x[0] == node_y[0]:
-                    continue
-                if node_x[1]['group'] == node_y[1]['group']:
-                    print("adding edge: {0} <> {1}".format(node_x[0],
-                                                           node_y[0]))
-                    sg.add_edge(node_x[0], node_y[0])
-
-        return sg
+                if not graph.has_node(cxp):
+                    parent_cxp = descriptor_id + ':' + cxp
+                    vdu_cxp = descriptor_id + '-' + cxp
+                    if level == 2 and graph.has_node(parent_cxp):
+                        cxp_ref[idx] = parent_cxp
+                    elif level == 2 and graph.has_node(vdu_cxp):
+                        cxp_ref[idx] = vdu_cxp
+                    else:
+                        log.error("[Level: {0}] The connection point '{1}' "
+                                  "defined in virtual link '{2}' is not "
+                                  "defined."
+                                  .format(level, cxp, vlink['id']))
+                        return
+            log.debug("Adding edge between connection points: {0}<->{1}"
+                      .format(cxp_ref[0],
+                              cxp_ref[1]))
+            graph.add_edge(cxp_ref[0],
+                           cxp_ref[1])
+        return True
 
     @staticmethod
-    def __find_graph_cycles__(graph, node, prev_node=None, backtrace=None):
+    def _get_vnf_combo_id(vnfd):
+        return Validator._build_vnf_combo_id(vnfd['vendor'], vnfd['name'],
+                                             vnfd['version'])
+
+    @staticmethod
+    def _build_vnf_combo_id(vnf_vendor, vnf_name, vnf_version):
+        return vnf_vendor + '.' + vnf_name + '.' + vnf_version
+
+    @staticmethod
+    def _find_graph_cycles(graph, node, prev_node=None, backtrace=None):
 
         if not backtrace:
             backtrace = []
@@ -286,9 +350,10 @@ class Validator(object):
 
         # iterate through neighbor nodes
         for neighbor in neighbors:
-            return Validator.__find_graph_cycles__(graph, neighbor,
-                                                   prev_node=node,
-                                                   backtrace=backtrace)
+            return Validator._find_graph_cycles(graph,
+                                                neighbor,
+                                                prev_node=node,
+                                                backtrace=backtrace)
         return backtrace
 
 
