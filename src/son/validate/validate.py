@@ -259,7 +259,6 @@ class Validator(object):
             for node_x in sg.nodes(data=True):
                 n_x = node_x[0]
                 attr_x = dict(node_x[1])
-                print(attr_x)
                 if attr_x['level'] != 2:
                     continue
                 for node_y in sg.nodes(data=True):
@@ -272,7 +271,7 @@ class Validator(object):
                                   .format(n_x, n_y))
                         sg.add_edge(n_x, n_y, attr_dict={'scope': 'intra'})
 
-        # temporarily export to the graph
+        # TODO: remove temporary export of the graph
         nx.write_graphml(sg, 'sample.graphml')
 
         return sg
@@ -280,7 +279,6 @@ class Validator(object):
     @staticmethod
     def _assign_edges(graph, descriptor_id, descriptor, level=1):
         for vlink in descriptor['virtual_links']:
-            print("--> level: {}".format(level))
             ctype = vlink['connectivity_type']
             # TODO: add support for 'E-Tree': topology not defined in schema!
             if ctype != 'E-Line':
