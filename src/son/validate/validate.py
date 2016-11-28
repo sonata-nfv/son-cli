@@ -31,19 +31,27 @@ import logging
 import coloredlogs
 import networkx as nx
 from son.schema.validator import SchemaValidator
-
-
 from son.workspace.workspace import Workspace, Project
+
 
 log = logging.getLogger(__name__)
 
 
 class Validator(object):
 
-    def __init__(self, workspace, project):
+    def __init__(self, workspace, project,
+                 v_syntax=True,
+                 v_integrity=True,
+                 v_topology=True):
+
         self._workspace = workspace
         self._project = project
         coloredlogs.install(level=workspace.log_level)
+
+        # filter what to validate
+        self._v_syntax = v_syntax
+        self._v_integrity = v_integrity
+        self._v_topology = v_topology
 
         # keep project descriptors
         self._nsd_file = None
@@ -54,13 +62,16 @@ class Validator(object):
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-    def validate(self):
+    def run(self):
         """
-        Validate a project.
-        It performs the syntax and network topology validation of a service.
-        :return:
+        Validate a SONATA service.
+        If performs the following validations: syntax, integrity and
+        network topology.
+        :param syntax: specifies whether to validate syntax
+        :param integrity: specifies whether to validate integrity
+        :param topology: specifies whether to validate network topology
+        :return: True if all validation were successful, False otherwise
         """
-        success = True
 
         # load and correlate project descriptors
         log.info("Loading project descriptors")
@@ -358,41 +369,125 @@ class Validator(object):
 def main():
     import argparse
 
+    # specify arguments
     parser = argparse.ArgumentParser(
-        description="Validate a SONATA project service")
+        description="Validate a SONATA Service. By default it performs a "
+                    "validation to the syntax, integrity and network "
+                    "topology.\n"
+    )
 
     parser.add_argument(
         "--workspace",
-        help="Specify workspace. If not specified "
-             "will assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
-        required=False)
-
+        dest="workspace_path",
+        help="Specify the directory of the SDK workspace for validation of "
+             "an SDK project. If not specified will assume the directory: '{}'"
+             .format(Workspace.DEFAULT_WORKSPACE_DIR),
+        required=False
+    )
     parser.add_argument(
         "--project",
-        help="Validate the project at the specified location. "
-             "If not specified will assume current directory '{}'"
+        dest="project_path",
+        help="Validate the service of the specified SDK project. If "
+             "not specified will assume the current directory: '{}'\n"
              .format(os.getcwd()),
-        required=False)
+        required=False
+    )
+    parser.add_argument(
+        "--package",
+        dest="pd",
+        help="Validate the specified package descriptor. "
+    )
+    parser.add_argument(
+        "--service",
+        dest="nsd",
+        help="Validate the specified service descriptor. "
+             "The directory of descriptors referenced in the service "
+             "descriptor should be specified using the argument '--path'.",
+        required=False
+    )
+    parser.add_argument(
+        "--function",
+        dest="vnfd",
+        help="Validate the specified function descriptor. If a directory is "
+             "specified, it will search for descriptor files with extension "
+             "defined in '--dformat' or default '{0}'",
+        required=False
+    )
+    parser.add_argument(
+        "--path",
+        help="Specify a directory to search for descriptors. Particularly "
+             "useful when using the '--service' argument.",
+        required=False
+    )
+    parser.add_argument(
+        "--dformat",
+        help="Specify the extension of descriptor files. Particularly "
+             "useful when using the '--function' argument",
+        required=False
+    )
+    parser.add_argument(
+        "--syntax", "-s",
+        help="Perform a syntax validation.",
+        required=False,
+        action="store_true",
+        default=False
+    )
+    parser.add_argument(
+        "--integrity", "-i",
+        help="Perform an integrity validation.",
+        required=False,
+        action="store_true",
+        default=False
+    )
+    parser.add_argument(
+        "--topology", "-t",
+        help="Perform a network topology validation.",
+        required=False,
+        action="store_true",
+        default=False
+    )
 
+    # parse arguments
     args = parser.parse_args()
 
-    if args.workspace:
-        ws_root = args.workspace
-    else:
-        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
-
-    prj_root = args.project if args.project else os.getcwd()
-
-    # Obtain Workspace object
-    workspace = Workspace.__create_from_descriptor__(ws_root)
-    if not workspace:
-        sys.stderr.write("Invalid workspace path: '%s'\n" % ws_root)
+    # either PROJECT, PACKAGE, SERVICE or FUNCTION must be specified
+    if not args.project_path and not args.pd and not args.nsd and not \
+            args.vnfd:
+        sys.stderr.write("One of the following arguments must be specified:"
+                         "\n\t--project"
+                         "\n\t--package"
+                         "\n\t--service"""
+                         "\n\t--function\n")
         exit(1)
 
-    project = Project.__create_from_descriptor__(workspace, prj_root)
-    if not project:
-        sys.stderr.write("Invalid project path: '%s'\n  " % prj_root)
-        exit(1)
+    # by default, perform all validations
+    if not args.syntax and not args.integrity and not args.topology:
+        args.syntax = args.integrity = args.topology = True
 
-    val = Validator(workspace, project)
-    val.validate()
+    validator = None
+
+    if args.project:
+        if args.workspace:
+            ws_root = args.workspace
+        else:
+            ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+
+        prj_root = args.project if args.project else os.getcwd()
+
+        # Obtain Workspace object
+        workspace = Workspace.__create_from_descriptor__(ws_root)
+        if not workspace:
+            sys.stderr.write("Invalid workspace path: '%s'\n" % ws_root)
+            exit(1)
+
+        project = Project.__create_from_descriptor__(workspace, prj_root)
+        if not project:
+            sys.stderr.write("Invalid project path: '%s'\n  " % prj_root)
+            exit(1)
+
+        validator = Validator(workspace, project=project)
+
+    elif args.service:
+        pass
+
+    validator.run()
