@@ -62,14 +62,13 @@ class Validator(object):
         coloredlogs.install(level=self._log_level)
 
         # keep loaded descriptors
-        self._loaded_vnfds = {}
-
-        # keep descriptors
-        self._nsd_file = None
-        self._nsd = None
-        self._vnfd_files = {}
+        self._nsd = {}
         self._vnfds = {}
-        self._prj_vnfds = {}
+        self._vnf_id_map = {}  # bridge vnf_id in NSD to vnf_combo_id in VNFD
+
+        # keep network graphs
+        self._ns_graph = None
+        self._vnf_graphs = {}
 
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
@@ -80,7 +79,7 @@ class Validator(object):
         self._dpath = dpath
         coloredlogs.set_level(log_level)
 
-    def validate_project(self, project,syntax=True, integrity=True,
+    def validate_project(self, project, syntax=True, integrity=True,
                          topology=True):
         """
         Validate a SONATA project.
@@ -95,16 +94,16 @@ class Validator(object):
 
         # load all project descriptors present at source directory
         log.info("Loading project descriptors")
-        if not self._load_project_descriptors():
+        if not self._load_project_descriptors(project):
             return False
 
         # validate syntax
         log.info("Validating syntax of descriptors")
-        if not self._validate_service_syntax():
-            return False
+        #if not self._validate_service_syntax(nsd):
+        #    return False
 
         # correlate/check reference integrity between descriptors
-        self._validate_service_integrity()
+        #self._validate_service_integrity()
 
         # validate topology
         log.info("Validating service network topology")
@@ -114,41 +113,116 @@ class Validator(object):
         log.info("SUCCESS")
         return True
 
-    def validate_service(self, nsd_file, dpath=None, syntax=True,
-                         integrity=True, topology=True):
+    def validate_service(self, nsd_file, dpath=DEFAULT_DPATH,
+                         dext=DEFAULT_DEXT, syntax=True, integrity=True,
+                         topology=True):
         """
         Validate a SONATA service.
         By default, it performs the following validations: syntax, integrity
         and network topology.
         :param nsd_file: service descriptor filename
         :param dpath: directory to search for function descriptors (VNFDs)
+        :param dext: extension of descriptor files (default: 'yml')
         :param syntax: specifies whether to validate syntax
         :param integrity: specifies whether to validate integrity
         :param topology: specifies whether to validate network topology
         :return: True if all validations were successful, False otherwise
         """
 
-        # load service descriptor and referenced function descriptors
-        self._load_service_descriptors()
+        # check validation parameters
+        if (integrity or topology) and not (dpath and dext):
+            log.critical("Invalid validation parameters. To validate the "
+                      "integrity or topology of a service both dpath and "
+                      "dext parameters must be specified.")
+            return
 
-        pass
+        log.info("Validating service. NSD file: '{0}', Syntax: {1}, "
+                 "Integrity: {2}, Topology: {3}"
+                 .format(nsd_file, syntax, integrity, topology))
 
-    def validate_function(self, vnfd_file, syntax=True, integrity=True,
-                          topology=True):
+        # load service descriptor
+        nsd = self._read_descriptor_file(nsd_file)
+        if not nsd:
+            log.critical("Failed to read service descriptor.")
+            return
+
+        ns_id = self._store_service(nsd_file, nsd)
+        if not ns_id:
+            log.critical("Couldn't store the service. ")
+            return
+
+        # validate service syntax
+        if syntax and not self._validate_service_syntax():
+            return
+
+        if integrity and not self._validate_service_integrity(dpath, dext):
+            return
+
+        log.info("SUCCESS. NSD ID: {0}"
+                 .format(self._get_ns_combo_id(nsd)))
+        return True
+
+    def _validate_service_integrity(self, dpath, dext):
+        nsd = self._nsd['descriptor']
+        ns_combo_id = Validator._get_ns_combo_id(nsd)
+
+        log.info("Validating integrity of service '{0}'"
+                 .format(ns_combo_id))
+
+        # get referenced function descriptors (VNFDs)
+        vnfds = self._load_service_functions(dpath, dext)
+        if not vnfds:
+            log.critical("Failed to read service function descriptors.")
+            return
+
+
+
+
+
+
+
+
+
+
+    def validate_function(self, vnfd_path, dext=None, syntax=True,
+                          integrity=True, topology=True):
         """
-        Validate a SONATA function (VNF).
+        Validate one or multiple SONATA functions (VNFs).
         By default, it performs the following validations: syntax, integrity
         and network topology.
-        :param vnf_file: function descriptor (VNFD) filename
+        :param vnfd_path: function descriptor (VNFD) filename or
+                          a directory to search for VNFDs
         :param syntax: specifies whether to validate syntax
         :param integrity: specifies whether to validate integrity
         :param topology: specifies whether to validate network topology
         :return: True if all validations were successful, False otherwise
         """
 
+        # validate multiple VNFs
+        if os.path.isdir(vnfd_path):
+            vnfd_files = Validator._list_files(vnfd_path, dext)
+            for vnfd_file in vnfd_files:
+                if not self.validate_function(vnfd_file,
+                                              syntax=syntax,
+                                              integrity=integrity,
+                                              topology=topology):
+                    return
+            return True
+
+        log.info("Validating function. VNFD file: '{0}', Syntax: {1}, "
+                 "Integrity: {2}, Topology: {3}"
+                 .format(vnfd_path, syntax, integrity, topology))
+
         # load function descriptor
-        vnfd = self._load_function_descriptor(vnfd_file)
+        vnfd = self._read_descriptor_file(vnfd_path)
         if not vnfd:
+            log.critical("Failed to read function descriptor.")
+            return
+
+        # store function descriptor in cache for later usage
+        if not self._store_function(vnfd_path, vnfd):
+            log.critical("Duplicate VNF descriptors with combo ID: '{0}'"
+                         .format(Validator._get_vnf_combo_id(vnfd)))
             return
 
         if syntax and not self._validate_function_syntax(vnfd):
@@ -160,7 +234,82 @@ class Validator(object):
         if topology and not self._validate_function_topology(vnfd):
             return
 
+        log.info("SUCCESS. VNF ID: {0}"
+                 .format(self._get_vnf_combo_id(vnfd)))
+
         return True
+
+    def _store_service(self, nsd_file, nsd):
+        ns_combo_id = Validator._get_ns_combo_id(nsd)
+        if self._nsd:
+            log.error("The service '{0}' was already stored in cache. Aborting"
+                      .format(ns_combo_id))
+            return
+
+        self._nsd['descriptor'] = nsd
+        self._nsd['file'] = nsd_file
+        return ns_combo_id
+
+    def _store_function(self, vnfd_file, vnfd):
+        vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
+        if vnf_combo_id in self._vnfds.keys():
+            log.error("VNF '{0}' is already stored in cache. Aborting"
+                      .format(vnf_combo_id))
+            return
+
+        self._vnfds[vnf_combo_id]['descriptor'] = vnfd
+        self._vnfds[vnf_combo_id]['file'] = vnfd_file
+        return vnf_combo_id
+
+    def _load_service_functions(self, dpath, dext):
+
+        log.debug("Loading functions of the service.")
+
+        nsd = self._nsd['descriptor']
+
+        # get VNFD file list from provided dpath
+        vnfd_files = Validator._list_files(dpath, dext)
+        log.debug("Found {0} VNF descriptors: {1} in dpath='{2}'"
+                  .format(len(vnfd_files), vnfd_files, dpath))
+
+        # load all VNFDs
+        path_vnfds = Validator._read_descriptor_files(vnfd_files)
+
+        # pop function descriptors not referenced in the service
+        if 'network_functions' not in nsd:
+            log.error("Service doesn't have any functions. "
+                      "Missing 'network_functions' section.")
+            return
+
+        functions = nsd['network_functions']
+        if functions and not path_vnfds:
+            log.error("Service references VNFs but none could be found in "
+                      "'{0}'. Please specify another dpath".format(dpath))
+            return
+
+        vnfds = {}
+        self._vnf_id_map = {}
+        for function in functions:
+            vnf_combo_id = Validator._build_combo_id(function['vnf_vendor'],
+                                                     function['vnf_name'],
+                                                     function['vnf_version'])
+            if vnf_combo_id not in path_vnfds.keys():
+                log.error("Referenced VNF descriptor '{0}' couldn't be "
+                          "found in path '{1}'"
+                          .format(vnf_combo_id, self._dpath))
+                return
+
+            vnf_id = function['vnf_id']
+            if vnf_combo_id in vnfds.keys():
+                log.error("Duplicate VNF entry in section "
+                          "'network_functions' with ID={}"
+                          .format(function['vnf_id']))
+                return
+
+            vnfds[vnf_id] = path_vnfds[vnf_combo_id]
+            self._vnf_id_map[vnf_combo_id] = vnf_id
+
+        return vnfds
 
     def _load_project_descriptors(self, project):
         """
@@ -263,27 +412,10 @@ class Validator(object):
 
 ## TODO: different id, same combo_id! This is integrity!
 
-    def _load_function_descriptor(self, vnfd_file):
-        vnfd = self._read_descriptor_file(vnfd_file)
-        if not vnfd:
-            return
-        return vnfd
-
-
-    def _load_service_descriptor(self, nsd_file):
-        with open(nsd_file, 'r') as _file:
-            self._nsd = yaml.load(_file)
-            if not self._nsd:
-                log.error("Couldn't read service descriptor file: '{0}'"
-                          .format(nsd_file))
-                return
-            self._nsd_file = nsd_file
-
-
-
-    def _list_vnfd_files(self, path):
+    @staticmethod
+    def _list_files(path, extension):
         """
-        Retrieves a list of function descriptor files (VNFDs) in a given
+        Retrieves a list of files with the specified extension in a given
         directory path.
         :param path: directory to search for VNF descriptor files
         :return: list of VNF descriptor files
@@ -291,11 +423,12 @@ class Validator(object):
         vnfd_files = []
         for root, dirs, files in os.walk(path):
             for file in files:
-                if file.endswith(self._dext):
+                if file.endswith(extension):
                     vnfd_files.append(os.path.join(root, file))
         return vnfd_files
 
-    def _read_descriptor_files(self, vnfd_files):
+    @staticmethod
+    def _read_descriptor_files(vnfd_files):
         """
         Loads the VNF descriptors provided in the file list. It builds a
         dictionary of the loaded VNF descriptor files. Each entry has the
@@ -309,7 +442,7 @@ class Validator(object):
             vnfd = Validator._read_descriptor_file(vnfd_file)
             if not vnfd:
                 continue
-            vnf_combo_id = self._get_vnf_combo_id(vnfd)
+            vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
 
             if vnf_combo_id in vnfd_dict:
                 log.error("Duplicate VNF descriptor in file: '{0}'"
@@ -331,6 +464,12 @@ class Validator(object):
                 log.error("Couldn't read descriptor file: '{0}'"
                           .format(file))
                 return
+            if 'vendor' not in descriptor or \
+                    'name' not in descriptor or \
+                    'version' not in descriptor:
+                log.warning("Invalid SONATA descriptor file: '{0}'. Ignoring."
+                            .format(file))
+                return
             return descriptor
 
     def _validate_service_syntax(self):
@@ -338,24 +477,15 @@ class Validator(object):
         Validate a the syntax of a service and all of its descriptors.
         :return:
         """
-
-        log.debug("Validate syntax of Service Descriptor file '{0}'"
-                  .format(self._nsd_file))
+        nsd = self._nsd['descriptor']
+        ns_combo_id = Validator._get_ns_combo_id(nsd)
+        log.info("Validating syntax of service '{0}'"
+                  .format(ns_combo_id))
         if not self._schema_validator.validate(
-              self._nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-            log.error("Bad Service Descriptor file: '{0}'"
-                      .format(self._nsd_file))
+              nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
+            log.error("Invalid syntax in service: '{0}'"
+                      .format(ns_combo_id))
             return
-
-        log.debug("Validate syntax of Function Descriptor files:")
-        for vnfd in self._vnfds.keys():
-            log.debug("... '{0}'".format(self._vnfd_files[vnfd]))
-            if not self._schema_validator.validate(
-                  self._vnfds[vnfd],
-                    SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-                log.error("Bad Function Descriptor file: {0}"
-                          .format(self._vnfd_files[vnfd]))
-                return
 
         return True
 
@@ -365,12 +495,12 @@ class Validator(object):
         :param vnfd: function descriptor dictionary
         :return: True if syntax is correct
         """
-        vnf_combo_id = self._get_vnf_combo_id(vnfd)
-        log.debug("Validating syntax of function descriptor '{0}'"
+        vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
+        log.debug("Validating syntax of function '{0}'"
                   .format(vnf_combo_id))
         if not self._schema_validator.validate(
               vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-            log.error("Invalid syntax in function descriptor '{0}'"
+            log.error("Invalid syntax in function '{0}'"
                       .format(vnf_combo_id))
             return
 
@@ -422,6 +552,8 @@ class Validator(object):
         # check for path cycles
 
 
+        return True
+
 
     def _validate_service_topology(self):
         """
@@ -463,7 +595,6 @@ class Validator(object):
 
     @staticmethod
     def _assign_nodes(graph, descriptor_id, descriptor, level=1):
-        print(level)
         # assign nodes
         if level == 1:
             # add connection points as nodes to the function graph
@@ -615,13 +746,20 @@ class Validator(object):
         return True
 
     @staticmethod
-    def _get_vnf_combo_id(vnfd):
-        return Validator._build_vnf_combo_id(vnfd['vendor'], vnfd['name'],
-                                             vnfd['version'])
+    def _get_ns_combo_id(nsd):
+        return Validator._build_combo_id(nsd['vendor'],
+                                         nsd['name'],
+                                         nsd['version'])
 
     @staticmethod
-    def _build_vnf_combo_id(vnf_vendor, vnf_name, vnf_version):
-        return vnf_vendor + '.' + vnf_name + '.' + vnf_version
+    def _get_vnf_combo_id(vnfd):
+        return Validator._build_combo_id(vnfd['vendor'],
+                                         vnfd['name'],
+                                         vnfd['version'])
+
+    @staticmethod
+    def _build_combo_id(vendor, name, version):
+        return vendor + '.' + name + '.' + version
 
     @staticmethod
     def _find_graph_cycles(graph, node, prev_node=None, backtrace=None):
@@ -674,15 +812,20 @@ def main():
         """,
     )
 
+    exclusive_parser = parser.add_mutually_exclusive_group(
+        required=True
+    )
+
     parser.add_argument(
-        "--workspace",
+        "-w", "--workspace",
         dest="workspace_path",
-        help="Specify the directory of the SDK workspace for validation of "
-             "an SDK project. If not specified will assume the directory: '{}'"
+        help="Specify the directory of the SDK workspace for validating the "
+             "SDK project. If not specified will assume the directory: '{}'"
              .format(Workspace.DEFAULT_WORKSPACE_DIR),
         required=False
     )
-    parser.add_argument(
+
+    exclusive_parser.add_argument(
         "--project",
         dest="project_path",
         help="Validate the service of the specified SDK project. If "
@@ -690,12 +833,12 @@ def main():
              .format(os.getcwd()),
         required=False
     )
-    parser.add_argument(
+    exclusive_parser.add_argument(
         "--package",
         dest="pd",
         help="Validate the specified package descriptor. "
     )
-    parser.add_argument(
+    exclusive_parser.add_argument(
         "--service",
         dest="nsd",
         help="Validate the specified service descriptor. "
@@ -703,7 +846,7 @@ def main():
              "descriptor should be specified using the argument '--path'.",
         required=False
     )
-    parser.add_argument(
+    exclusive_parser.add_argument(
         "--function",
         dest="vnfd",
         help="Validate the specified function descriptor. If a directory is "
@@ -712,13 +855,13 @@ def main():
         required=False
     )
     parser.add_argument(
-        "--path",
+        "--dpath",
         help="Specify a directory to search for descriptors. Particularly "
              "useful when using the '--service' argument.",
         required=False
     )
     parser.add_argument(
-        "--dformat",
+        "--dext",
         help="Specify the extension of descriptor files. Particularly "
              "useful when using the '--function' argument",
         required=False
@@ -754,7 +897,7 @@ def main():
 
     validator = None
 
-    if args.project_path and not (args.pd or args.nsd or args.vnfd):
+    if args.project_path:
 
         if args.workspace_path:
             ws_root = args.workspace_path
@@ -774,25 +917,51 @@ def main():
             log.error("Invalid project path: '%s'\n  " % prj_root)
             exit(1)
 
-        validator = Validator(workspace, project=project)
-
-    elif args.pd and not (args.project_path or args.nsd or args.vnfd):
+        validator = Validator(workspace=workspace)
+        validator.validate_project(project,
+                                   syntax=args.syntax,
+                                   integrity=args.integrity,
+                                   topology=args.topology)
+    elif args.pd:
         pass
 
-    elif args.nsd and not (args.project_path or args.pd or args.vnfd):
-        pass
+    elif args.nsd:
 
-    elif args.vnfd and not (args.project_path or args.pd or args.nsd):
+        if not args.dpath:
+            args.dpath = Validator.DEFAULT_DPATH
+        if not args.dext:
+            args.dext = Validator.DEFAULT_DEXT
+
+        validator = Validator()
+        validator.validate_service(args.nsd, dpath=args.dpath,
+                                   dext=args.dext, syntax=args.syntax,
+                                   integrity=args.integrity,
+                                   topology=args.topology)
+
+    elif args.vnfd:
+
+
+        g1 = nx.Graph()
+        g2 = nx.Graph()
+
+        g1.add_node("ola")
+        g1.add_node("mundo")
+        g2.add_node("como")
+        g2.add_node("estas")
+        g1.add_edge("ola", "mundo")
+        g2.add_edge("como", "estas")
+
+        g3 = nx.Graph()
+
+        g3.add_path(g1.nodes())
+        g3.add_path(g2.nodes())
+
+        g3.add_edge("mundo", "como")
+
+        print(g3.edges())
+
+
         validator = Validator()
         validator.validate_function(args.vnfd)
-
-    else:
-        parser.error("One of the following arguments must be exclusively "
-                     "specified:"
-                     "\n\t--project"
-                     "\n\t--package"
-                     "\n\t--service"""
-                     "\n\t--function\n")
-        exit(1)
 
 
