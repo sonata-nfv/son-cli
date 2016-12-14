@@ -26,6 +26,7 @@
 
 import os
 import sys
+import inspect
 import yaml
 import logging
 import coloredlogs
@@ -39,106 +40,149 @@ log = logging.getLogger(__name__)
 
 class Validator(object):
 
-    DEFAULT_DEXT = 'yml'
-    DEFAULT_DPATH = '.'
-    DEFAULT_LOG_LEVEL = 'debug'
+    CXPT_KEY_SEPARATOR = ':'         # connection point key separator
 
-    def __init__(self, workspace=None, log_level=DEFAULT_LOG_LEVEL):
+    def __init__(self, workspace=None, log_level='debug'):
 
         self._workspace = workspace
         self._log_level = log_level
+        self._syntax = True
+        self._integrity = True
+        self._topology = True
 
         # create "virtual" workspace if not provided (don't actually create
         # file structure)
         if not self._workspace:
-            self._workspace = Workspace('.', log_level=self._log_level)
+            self._workspace = Workspace('.', log_level=log_level)
 
         # load configuration from workspace
         self._dext = self._workspace.default_descriptor_extension
-        self._dpath = self.DEFAULT_DPATH
+        self._dpath = '.'
         self._log_level = self._workspace.log_level
 
         # configure logs
         coloredlogs.install(level=self._log_level)
 
         # keep loaded descriptors
-        self._nsd = {}
-        self._vnfds = {}
-        self._vnf_id_map = {}  # bridge vnf_id in NSD to vnf_combo_id in VNFD
-
-        # keep network graphs
-        self._ns_graph = None
-        self._vnf_graphs = {}
+        self._nss = {}          # store services [id][descriptor, file, graph]
+        self._vnfs = {}         # store functions [id][descriptor, file, graph]
+        self._vnf_cid_map = {}  # bridge vnf_id in NSD to vnf_combo_id in VNFD
 
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-    def configure(self, dext=DEFAULT_DEXT, dpath=DEFAULT_DPATH,
-                  log_level=DEFAULT_LOG_LEVEL):
-        self._dext = dext
-        self._dpath = dpath
-        coloredlogs.set_level(log_level)
+    def configure(self, syntax=None, integrity=None, topology=None,
+                  dpath=None, dext=None, log_level=None):
+        """
+        Configure parameters for validation. It is recommended to call this
+        function before performing a validation.
+        :param syntax: specifies whether to validate syntax
+        :param integrity: specifies whether to validate integrity
+        :param topology: specifies whether to validate network topology
+        :param dpath: directory to search for function descriptors (VNFDs)
+        :param dext: extension of descriptor files (default: 'yml')
+        :param log_level: verbosity level of logger
+        """
+        # assign parameters
+        if syntax:
+            self._syntax = syntax
+        if integrity:
+            self._integrity = integrity
+        if topology:
+            self._topology = topology
+        if dext:
+            self._dext = dext
+        if dpath:
+            self._dpath = dpath
+        if log_level:
+            coloredlogs.set_level(log_level)
 
-    def validate_project(self, project, syntax=True, integrity=True,
-                         topology=True):
+    def _assert_configuration(self):
+        """
+        Ensures that the current configuration is compatible with the
+        validation to perform. If issues are found the application is
+        interrupted with the appropriate error.
+        This is an internal function which must be invoked only by:
+            - 'validate_project'
+            - 'validate_service'
+            - 'validate_function'
+
+        """
+        # ensure this function is called by specific functions
+        caller = inspect.stack()[1][3]
+        if caller != 'validate_function' and caller != 'validate_service' and \
+           caller != 'validate_project':
+            log.error("Cannot assert a correct configuration. Validation "
+                      "scope couldn't be determined. Aborting")
+            sys.exit(1)
+
+        # general rules - apply to all validations
+        if self._integrity and not self._syntax:
+            log.error("Cannot validate integrity without validating syntax "
+                      "first. Aborting.")
+            sys.exit(1)
+
+        if self._topology and not self._integrity:
+            log.error("Cannot validate topology without validating integrity "
+                      "first. Aborting.")
+            sys.exit(1)
+
+        if caller == 'validate_project':
+            pass
+
+        elif caller == 'validate_service':
+            # check SERVICE validation parameters
+            if (self._integrity or self._topology) and not \
+               (self._dpath and self._dext):
+                log.critical("Invalid validation parameters. To validate the "
+                             "integrity or topology of a service both "
+                             "'--dpath' and '--dext' parameters must be "
+                             "specified.")
+                sys.exit(1)
+
+        elif caller == 'validate_function':
+            pass
+
+    def validate_project(self, project):
         """
         Validate a SONATA project.
         By default, it performs the following validations: syntax, integrity
         and network topology.
         :param project: SONATA project
-        :param syntax: specifies whether to validate syntax
-        :param integrity: specifies whether to validate integrity
-        :param topology: specifies whether to validate network topology
         :return: True if all validations were successful, False otherwise
         """
 
+        self._assert_configuration()
+        log.info("Validating project {0}. Syntax: {1}, Integrity: {2}, "
+                 "Topology: {3}"
+                 .format(project.project_root, self._syntax, self._integrity,
+                         self._topology))
+
+        log.debug("Loading project configuration")
+        self._dpath = project.vnfd_root
+        self._dext = project.descriptor_extension
+
         # load all project descriptors present at source directory
-        log.info("Loading project descriptors")
-        if not self._load_project_descriptors(project):
-            return False
+        log.debug("Loading project service")
+        nsd_file = Validator._load_project_service_file(project)
 
-        # validate syntax
-        log.info("Validating syntax of descriptors")
-        #if not self._validate_service_syntax(nsd):
-        #    return False
+        return self.validate_service(nsd_file)
 
-        # correlate/check reference integrity between descriptors
-        #self._validate_service_integrity()
-
-        # validate topology
-        log.info("Validating service network topology")
-        if not self._validate_service_topology():
-            return False
-
-        log.info("SUCCESS")
-        return True
-
-    def validate_service(self, nsd_file, dpath=DEFAULT_DPATH,
-                         dext=DEFAULT_DEXT, syntax=True, integrity=True,
-                         topology=True):
+    def validate_service(self, nsd_file):
         """
         Validate a SONATA service.
         By default, it performs the following validations: syntax, integrity
         and network topology.
         :param nsd_file: service descriptor filename
-        :param dpath: directory to search for function descriptors (VNFDs)
-        :param dext: extension of descriptor files (default: 'yml')
-        :param syntax: specifies whether to validate syntax
-        :param integrity: specifies whether to validate integrity
-        :param topology: specifies whether to validate network topology
         :return: True if all validations were successful, False otherwise
         """
 
-        # check validation parameters
-        if (integrity or topology) and not (dpath and dext):
-            log.critical("Invalid validation parameters. To validate the "
-                      "integrity or topology of a service both dpath and "
-                      "dext parameters must be specified.")
-            return
+        self._assert_configuration()
 
         log.info("Validating service. NSD file: '{0}', Syntax: {1}, "
                  "Integrity: {2}, Topology: {3}"
-                 .format(nsd_file, syntax, integrity, topology))
+                 .format(nsd_file, self._syntax, self._integrity,
+                         self._topology))
 
         # load service descriptor
         nsd = self._read_descriptor_file(nsd_file)
@@ -146,72 +190,64 @@ class Validator(object):
             log.critical("Failed to read service descriptor.")
             return
 
-        ns_id = self._store_service(nsd_file, nsd)
-        if not ns_id:
+        ns_cid = self._store_service(nsd_file, nsd)
+        if not ns_cid:
             log.critical("Couldn't store the service. ")
             return
 
         # validate service syntax
-        if syntax and not self._validate_service_syntax():
+        if self._syntax and not self._validate_service_syntax(ns_cid):
             return
 
-        if integrity and not self._validate_service_integrity(dpath, dext):
+        if self._integrity and not self._validate_service_integrity(ns_cid):
             return
 
-        log.info("SUCCESS. NSD ID: {0}"
-                 .format(self._get_ns_combo_id(nsd)))
+        if self._topology and not self._validate_service_topology(ns_cid):
+            return
+
+        log.info("SUCCESS. NSD ID: {0}".format(ns_cid))
         return True
 
-    def _validate_service_integrity(self, dpath, dext):
-        nsd = self._nsd['descriptor']
-        ns_combo_id = Validator._get_ns_combo_id(nsd)
+    def _validate_service_integrity(self, ns_cid):
 
-        log.info("Validating integrity of service '{0}'"
-                 .format(ns_combo_id))
+        log.info("Validating integrity of service '{0}'".format(ns_cid))
 
         # get referenced function descriptors (VNFDs)
-        vnfds = self._load_service_functions(dpath, dext)
-        if not vnfds:
-            log.critical("Failed to read service function descriptors.")
+        if not self._load_service_functions(ns_cid):
+            log.critical("Failed to read service function descriptors")
             return
 
+        # validate referenced function descriptors (VNFDs)
+        for vnf_cid in self._vnfs.keys():
+            vnfd_file = self._vnfs[vnf_cid]['file']
+            if not self.validate_function(vnfd_file):
+                return
 
+        return True
 
-
-
-
-
-
-
-
-    def validate_function(self, vnfd_path, dext=None, syntax=True,
-                          integrity=True, topology=True):
+    def validate_function(self, vnfd_path):
         """
         Validate one or multiple SONATA functions (VNFs).
         By default, it performs the following validations: syntax, integrity
         and network topology.
         :param vnfd_path: function descriptor (VNFD) filename or
                           a directory to search for VNFDs
-        :param syntax: specifies whether to validate syntax
-        :param integrity: specifies whether to validate integrity
-        :param topology: specifies whether to validate network topology
         :return: True if all validations were successful, False otherwise
         """
+        self._assert_configuration()
 
         # validate multiple VNFs
         if os.path.isdir(vnfd_path):
-            vnfd_files = Validator._list_files(vnfd_path, dext)
+            vnfd_files = Validator._list_files(vnfd_path, self._dext)
             for vnfd_file in vnfd_files:
-                if not self.validate_function(vnfd_file,
-                                              syntax=syntax,
-                                              integrity=integrity,
-                                              topology=topology):
+                if not self.validate_function(vnfd_file):
                     return
             return True
 
         log.info("Validating function. VNFD file: '{0}', Syntax: {1}, "
                  "Integrity: {2}, Topology: {3}"
-                 .format(vnfd_path, syntax, integrity, topology))
+                 .format(vnfd_path, self._syntax, self._integrity,
+                         self._topology))
 
         # load function descriptor
         vnfd = self._read_descriptor_file(vnfd_path)
@@ -220,98 +256,198 @@ class Validator(object):
             return
 
         # store function descriptor in cache for later usage
-        if not self._store_function(vnfd_path, vnfd):
-            log.critical("Duplicate VNF descriptors with combo ID: '{0}'"
-                         .format(Validator._get_vnf_combo_id(vnfd)))
+        vnf_cid = self._store_function(vnfd_path, vnfd)
+        if not vnf_cid:
+            log.critical("Couldn't store VNF of file '{0}'".format(vnfd_path))
             return
 
-        if syntax and not self._validate_function_syntax(vnfd):
+        if self._syntax and not self._validate_function_syntax(vnf_cid):
             return
 
-        if integrity and not self._validate_function_integrity(vnfd):
+        if self._integrity and not self._validate_function_integrity(vnf_cid):
             return
 
-        if topology and not self._validate_function_topology(vnfd):
+        if self._topology and not self._validate_function_topology(vnf_cid):
             return
 
-        log.info("SUCCESS. VNF ID: {0}"
-                 .format(self._get_vnf_combo_id(vnfd)))
+        log.info("SUCCESS. VNF ID: {0}".format(vnf_cid))
 
         return True
 
-    def _store_service(self, nsd_file, nsd):
-        ns_combo_id = Validator._get_ns_combo_id(nsd)
-        if self._nsd:
-            log.error("The service '{0}' was already stored in cache. Aborting"
-                      .format(ns_combo_id))
+    def _store_service(self, nsd_file, nsd, ns_graph=None):
+        ns_cid = Validator._get_ns_combo_id(nsd)
+        if ns_cid in self._nss and \
+                (self._nss[ns_cid]['descriptor'] != nsd or
+                 self._nss[ns_cid]['file'] != nsd_file):
+            log.error("The service '{0}' was already stored in cache with "
+                      "different values. Aborting."
+                      .format(ns_cid))
             return
 
-        self._nsd['descriptor'] = nsd
-        self._nsd['file'] = nsd_file
-        return ns_combo_id
+        self._nss[ns_cid] = {}
+        self._nss[ns_cid]['descriptor'] = nsd
+        self._nss[ns_cid]['file'] = nsd_file
+        self._nss[ns_cid]['graph'] = ns_graph
+        return ns_cid
 
-    def _store_function(self, vnfd_file, vnfd):
-        vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
-        if vnf_combo_id in self._vnfds.keys():
-            log.error("VNF '{0}' is already stored in cache. Aborting"
-                      .format(vnf_combo_id))
+    def _update_service(self, ns_cid, ns_file=None, nsd=None,
+                         ns_graph=None, parent=None):
+        if ns_cid not in self._vnfs.keys():
+            log.error("Update failure. Service '{0}' is not stored in cache."
+                      .format(ns_cid))
             return
 
-        self._vnfds[vnf_combo_id]['descriptor'] = vnfd
-        self._vnfds[vnf_combo_id]['file'] = vnfd_file
-        return vnf_combo_id
+        if ns_file:
+            self._vnfs[ns_cid]['file'] = ns_file
+        if nsd:
+            self._vnfs[ns_cid]['descriptor'] = ns_file
+        if ns_graph:
+            self._vnfs[ns_cid]['graph'] = ns_graph
+        if parent:
+            self._vnfs[ns_cid]['parent'] = parent
 
-    def _load_service_functions(self, dpath, dext):
+        return True
+
+    def _get_stored_service(self, ns_cid):
+        if ns_cid not in self._nss:
+            log.error("Service '{0}' is not stored in cache.".format(ns_cid))
+            return
+        return self._nss[ns_cid]
+
+    def _clear_stored_services(self):
+        self._nss.clear()
+
+    def _store_function(self, vnfd_file, vnfd, ns_vnf_id=None,
+                        vnf_graph=None, parent=None):
+        vnf_cid = Validator._get_vnf_combo_id(vnfd)
+
+        # verify if entry already exists and if its equal
+        if vnf_cid in self._vnfs.keys() and \
+                (self._vnfs[vnf_cid]['descriptor'] != vnfd or
+                 self._vnfs[vnf_cid]['file'] != vnfd_file):
+            log.error("VNF '{0}' is already stored in cache with different "
+                      "values. Aborting."
+                      .format(vnf_cid))
+            return
+
+        if vnf_cid not in self._vnfs.keys():
+            self._vnfs[vnf_cid] = {}
+
+        self._update_function(vnf_cid, vnf_file=vnfd_file, vnfd=vnfd,
+                              vnf_graph=vnf_graph, parent=parent)
+
+        # map service vnf_id to vnf_cid, if available
+        if ns_vnf_id:
+            self._map_vnf_cid(ns_vnf_id, vnf_cid)
+
+        return vnf_cid
+
+    def _update_function(self, vnf_cid, vnf_file=None, vnfd=None,
+                         vnf_graph=None, parent=None):
+        if vnf_cid not in self._vnfs.keys():
+            log.error("Update failure. VNF '{0}' is not stored in cache."
+                      .format(vnf_cid))
+            return
+
+        if vnf_file:
+            self._vnfs[vnf_cid]['file'] = vnf_file
+        if vnfd:
+            self._vnfs[vnf_cid]['descriptor'] = vnfd
+        if vnf_graph:
+            self._vnfs[vnf_cid]['graph'] = vnf_graph
+        if parent:
+            self._vnfs[vnf_cid]['parent'] = parent
+
+        return True
+
+    def _get_stored_function(self, vnf_cid):
+        if vnf_cid not in self._vnfs.keys():
+            log.error("Function '{0}' is not stored in cache."
+                      .format(vnf_cid))
+            return
+        return self._vnfs[vnf_cid]
+
+    def _clear_stored_functions(self):
+        self._vnfs.clear()
+
+    def _map_vnf_cid(self, ns_vnf_id, vnf_cid):
+        """
+        Maps a vnf_id referenced in section 'network_functions' of a service
+        to the vnf_cid (vendor.name.version).
+        :param ns_vnf_id: vnf identifier in service descriptor
+        :param vnf_cid: vnf combo identifier of function
+        :return: True if successful, None otherwise
+        """
+        if ns_vnf_id in self._vnf_cid_map.keys():
+            log.error("vnf_id='{0}' is already mapped to vnf_cid="
+                      "'{1}'. Aborting."
+                      .format(ns_vnf_id, self._get_mapped_vnf_cid(ns_vnf_id)))
+            return
+        self._vnf_cid_map[ns_vnf_id] = vnf_cid
+        return True
+
+    def _get_mapped_vnf_cid(self, ns_vnf_id, ):
+        """
+        Obtains the vnf_cid (vendor.name.version) of a function previously
+        mapped to a vnf_id of a service
+        :param ns_vnf_id: vnf identifier in service descriptor
+        :return: vnf combo identifier of function
+        """
+        if ns_vnf_id not in self._vnf_cid_map.keys():
+            log.error("vnf_id='{0}' is not mapped".format(ns_vnf_id))
+            return
+        return self._vnf_cid_map[ns_vnf_id]
+
+    def _load_service_functions(self, ns_cid):
+        """
+        Loads and stores functions (VNFs) referenced in the specified service
+        :param ns_cid: service identifier
+        :return: True if successful, None otherwise
+        """
+        nsd = self._get_stored_service(ns_cid)['descriptor']
 
         log.debug("Loading functions of the service.")
 
-        nsd = self._nsd['descriptor']
-
         # get VNFD file list from provided dpath
-        vnfd_files = Validator._list_files(dpath, dext)
-        log.debug("Found {0} VNF descriptors: {1} in dpath='{2}'"
-                  .format(len(vnfd_files), vnfd_files, dpath))
+        vnfd_files = Validator._list_files(self._dpath, self._dext)
+        log.debug("Found {0} descriptors in dpath='{2}': {1}"
+                  .format(len(vnfd_files), vnfd_files, self._dpath))
 
         # load all VNFDs
-        path_vnfds = Validator._read_descriptor_files(vnfd_files)
+        path_vnfs = Validator._read_descriptor_files(vnfd_files)
 
-        # pop function descriptors not referenced in the service
+        # check for errors
         if 'network_functions' not in nsd:
             log.error("Service doesn't have any functions. "
                       "Missing 'network_functions' section.")
             return
 
         functions = nsd['network_functions']
-        if functions and not path_vnfds:
+        if functions and not path_vnfs:
             log.error("Service references VNFs but none could be found in "
-                      "'{0}'. Please specify another dpath".format(dpath))
+                      "'{0}'. Please specify another '--dpath'"
+                      .format(self._dpath))
             return
 
-        vnfds = {}
-        self._vnf_id_map = {}
+        # store function descriptors referenced in the service
         for function in functions:
-            vnf_combo_id = Validator._build_combo_id(function['vnf_vendor'],
-                                                     function['vnf_name'],
-                                                     function['vnf_version'])
-            if vnf_combo_id not in path_vnfds.keys():
+            vnf_cid = Validator._build_combo_id(function['vnf_vendor'],
+                                                function['vnf_name'],
+                                                function['vnf_version'])
+            if vnf_cid not in path_vnfs.keys():
                 log.error("Referenced VNF descriptor '{0}' couldn't be "
-                          "found in path '{1}'"
-                          .format(vnf_combo_id, self._dpath))
+                          "found in path '{1}'".format(vnf_cid, self._dpath))
                 return
 
             vnf_id = function['vnf_id']
-            if vnf_combo_id in vnfds.keys():
-                log.error("Duplicate VNF entry in section "
-                          "'network_functions' with ID={}"
-                          .format(function['vnf_id']))
-                return
+            self._store_function(path_vnfs[vnf_cid]['file'],
+                                 path_vnfs[vnf_cid]['descriptor'],
+                                 ns_vnf_id=vnf_id,
+                                 parent=ns_cid)
+        return True
 
-            vnfds[vnf_id] = path_vnfds[vnf_combo_id]
-            self._vnf_id_map[vnf_combo_id] = vnf_id
-
-        return vnfds
-
-    def _load_project_descriptors(self, project):
+    @staticmethod
+    def _load_project_service_file(project):
         """
         Load descriptors from a SONATA SDK project.
         :param project: SDK project
@@ -331,86 +467,7 @@ class Validator(object):
                          .format(project.project_root, nsd_files))
             return False
 
-        return self._load_service_descriptors(nsd_files[0],
-                                              dpath=project.vnfd_root)
-
-
-        # read VNFD files in project source
-        vnfd_files = project.get_vnf_descriptors()
-        prj_vnfds = self._load_vnfd_files(vnfd_files)
-
-        if not prj_vnfds:
-            log.warning("Project source does not contain VNF descriptors")
-
-        # read NSD file and get its referenced function descriptors (VNFDS)
-        self._vnfds = {}
-
-        if len(self._nsd['network_functions']) > 0 and len(prj_vnfds) == 0:
-
-            return
-
-        for vnf in self._nsd['network_functions']:
-            vnf_combo_id = self._build_vnf_combo_id(vnf['vnf_vendor'],
-                                                    vnf['vnf_name'],
-                                                    vnf['vnf_version'])
-            if vnf_combo_id not in prj_vnfds.keys():
-                log.error("Referenced VNF descriptor '{0}' could not be found"
-                          .format(vnf_combo_id))
-                return
-            self._vnfds[vnf['vnf_id']] = prj_vnfds.pop(vnf_combo_id)
-            self._vnfd_files[vnf['vnf_id']] = prj_vnfd_files.pop(vnf_combo_id)
-
-        if len(prj_vnfds) > 0:
-            log.warning("The following VNFs are present in project sources "
-                        "but are not referenced in the service descriptor: {0}"
-                        .format(prj_vnfds.keys()))
-        return True
-
-    def _load_service_descriptors(self, nsd_file, dpath='.'):
-        log.debug("Loading service descriptor from file '{0}'"
-                  .format(nsd_file))
-
-        if not nsd_file:
-            log.critical("Provided service descriptor file is invalid.")
-            return False
-
-        # load service descriptor
-        self._load_service_descriptor(nsd_file)
-
-        # load VNFDs at provided path
-        vnfd_files = self._get_vnfd_files_from_dir(dpath)
-        path_vnfds = self._load_vnfd_files(vnfd_files)
-
-        # get referenced VNFDs
-        self._vnfds = {}
-        nsd_functions = self._nsd['network_functions']
-        if not nsd_functions:
-            log.warning("Service '{0}' does not have functions")
-            return
-
-        if not path_vnfds or len(path_vnfds) == 0:
-            return
-
-        if len(nsd_functions) > 0 and len(path_vnfds) == 0:
-            log.error("Service '{0}' references function "
-                      "descriptors (VNFs) but none were found in  the path "
-                      "'{1}'."
-                      .format(nsd_file, dpath))
-            return False
-
-        for vnf in nsd_functions:
-            vnf_combo_id = self._build_vnf_combo_id(vnf['vnf_vendor'],
-                                                    vnf['vnf_name'],
-                                                    vnf['vnf_version'])
-            if vnf_combo_id not in path_vnfds.keys():
-                log.error("Referenced VNF descriptor '{0}' could not be "
-                          "found in path '{1}'"
-                          .format(vnf_combo_id, dpath))
-                return False
-
-
-
-## TODO: different id, same combo_id! This is integrity!
+        return nsd_files[0]
 
     @staticmethod
     def _list_files(path, extension):
@@ -420,36 +477,38 @@ class Validator(object):
         :param path: directory to search for VNF descriptor files
         :return: list of VNF descriptor files
         """
-        vnfd_files = []
+        file_list = []
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(extension):
-                    vnfd_files.append(os.path.join(root, file))
-        return vnfd_files
+                    file_list.append(os.path.join(root, file))
+        return file_list
 
     @staticmethod
-    def _read_descriptor_files(vnfd_files):
+    def _read_descriptor_files(files):
         """
         Loads the VNF descriptors provided in the file list. It builds a
         dictionary of the loaded VNF descriptor files. Each entry has the
         key of the VNF combo ID, in the format 'vendor.name.version'.
-        :param vnfd_files: filename list of VNF descriptors
+        :param files: filename list of descriptors
         :return: Dictionary of VNF descriptor dictionaries. None if
         unsuccessful.
         """
-        vnfd_dict = {}
-        for vnfd_file in vnfd_files:
-            vnfd = Validator._read_descriptor_file(vnfd_file)
+        descriptors = {}
+        for file in files:
+            vnfd = Validator._read_descriptor_file(file)
             if not vnfd:
                 continue
-            vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
+            desc_cid = Validator._get_vnf_combo_id(vnfd)
 
-            if vnf_combo_id in vnfd_dict:
-                log.error("Duplicate VNF descriptor in file: '{0}'"
-                          .format(vnfd_file))
+            if desc_cid in descriptors.keys():
+                log.error("Duplicate descriptor in files: '{0}' <==> {1}"
+                          .format(file, descriptors[desc_cid]['file']))
                 continue
-            vnfd_dict[vnf_combo_id] = vnfd
-        return vnfd_dict
+            descriptors[desc_cid] = {}
+            descriptors[desc_cid]['descriptor'] = vnfd
+            descriptors[desc_cid]['file'] = file
+        return descriptors
 
     @staticmethod
     def _read_descriptor_file(file):
@@ -472,58 +531,52 @@ class Validator(object):
                 return
             return descriptor
 
-    def _validate_service_syntax(self):
+    def _validate_service_syntax(self, ns_cid):
         """
-        Validate a the syntax of a service and all of its descriptors.
-        :return:
+        Validate a the syntax of a service (NS) against its schema.
+        :param ns_cid: service identifier
+        :return: True if syntax is correct, None otherwise
         """
-        nsd = self._nsd['descriptor']
-        ns_combo_id = Validator._get_ns_combo_id(nsd)
-        log.info("Validating syntax of service '{0}'"
-                  .format(ns_combo_id))
+        log.info("Validating syntax of service '{0}'".format(ns_cid))
+        nsd = self._get_stored_service(ns_cid)['descriptor']
         if not self._schema_validator.validate(
               nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-            log.error("Invalid syntax in service: '{0}'"
-                      .format(ns_combo_id))
+            log.error("Invalid syntax in service: '{0}'".format(ns_cid))
             return
-
         return True
 
-    def _validate_function_syntax(self, vnfd):
+    def _validate_function_syntax(self, vnf_cid):
         """
         Validate the syntax of a function (VNF) against its schema.
-        :param vnfd: function descriptor dictionary
-        :return: True if syntax is correct
+        :param vnf_cid: function identifier
+        :return: True if syntax is correct, None otherwise
         """
-        vnf_combo_id = Validator._get_vnf_combo_id(vnfd)
-        log.debug("Validating syntax of function '{0}'"
-                  .format(vnf_combo_id))
+        log.info("Validating syntax of function '{0}'".format(vnf_cid))
+        vnfd = self._get_stored_function(vnf_cid)['descriptor']
         if not self._schema_validator.validate(
               vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-            log.error("Invalid syntax in function '{0}'"
-                      .format(vnf_combo_id))
+            log.error("Invalid syntax in function '{0}'".format(vnf_cid))
             return
-
         return True
 
-    def _validate_function_integrity(self, vnfd):
+    def _validate_function_integrity(self, vnf_cid):
         """
         Validate the integrity of a function (VNF).
         It checks for inconsistencies in the identifiers of connection
         points, virtual deployment units (VDUs), ...
-        :param vnfd: function descriptor dictionary
+        :param vnf_cid: function identifier
         :return: True if integrity is correct
         """
-        vnf_combo_id = self._get_vnf_combo_id(vnfd)
-        log.debug("Validating integrity of function descriptor '{0}'"
-                  .format(vnf_combo_id))
+        log.info("Validating integrity of function descriptor '{0}'"
+                 .format(vnf_cid))
+        vnfd = self._get_stored_function(vnf_cid)['descriptor']
 
         # get connection points of VNF
         cxpts = []
         for cxp in vnfd['connection_points']:
             if cxp['id'] in cxpts:
                 log.error("[VNF: {0}] Duplicate connection point: '{1}'"
-                          .format(vnf_combo_id, cxp['id']))
+                          .format(vnf_cid, cxp['id']))
                 return
             cxpts.append(cxp['id'])
 
@@ -533,217 +586,246 @@ class Validator(object):
                 if cxp['id'] in cxpts:
                     log.error("[VNF: {0}, VDU: {1}] Duplicate connection "
                               "point: '{2}'"
-                              .format(vnf_combo_id, vdu['id'], cxp['id']))
+                              .format(vnf_cid, vdu['id'], cxp['id']))
                     return
                 cxpts.append(cxp['id'])
 
         return True
 
-    def _validate_function_topology(self, vnfd):
-        """
-        Validate the network topology of a function.
-        It builds the network graph of the function, including VDU connections.
-        :param vnfd: function descriptor dictionary
-        :return: True if topology doesn't present issues
-        """
-        # build function network graph
-        fg = self._build_function_graph(vnfd)
-
-        # check for path cycles
 
 
-        return True
-
-
-    def _validate_service_topology(self):
+    def _validate_service_topology(self, ns_cid):
         """
         Validate the network topology of a service.
         :return:
         """
+        log.info("Validating topology of service '{0}'".format(ns_cid))
+
         # build service network graph
-        sg = self._build_service_graph()
-        if not sg:
+        if not self._build_service_graph(ns_cid):
             return
+
+
 
         # check for forwarding cycles
-        Validator._find_graph_cycles(sg, sg.nodes()[0])
+        ##Validator._find_graph_cycles(sg, sg.nodes()[0])
 
         return True
 
-    def _build_function_graph(self, vnfd):
+    def _validate_function_topology(self, vnf_cid):
         """
-        Build the network graph of a function.
-        This graph will be later used to check for invalid or cyclic paths.
-        :return:
+        Validate the network topology of a function.
+        It builds the network graph of the function, including VDU connections.
+        :param vnf_cid: function identifier
+        :return: True if topology doesn't present issues
         """
-        vnf_combo_id = self._get_vnf_combo_id(vnfd)
+        log.info("Validating topology of function '{0}'"
+                 .format(vnf_cid))
 
-        # function network graph
-        fg = nx.Graph()
-
-        if not Validator._assign_nodes(fg, vnf_combo_id, vnfd, level=1):
+        # build function network graph
+        if not self._build_function_graph(vnf_cid):
             return
 
-        if not Validator._assign_nodes(fg, vnf_combo_id, vnfd, level=2):
-            return
+        # store function graph
+        #self._vnfds
 
-        # add edges to the graph by reading the virtual links
-        if not Validator._assign_edges(fg, vnf_combo_id, vnfd, level=2):
-            return
+        # check for path cycles
 
         return True
 
-    @staticmethod
-    def _assign_nodes(graph, descriptor_id, descriptor, level=1):
-        # assign nodes
-        if level == 1:
-            # add connection points as nodes to the function graph
-            for cxp in descriptor['connection_points']:
-                if cxp['type'] == 'interface':
-                    log.debug("[VNF: {0}] Adding node '{1}'"
-                              .format(descriptor_id, cxp['id']))
-                    graph.add_node(cxp['id'], attr_dict={'level': 1})
-
-        elif level == 2:
-            for vdu in descriptor['virtual_deployment_units']:
-                for cxp in vdu['connection_points']:
-                    if cxp['type'] == 'interface':
-                        log.debug("[VNF: {0}, VDU: {1}] Adding node '{2}'"
-                                  .format(descriptor_id,
-                                          vdu['id'],
-                                          descriptor_id + '-' + cxp['id']))
-                        graph.add_node(descriptor_id + '-' + cxp['id'],
-                                       attr_dict={'level': 2,
-                                                  'parent': descriptor_id})
-
-        # remove nodes associated with E-LAN links
-        for vlink in descriptor['virtual_links']:
-            if vlink['connectivity_type'] != 'E-LAN':
-                continue
-            for ref_cxp in vlink['connection_points_reference']:
-                    if ref_cxp in graph.nodes():
-                        graph.remove_node(ref_cxp)
-                    elif descriptor_id + '-' + ref_cxp in graph.nodes():
-                        graph.remove_node(descriptor_id + '-' + ref_cxp)
-
-        return True
-
-    def _build_service_graph(self):
+    def _build_service_graph(self, ns_cid):
         """
         Build the network graph of a service.
         This graph will be later used for checking invalid or cyclic
         paths.
         :return:
         """
+        nsd = self._get_stored_service(ns_cid)['descriptor']
+
         # service network graph
         sg = nx.Graph()
 
-        # add connection points as nodes to the service graph
-        for cxp in self._nsd['connection_points']:
-            if cxp['type'] == 'interface':
-                sg.add_node(cxp['id'], attr_dict={'level': 0})
-        for vnf_id in self._vnfds.keys():
-            for cxp in self._vnfds[vnf_id]['connection_points']:
-                if cxp['type'] == 'interface':
-                    sg.add_node(vnf_id + ':' + cxp['id'],
-                                attr_dict={'level': 1, 'parents': vnf_id})
+        self._assign_nodes(sg, ns_cid, nsd, 0)
+        self._assign_edges(sg, ns_cid, nsd, 0)
 
-        # eliminate all connection points associated with bridged (E-LAN) links
-        for vlink in self._nsd['virtual_links']:
-            if vlink['connectivity_type'] != 'E-LAN':
-                continue
-            cxpoints = vlink['connection_points_reference']
-            for cxp in cxpoints:
-                sg.remove_node(cxp)
-
-        # add edges between functions to the graph
-        if not Validator._assign_edges(sg, 'ns', self._nsd):
-            return
-
-        # add VDU nodes and edges between them, within each function
-        for vnf_id in self._vnfds.keys():
-            vnfd = self._vnfds[vnf_id]
-
-            # add VDU connection points as nodes
-            for vdu in vnfd['virtual_deployment_units']:
-                for cxp in vdu['connection_points']:
-                    if cxp['type'] == 'interface':
-                        cxp_id = vnf_id + '-' + cxp['id']
-                        log.debug("Adding node '{0}'".format(cxp_id))
-                        sg.add_node(cxp_id, attr_dict={'level': 2,
-                                                       'parents':
-                                                           vnf_id + '.' +
-                                                           vdu['id']})
-
-            # eliminate all connection points associated with E-LAN links
-            for vlink in vnfd['virtual_links']:
-                if vlink['connectivity_type'] != 'E-LAN':
-                    continue
-                cxpoints = vlink['connection_points_reference']
-                for cxp in cxpoints:
-                    if vnf_id + '-' + cxp in sg.nodes():
-                        sg.remove_node(vnf_id + '-' + cxp)
-
-            # add edges based on virtual links of the VNF
-            if not Validator._assign_edges(sg, vnf_id, vnfd, level=2):
-                return
-
-            # add edges within VDU interfaces (VDUs cannot be decomposed)
-            for node_x in sg.nodes(data=True):
-                n_x = node_x[0]
-                attr_x = dict(node_x[1])
-                if attr_x['level'] != 2:
-                    continue
-                for node_y in sg.nodes(data=True):
-                    n_y = node_y[0]
-                    attr_y = dict(node_y[1])
-                    if attr_y['level'] != 2 or n_x == n_y:
-                        continue
-                    if attr_x['parents'] == attr_y['parents']:
-                        log.debug("Adding intra VDU edge: {0}<->{1}"
-                                  .format(n_x, n_y))
-                        sg.add_edge(n_x, n_y, attr_dict={'scope': 'intra'})
-
-        # TODO: remove temporary export of the graph
-        nx.write_graphml(sg, 'sample.graphml')
+        print(sg.edges())
+        Validator._find_graph_cycles(sg, sg.nodes()[0])
 
         return sg
 
+    def _build_function_graph(self, vnf_cid):
+        """
+        Build the network graph of a function.
+        This graph will be later used to check for invalid or cyclic paths.
+        :return:
+        """
+        log.debug("Building graph of vnf_cid='{}'".format(vnf_cid))
+
+        vnfd = self._get_stored_function(vnf_cid)['descriptor']
+
+        # function network graph
+        vnfg = nx.Graph()
+
+        # assign connection points as nodes, lvl=1 (VNF level)
+        if not Validator._assign_nodes(vnfg, vnf_cid, vnfd, 1):
+            return
+
+        if not Validator._assign_nodes(vnfg, vnf_cid, vnfd, 2):
+            return
+
+        # add edges to the graph by reading the virtual links
+        if not self._assign_edges(vnfg, vnf_cid, vnfd, 2):
+            return
+
+        self._update_function(vnf_cid, vnf_graph=vnfg)
+
+        return True
+
     @staticmethod
-    def _assign_edges(graph, descriptor_id, descriptor, level=1):
+    def _assign_nodes(graph, descriptor_id, descriptor, level):
+
+        # ensure 'connection_points' section exists in service or function
+        if 'connection_points' not in descriptor:
+            log.error("Descriptor='{}' is missing 'connection_points' section"
+                      .format(descriptor_id))
+            return
+
+        nodes = []
+        # gather nodes from connection points of services and functions
+        if level == 0 or level == 1:  # service (NS) and function levels (VNF)
+            nodes = (cxpt['id']
+                     for cxpt in descriptor['connection_points']
+                     if cxpt['type'] == 'interface')
+            if not nodes:
+                log.error("Descriptor='{}' doesn't have interface connection "
+                          "points".format(descriptor_id))
+                return
+
+        # gather nodes from connection points of VDUs
+        elif level == 2:  # unit level (VDU)
+            if 'virtual_deployment_units' not in descriptor:
+                log.error("Descriptor='{0}', doesn't contain a "
+                          "'virtual_deployment_units' section"
+                          .format(descriptor_id))
+                return
+
+            for vdu in descriptor['virtual_deployment_units']:
+                nodes += (cxpt['id']
+                          for cxpt in vdu['connection_points']
+                          if cxpt['type'] == 'interface')
+                if not nodes:
+                    log.error("Descriptor='{0}', VDU='{1}' doesn't have "
+                              "interface connection points"
+                              .format(descriptor_id, vdu['id']))
+                    return
+
+        # assign nodes to graph
+        for node in nodes:
+            log.debug("[vnf_id: {0}] Adding node '{1}'"
+                      .format(descriptor_id, node))
+
+            graph.add_node(node,
+                           attr_dict={'level': level, 'parent': descriptor_id})
+
+        # remove nodes associated with E-LAN links (TODO: temp!!)
+        for vlink in descriptor['virtual_links']:
+            if vlink['connectivity_type'] != 'E-LAN':
+                continue
+            for ref_cxp in vlink['connection_points_reference']:
+                    if ref_cxp in graph.nodes():
+                        log.debug("Removing node '{0}' due to being "
+                                  "associated with an E-LAN link"
+                                  .format(ref_cxp))
+                        graph.remove_node(ref_cxp)
+
+        return True
+
+    def _assign_edges(self, graph, descriptor_id, descriptor, level=0):
+        log.debug("Assigning edges to the graph with nodes: {0}"
+                  .format(graph.nodes()))
+
         for vlink in descriptor['virtual_links']:
             ctype = vlink['connectivity_type']
+
             # TODO: add support for 'E-Tree': topology not defined in schema!
             if ctype != 'E-Line':
                 continue
-            cxp_ref = vlink['connection_points_reference']
-            if len(cxp_ref) != 2:
+
+            cxpt_pair = vlink['connection_points_reference']
+            if len(cxpt_pair) != 2:
                 log.error("The virtual link '{0}' of type 'E-Line' must only "
                           "comprise 2 connection points"
                           .format(vlink['id']))
                 return
 
-            for idx, cxp in enumerate(cxp_ref):
+            for idx, cxpt in enumerate(cxpt_pair):
 
-                if not graph.has_node(cxp):
-                    parent_cxp = descriptor_id + ':' + cxp
-                    vdu_cxp = descriptor_id + '-' + cxp
-                    if level == 2 and graph.has_node(parent_cxp):
-                        cxp_ref[idx] = parent_cxp
-                    elif level == 2 and graph.has_node(vdu_cxp):
-                        cxp_ref[idx] = vdu_cxp
-                    else:
-                        log.error("[Level: {0}] The connection point '{1}' "
-                                  "defined in virtual link '{2}' is not "
-                                  "defined."
-                                  .format(level, cxp, vlink['id']))
+                # ensure cxpt exists in the graph
+                if not graph.has_node(cxpt):
+                    cxpt_keys = cxpt.split(Validator.CXPT_KEY_SEPARATOR)
+
+                    if len(cxpt_keys) == 1:
+                        log.error("The connection point '{0}' defined in "
+                                  "virtual link '{1}' is not defined"
+                                  .format(cxpt, vlink['id']))
                         return
-            log.debug("Adding edge between connection points: {0}<->{1}"
-                      .format(cxp_ref[0],
-                              cxp_ref[1]))
-            graph.add_edge(cxp_ref[0],
-                           cxp_ref[1])
+
+                    # should be a cxpt in format: 'vnf_id:cxpt_id' in NS level
+                    elif len(cxpt_keys) == 2 and level == 0:
+
+                        vnf_id = cxpt_keys[0]
+                        cxpt_id = cxpt_keys[1]
+
+                        # retrieve graph from the obtained vnf_id
+                        vnf_cid = self._get_mapped_vnf_cid(vnf_id)
+                        vnf = self._get_stored_function(vnf_cid)
+                        if 'graph' not in vnf:
+                            log.error("Couldn't retrieve stored graph for "
+                                      "VNF with ID='{0}' specified in "
+                                      "virtual link '{1}"
+                                      .format(vnf_id, vlink['id']))
+                            return
+                        vnf_graph = vnf['graph']
+
+                        # ensure cxpt exists within this VNF
+                        if cxpt_id not in vnf_graph.nodes():
+                            log.error("Couldn't retrieve connection point "
+                                      "'{0}' of VNF with ID='{1}' "
+                                      "specified in virtual link '{2}'"
+                                      .format(cxpt_id, vnf_id,
+                                              vlink['id']))
+                            return
+
+                        # add nodes to service graph with vnf_cid prefix
+                        prefix = vnf_cid + '/'
+                        prefix_map = dict.fromkeys(vnf_graph.nodes(),
+                                                   prefix)
+                        vnf_graph_copy = nx.relabel_nodes(vnf_graph,
+                                                          prefix_map,
+                                                          copy=True)
+                        graph.add_nodes_from(vnf_graph_copy)
+
+                        # change cxpt with the correct prefix
+                        cxpt_pair[idx] = prefix + cxpt
+
+                    else:
+                        log.error("The virtual link '{0}' contains an "
+                                  "invalid connection point: '{1}'"
+                                  .format(vlink['id'], cxpt))
+                        return
+
+            # add edge to the graph
+            log.debug("Adding edge '{0}' <---> '{1}'"
+                      .format(cxpt_pair[0], cxpt_pair[1]))
+            graph.add_edge(cxpt_pair[0], cxpt_pair[1])
+
         return True
+
+    @staticmethod
+    def _dot_join(a, b):
+        if not a or not b:
+            return
+        return a + '.' + b
 
     @staticmethod
     def _get_ns_combo_id(nsd):
@@ -851,7 +933,7 @@ def main():
         dest="vnfd",
         help="Validate the specified function descriptor. If a directory is "
              "specified, it will search for descriptor files with extension "
-             "defined in '--dformat' or default '{0}'",
+             "defined in '--dext'",
         required=False
     )
     parser.add_argument(
@@ -918,25 +1000,22 @@ def main():
             exit(1)
 
         validator = Validator(workspace=workspace)
-        validator.validate_project(project,
-                                   syntax=args.syntax,
-                                   integrity=args.integrity,
-                                   topology=args.topology)
+        validator.configure(syntax=args.syntax,
+                            integrity=args.integrity,
+                            topology=args.topology)
+        validator.validate_project(project)
+
     elif args.pd:
         pass
 
     elif args.nsd:
-
-        if not args.dpath:
-            args.dpath = Validator.DEFAULT_DPATH
-        if not args.dext:
-            args.dext = Validator.DEFAULT_DEXT
-
         validator = Validator()
-        validator.validate_service(args.nsd, dpath=args.dpath,
-                                   dext=args.dext, syntax=args.syntax,
-                                   integrity=args.integrity,
-                                   topology=args.topology)
+        validator.configure(dpath=args.dpath, dext=args.dext,
+                            syntax=args.syntax,
+                            integrity=args.integrity,
+                            topology=args.topology)
+
+        validator.validate_service(args.nsd)
 
     elif args.vnfd:
 
@@ -960,8 +1039,6 @@ def main():
 
         print(g3.edges())
 
-
         validator = Validator()
+        validator.configure(dext=args.dext)
         validator.validate_function(args.vnfd)
-
-
