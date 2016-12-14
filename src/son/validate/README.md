@@ -15,12 +15,10 @@ optional arguments:
   -w WORKSPACE_PATH, --workspace WORKSPACE_PATH
                         Specify the directory of the SDK workspace for
                         validating the SDK project. If not specified will
-                        assume the directory: '/home/lconceicao/.son-
-                        workspace'
+                        assume the directory: '$HOME/.son-workspace'
   --project PROJECT_PATH
                         Validate the service of the specified SDK project. If
-                        not specified will assume the current directory:
-                        '/home/lconceicao/projects/sonata/son-cli'
+                        not specified will assume the current directory.
   --package PD          Validate the specified package descriptor.
   --service NSD         Validate the specified service descriptor. The
                         directory of descriptors referenced in the service
