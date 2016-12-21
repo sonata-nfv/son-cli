@@ -150,7 +150,7 @@ class AccessClient:
     def push_package(self, token, path):
         """
         tbd
-        :return: 
+        :return:
         """
         mode = "push"
         url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
