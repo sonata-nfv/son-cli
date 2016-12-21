@@ -104,7 +104,7 @@ parser = argparse.ArgumentParser(description=description,
 # positional  arguments
 parser.add_argument(
     "command",
-    choices=['init', 'profile', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm'],
+    choices=['init', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)
@@ -113,9 +113,8 @@ parser.add_argument(
          flow_total : flow_entry + flow_mon
          init : start/stop the monitoring framework
          msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
-         profile : performance profiling (tba)
          dump: start tcpdump for specified interface (save as .pcap)
-         xterm: start an xterminal for specific vnf(s)
+         xterm: start an x-terminal for specific vnf(s)
          """)
 
 parser.add_argument(
@@ -129,11 +128,9 @@ parser.add_argument(
           Action for init:
           start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
           stop: stop the monitoring framework
-          Action for nsd:
-          start: start the monitoring metrics from the nsd
-          stop: start the monitoring metrics from the nsd
-          Action for xterm:
-          vnf names to start an xterm for
+          Action for msd:
+          start: start exporting the monitoring metrics from the msd
+          stop: stop exporting the monitoring metrics from the msd
           """)
 # vnf names to start an xterm for
 parser.add_argument(
@@ -194,14 +191,14 @@ parser.add_argument(
     help="weight edge attribute to calculate the path")
 parser.add_argument(
     "--match", "-ma", dest="match",
-    help="string holding extra matches for the flow entries")
+    help="string to specify how to match the monitored flow")
+parser.add_argument(
+    "--priority", "-p", dest="priority",
+    help="priority of the flow match entry, installed to get counter metrics for the monitored flow.")
 parser.add_argument(
     "--bidirectional", "-b", dest="bidirectional",
     action='store_false',
     help="add/remove the flow entries from src to dst and back")
-parser.add_argument(
-    "--priority", "-p", dest="priority",
-    help="priority of the installed flowrule")
 
 ## arguments specific for metric/flow monitoring
 parser.add_argument(
@@ -210,10 +207,11 @@ parser.add_argument(
     help="tx_bytes, rx_bytes, tx_packets, rx_packets")
 parser.add_argument(
     "--cookie", "-c", dest="cookie",
-    help="flow cookie to monitor")
+    help="integer value to identify this flow monitor rule")
 parser.add_argument(
     "--file", "-f", dest="file",
     help="service descriptor file describing monitoring rules or pcap dump file")
+
 
 def main():
 

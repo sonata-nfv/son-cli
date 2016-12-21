@@ -41,37 +41,45 @@ prometheus_port = '9090'
 prometheus_REST_api = 'http://{0}:{1}'.format(prometheus_ip, prometheus_port)
 
 # translate metric names to the prometheus query
-metric2total_query = {
-    "rx_packet_count": "container_network_receive_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
-    "tx_packet_count": "container_network_transmit_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
-    "rx_bytes_count": "container_network_receive_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
-    "tx_bytes_count": "container_network_transmit_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}"
-}
+
 metric2flowquery = {
+    'tx_packet_rate': 'rate(sonemu_tx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}[3s])',
+    'rx_packet_rate': 'rate(sonemu_rx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}[3s])',
+    'tx_byte_rate': 'rate(sonemu_tx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}[3s])',
+    'rx_byte_rate': 'rate(sonemu_rx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}[3s])',
     'tx_packet_count': 'sonemu_tx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
     'rx_packet_count': 'sonemu_rx_count_packets{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
     'tx_byte_count': 'sonemu_tx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}',
     'rx_byte_count': 'sonemu_rx_count_bytes{{flow_id=\"{0}\",vnf_name=\"{1}\",vnf_interface=\"{2}\"}}'
 }
-metric2totalflowquery = {
-    'tx_packet_count': 'sonemu_tx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
-    'rx_packet_count': 'sonemu_rx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
-    'tx_byte_count': 'sonemu_tx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
-    'rx_byte_count': 'sonemu_rx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}'
-}
 
-metric2vnfquery = {
+compute2vnfquery = {
     "cpu" : "sum(rate(container_cpu_usage_seconds_total{{name=\"mn.{0}\"}}[3s]))*100",
     "mem" : "container_memory_usage_bytes{{name=\"mn.{0}\"}}",
+}
+
+network2vnfquery = {
     'tx_packet_rate': 'rate(sonemu_tx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
     'rx_packet_rate': 'rate(sonemu_rx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
     'tx_byte_rate': 'rate(sonemu_tx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
     'rx_byte_rate': 'rate(sonemu_rx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}[3s])',
+    'tx_packet_count': 'sonemu_tx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'rx_packet_count': 'sonemu_rx_count_packets{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'tx_byte_count': 'sonemu_tx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'rx_byte_count': 'sonemu_rx_count_bytes{{flow_id=\"None\",vnf_name=\"{0}\",vnf_interface=\"{1}\"}}',
+    'tx_packet_rate_cadv': 'rate(container_network_transmit_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}[3s])',
+    'rx_packet_rate_cadv': 'rate(container_network_receive_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}[3s])',
+    'tx_byte_rate_cadv': 'rate(container_network_transmit_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}[3s])',
+    'rx_byte_rate_cadv': 'rate(container_network_receive_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}[3s])',
+    "rx_packet_count_cadv": "container_network_receive_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "tx_packet_count_cadv": "container_network_transmit_packets_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "rx_bytes_count_cadv": "container_network_receive_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}",
+    "tx_bytes_count_cadv": "container_network_transmit_bytes_total{{name=\"mn.{0}\",interface=\"{1}\"}}"
 }
 
-profile2vnfquery = {
-    "jitter" : "sonemu_jitter_ms{vnf_name=\"profile_sink\"}",
-    "packet_loss": "sonemu_packet_loss_percent{vnf_name=\"profile_sink\"}"
+test2vnfquery = {
+    "jitter" : "sonemu_jitter_ms{vnf_name=\"{0}\"}",
+    "packet_loss": "sonemu_packet_loss_percent{vnf_name=\"{0}\"}"
 }
 
 def query_Prometheus(query):
