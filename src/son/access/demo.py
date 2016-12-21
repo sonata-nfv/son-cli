@@ -11,14 +11,13 @@ import requests
 from multiprocessing import Process
 from tests.mock import main as mocked
 
-#dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-#sys.path.extend([str(dir)])
+# dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+# sys.path.extend([str(dir)])
 
 class mcolors:
      OKGREEN = '\033[92m'
      FAIL = '\033[91m'
      ENDC = '\033[0m'
-
 
      def disable(self):
          self.OKGREEN = ''
@@ -53,9 +52,7 @@ def main():
     command = "sudo python %s.py %s -U %s" % (mode, url, pkg)
     print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
     result = os.popen(command).read()
-    #print command
     print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC
-    #print result
 
     time.sleep(3)
 
@@ -63,9 +60,7 @@ def main():
     command = "sudo python %s.py %s --list_packages" % (mode, url)
     print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
     result = os.popen(command).read()
-    #print command
     print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC
-    #print result
 
 processes = []
 

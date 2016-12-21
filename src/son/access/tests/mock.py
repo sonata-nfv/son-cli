@@ -25,27 +25,27 @@ def token(data):
 def payload(username):
     """
     try:
-            user = User.objects.get(email=post_data['email'])
-            user.match_password(post_data['password'])
-        except (User.DoesNotExist, User.PasswordDoesNotMatch):
-            return json_response({'message': 'Wrong credentials'}, status=400)
+        user = User.objects.get(email=post_data['email'])
+        user.match_password(post_data['password'])
+    except (User.DoesNotExist, User.PasswordDoesNotMatch):
+        return json_response({'message': 'Wrong credentials'}, status=400)
 
-        payload = {
+    payload = {
             'user_id': user.id,
             'exp': datetime.utcnow() + timedelta(seconds=self.JWT_EXP_DELTA_SECONDS)
-        }
-        jwt_token = jwt.encode(payload, self.JWT_SECRET, self.JWT_ALGORITHM)
-        return json_response({'token': jwt_token.decode('utf-8')})
+    }
+    jwt_token = jwt.encode(payload, self.JWT_SECRET, self.JWT_ALGORITHM)
+    return json_response({'token': jwt_token.decode('utf-8')})
     """
 
     return {
-    'exp':  time.time() + 60 * 60,
-    'iat': time.time(),
-    'iss': 'JWT_ISSUER',
-    'scopes': ['get_services', 'get_functions', 'get_packages'],
-    'user': {
-      'username': username
-    }
+        'exp':  time.time() + 60 * 60,
+        'iat': time.time(),
+        'iss': 'JWT_ISSUER',
+        'scopes': ['get_services', 'get_functions', 'get_packages'],
+        'user': {
+            'username': username
+        }
     }
 
 
