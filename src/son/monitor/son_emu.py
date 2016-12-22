@@ -290,7 +290,7 @@ class emu():
         #process.wait()
         return process
 
-
+    # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
         actions = {'start': put, 'stop': delete}
@@ -308,6 +308,7 @@ class emu():
         response = actions[action](url)
         return response.json()
 
+    # export flow traffic counter, of a manually pre-installed flow entry, specified by its cookie
     def flow_mon(self, action, vnf_name, metric, cookie, **kwargs):
         # check required arguments
         actions = {'start': self.session.put, 'stop': self.session.delete}
@@ -319,44 +320,14 @@ class emu():
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
 
-        url = construct_url(self.url, 'restapi/monitor/vnf',
+        url = construct_url(self.url, 'restapi/monitor/flow',
                             vnf_name2, vnf_interface, metric, cookie)
 
         response = actions[action](url)
 
         return response.json()
 
-    def flow_entry_old(self, action, source, destination, **args):
-        # check required arguments
-        actions = {'start': self.session.put, 'stop':self.session.delete}
-        if not valid_arguments(source, destination):
-            return "arguments not valid"
-        if actions.get(action) is None:
-            return "Action argument not valid"
-
-        vnf_src_name = parse_vnf_name(source)
-        vnf_dst_name = parse_vnf_name(destination)
-
-        params = create_dict(
-            vnf_src_interface=parse_vnf_interface(source),
-            vnf_dst_interface=parse_vnf_interface(destination),
-            weight=args.get("weight"),
-            match=args.get("match"),
-            bidirectional=args.get("bidirectional"),
-            priority=args.get("priority"),
-            cookie=args.get("cookie"),
-            skip_vlan_tag=True,
-            monitor=args.get("monitor"),
-            monitor_placement=args.get("monitor_placement") )
-
-        response = actions[action]("{0}/restapi/network/{1}/{2}".format(
-                    self.url,
-                    vnf_src_name,
-                    vnf_dst_name),
-                    json=params)
-
-        return response.json()
-
+    # install a flow match entry in the datacenter and export the flow counters
     def flow_entry(self, action, source, destination, **args):
         # check required arguments
         actions = {'start': self.session.put, 'stop':self.session.delete}
@@ -388,6 +359,8 @@ class emu():
 
         return response.json()
 
+    # install monitoring of a specific flow on a pre-existing link in the service.
+    # the traffic counters of the newly installed monitor flow are exported
     def flow_total(self, action, source, destination, metric, cookie, **kwargs):
         # check required arguments
         actions = {'start': self.session.put, 'stop': self.session.delete}
@@ -422,54 +395,6 @@ class emu():
         # first add this specific flow to the emulator network
         ret1 = self.flow_entry(action ,source, destination, **params)
         return_value = "flow-entry:\n{0}".format(ret1)
-        return return_value
-
-    def flow_total_old(self, action, source, destination, metric, cookie, **kwargs):
-        # check required arguments
-        actions = {'start': self.session.put, 'stop': self.session.delete}
-        if not valid_arguments(source, destination, cookie):
-            return "arguments not valid"
-        if actions.get(action) is None:
-            return "Action argument not valid"
-
-        vnf_src_name = parse_vnf_name(source)
-        vnf_dst_name = parse_vnf_name(destination)
-
-        monitor_placement = None
-        if 'rx' in metric:
-            monitor_placement = 'rx'
-        elif 'tx' in metric:
-            monitor_placement = 'tx'
-
-
-        params = create_dict(
-            vnf_src_interface=parse_vnf_interface(source),
-            vnf_dst_interface=parse_vnf_interface(destination),
-            weight=kwargs.get("weight"),
-            match=kwargs.get("match"),
-            bidirectional=kwargs.get("bidirectional"),
-            priority=kwargs.get("priority"),
-            cookie=cookie,
-            skip_vlan_tag=True,
-            monitor=True,
-            monitor_placement=monitor_placement)
-
-        # first add this specific flow to the emulator network
-        ret1 = self.flow_entry(action ,source, destination, **params)
-        # then export its metrics (from the src and dst vnf_interface)
-        if kwargs.get("bidirectional") == True:
-            ret3 = self.flow_mon(action, destination, metric, cookie)
-            ret2 = self.flow_mon(action, source, metric, cookie)
-
-        elif 'rx' in metric:
-            ret3 = self.flow_mon(action, destination, metric, cookie)
-            ret2 = ''
-
-        elif 'tx' in metric:
-            ret2 = self.flow_mon(action, source, metric, cookie)
-            ret3 = ''
-
-        return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
         return return_value
 
     def query(self, vnf_name, query, datacenter=None, **kwargs):
