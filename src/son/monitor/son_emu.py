@@ -21,9 +21,9 @@ acknowledge the contributions of their colleagues of the SONATA
 partner consortium (www.sonata-nfv.eu).
 """
 
-from requests import get, put, delete
+from requests import get, put, delete, Session
 from son.monitor.utils import *
-from son.monitor.prometheus import query_Prometheus, metric2total_query, metric2flowquery, metric2totalflowquery, metric2vnfquery, profile2vnfquery
+from son.monitor.prometheus import query_Prometheus
 from son.monitor.grafana_lib import Grafana
 import son.monitor.profiler as profiler
 from subprocess import Popen
@@ -37,8 +37,13 @@ import select
 from time import sleep
 from threading import Thread
 
+from son.monitor.msd import msd as msd_object
+
+import re
+
 import logging
 logging.basicConfig(level=logging.INFO)
+#logging.getLogger("requests").setLevel(logging.WARNING)
 
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -47,22 +52,9 @@ pp = pprint.PrettyPrinter(indent=4)
 This class implements the son-emu commands via its REST api.
 """
 
-COOKIE_START = 100
-
-metric2flow_metric = {
-    "rx_packet_count": "rx_packets",
-    "tx_packet_count": "tx_packets",
-    "rx_byte_count": "tx_bytes",
-    "tx_byte_count": "tx_bytes",
-    "rx_packet_rate": "rx_packets",
-    "tx_packet_rate": "tx_packets",
-    "rx_byte_rate": "tx_bytes",
-    "tx_byte_rate": "tx_bytes"
-}
-
 class emu():
 
-    def __init__(self, REST_api):
+    def __init__(self, REST_api, ip='localhost', vm=False, user=None, password=None):
         self.url = REST_api
         self.tmp_dir = '/tmp/son-monitor'
         self.docker_dir = '/tmp/son-monitor/docker'
@@ -75,8 +67,20 @@ class emu():
 
         self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
 
+        # remote son-emu parameters
+        self.son_emu_ip = ip
+        self.emu_in_vm = vm
+        self.ssh_user = user
+        self.ssh_password = password
+
+
         self.grafana = None
 
+        # Build up our session
+        self.session = Session()
+        self.session.headers = {
+            "Accept": "application/json; charset=UTF-8"
+        }
 
     def init(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
@@ -93,39 +97,32 @@ class emu():
         actions = {'start': self.start_msd, 'stop': self.stop_msd}
         return actions[action](**kwargs)
 
-    # parse the nsd file and install the grafana metrics
-    def start_nsd(self, file=None, **kwargs):
-        self.grafana = Grafana()
-        self.grafana.init_dashboard()
-        self.grafana.parse_nsd(file)
-
-        return 'nsd metrics installed'
-
-    def stop_nsd(self, **kwargs):
-        self.grafana.init_dashboard()
-
-    # parse the msd file and export the metrics ffrom son-emu and show in grafana
+    # parse the msd file and export the metrics from son-emu and show in grafana
     def start_msd(self, file=None, **kwargs):
 
         # also start son-monitor containers
         self.start_containers()
+
+        # initialize msd object
+        msd_obj = msd_object(file, self)
+        msd_obj.start()
 
         # Parse the msd file
         logging.info('parsing msd: {0}'.format(file))
         msd = load_yaml(file)
 
         # initialize a new Grafana dashboard
-        self.grafana = Grafana()
-        dashboard_name = msd['dashboard']
-        self.grafana.init_dashboard(title=dashboard_name)
+        #self.grafana = Grafana()
+        #dashboard_name = msd['dashboard']
+        #self.grafana.init_dashboard(title=dashboard_name)
 
         # Install the vnf metrics
-        self.install_vnf_metrics(msd, dashboard_name)
+        #self.install_vnf_metrics(msd, dashboard_name)
 
         # install the link metrics
         #first make sure everything is stopped
         #self.install_nsd_links(msd, 'stop', dashboard_name)
-        self.install_nsd_links(msd, 'start', dashboard_name)
+        #self.install_nsd_links(msd, 'start', dashboard_name)
 
         # execute the SAP commands
         # first make sure everything is stopped
@@ -136,16 +133,20 @@ class emu():
 
     def stop_msd(self, file=None, **kwargs):
 
+        # initialize msd object
+        msd_obj = msd_object(file, self)
+        msd_obj.stop()
+
         logging.info('parsing msd: {0}'.format(file))
         msd = load_yaml(file)
 
         # clear the dashboard
-        self.grafana = Grafana()
-        dashboard_name = msd['dashboard']
-        self.grafana.del_dashboard(title=dashboard_name)
+        #self.grafana = Grafana()
+        #dashboard_name = msd['dashboard']
+        #self.grafana.del_dashboard(title=dashboard_name)
 
         # delete all installed flow_metrics
-        self.install_nsd_links(msd, 'stop', dashboard_name)
+        #self.install_nsd_links(msd, 'stop', dashboard_name)
 
         # kill all the SAP commands
         self.install_sap_commands(msd, "stop")
@@ -170,119 +171,13 @@ class emu():
                     else:
                         cmd = 'sudo docker exec -it ' + sap_docker_name + ' ' + cmd
 
-                    thread = Thread(target=self.ssh_cmd, kwargs=dict(cmd=cmd, username='steven', password='test'))
+                    thread = Thread(target=self.ssh_cmd, kwargs=dict(cmd=cmd, username=self.ssh_user, password=self.ssh_password))
                     thread.start()
                     if wait:
                         thread.join()
                     #process = self.ssh_cmd(cmd, username='steven', password='test', wait=wait)
                 elif sap['method'] == 'son-emu-local':
                     process = self.docker_exec_cmd(cmd, sap_docker_name)
-
-    # Install the vnf metrics (cpu, mem, interface packet rate)
-    def install_vnf_metrics(self, msd, dashboard_name):
-
-        vnf_metrics = msd['vnf_metrics']
-        for metric_group in vnf_metrics:
-            graph_list = []
-
-            title = metric_group['desc']
-            metric_type = metric_group['type']
-
-            logging.info('metric_type:{0}'.format(metric_type))
-            if metric_type in ["jitter", "packet_loss"]:
-                query = profile2vnfquery[metric_type]
-                graph_dict = dict(desc=title, metric=query)
-                graph_list.append(graph_dict)
-
-            elif len(metric_group.get('vnf_ids',[])) == 0:
-                # no vnfs need to be monitored
-                continue
-
-            for vnf_id in metric_group.get('vnf_ids',[]):
-                graph_dict = {}
-
-                if metric_type in ["packet_rate", "byte_rate"]:
-                    metric_type2 = vnf_id['direction'] + "_" + metric_type
-                    vnf_name = parse_vnf_name(vnf_id['vnf'])
-                    vnf_interface = parse_vnf_interface(vnf_id['vnf'])
-                    flow_metric = metric2flow_metric[metric_type2]
-                    self.interface('start', vnf_name + ':' + vnf_interface, flow_metric)
-                    query = metric2vnfquery[metric_type2].format(vnf_name, vnf_interface)
-                    desc = vnf_id['vnf'] + ':' + vnf_id['direction']
-                    graph_dict = dict(desc=desc, metric=query)
-
-                elif metric_type in ["cpu", "mem"]:
-                    query = metric2vnfquery[metric_type].format(vnf_id)
-                    graph_dict = dict(desc=vnf_id, metric=query)
-
-                else:
-                    logging.info("No query found for metric type: {0}".format(metric_type))
-                    continue
-
-                graph_list.append(graph_dict)
-
-            self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=dashboard_name)
-
-    # install or delete all installed flow_metrics
-    def install_nsd_links(self, msd, action, dashboard_name):
-        # install the link metrics
-        cookie = COOKIE_START
-        for nsd_link in msd['nsd_links']:
-            graph_list = []
-            if nsd_link['metrics'] is None:
-                # no vnfs need to be monitored
-                break
-            title = nsd_link['desc']
-            metric_type = nsd_link['metric_type']
-            source = nsd_link['source']
-            destination = nsd_link['destination']
-            if 'rx' in metric_type:
-                vnf_name = parse_vnf_name(destination)
-                vnf_interface = parse_vnf_interface(destination)
-            elif 'tx' in metric_type:
-                vnf_name = parse_vnf_name(source)
-                vnf_interface = parse_vnf_interface(source)
-
-            for metric in nsd_link['metrics']:
-                graph_dict = {}
-
-                # an interface metric exported from cAdvisor
-                if metric['type'] == "total":
-                    if action == 'stop': continue
-                    query = metric2total_query[metric_type].format(
-                        vnf_name, vnf_interface)
-                    graph_dict = dict(desc=metric['desc'], metric=query)
-                # an interface metric as an interface packet counter from the son-emu network switch
-                elif metric['type'] == "flow_total":
-                    flow_metric = metric2flow_metric[metric_type]
-                    self.interface(action, vnf_name + ':' + vnf_interface, flow_metric)
-                    if action == 'stop' : continue
-                    query = metric2totalflowquery[metric_type].format(vnf_name, vnf_interface)
-                    graph_dict = dict(desc=metric['desc'], metric=query)
-                # a metric as a custom flow counter from the son-emu network switch
-                elif metric['type'] == "flow":
-                    flow_metric = metric2flow_metric[metric_type]
-                    source = nsd_link['source']
-                    destination = nsd_link['destination']
-                    match = metric['match']
-                    #install the flow and export the metric
-                    if action == 'stop':
-                        self.flow_total(action, source, destination, flow_metric, cookie)
-                        cookie += 1
-                        continue
-                    else:
-                        self.flow_total(action, source, destination, flow_metric, cookie, match=match,
-                                        bidirectional=False, priority=100)
-                        query = metric2flowquery[metric_type].format(cookie, vnf_name, vnf_interface)
-                        graph_dict = dict(desc=metric['desc'], metric=query)
-                        cookie += 1
-
-                if action == 'start':
-                    graph_list.append(graph_dict)
-
-            if action == 'start':
-                self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=dashboard_name, graph_type='bars')
-
 
     # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
     def start_containers(self, **kwargs):
@@ -320,7 +215,7 @@ class emu():
         process.wait()
 
         # Wait a while for containers to be completely started
-        sleep(2)
+        sleep(4)
         return 'son-monitor started'
 
     # start the sdk monitoring framework
@@ -357,7 +252,7 @@ class emu():
 
         return 'son-monitor stopped'
 
-    def ssh_cmd(self, cmd, host='localhost', port=22, username='vagrant', password='vagrant'):
+    def ssh_cmd(self, cmd, host='localhost', port=22, username=None, password=None):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         # ssh.connect(mgmt_ip, username='steven', password='test')
@@ -373,14 +268,13 @@ class emu():
                 rl, wl, xl = select.select([stdout.channel], [], [], 0.0)
                 if len(rl) > 0:
                     # Print data from stdout
-                    logging.info(stdout.channel.recv(1024))
+                    logging.info(stdout.channel.recv(1024).decode("utf-8"))
                     timer = 0
             else:
                 timer += 1
                 sleep(1)
 
         ssh.close()
-
 
     def docker_exec_cmd(self, cmd, docker_name):
         cmd_list = shlex.split(cmd)
@@ -396,8 +290,8 @@ class emu():
         #process.wait()
         return process
 
-
-    def interface(self, action, vnf_name, metric, **kwargs):
+    # export a network interface traffic rate counter
+    def monitor_interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
         actions = {'start': put, 'stop': delete}
         if not valid_arguments(action, vnf_name, metric):
@@ -408,15 +302,16 @@ class emu():
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
 
-        url = construct_url(self.url, 'restapi/monitor',
+        url = construct_url(self.url, 'restapi/monitor/vnf',
                             vnf_name2, vnf_interface, metric)
 
         response = actions[action](url)
         return response.json()
 
+    # export flow traffic counter, of a manually pre-installed flow entry, specified by its cookie
     def flow_mon(self, action, vnf_name, metric, cookie, **kwargs):
         # check required arguments
-        actions = {'start': put, 'stop': delete}
+        actions = {'start': self.session.put, 'stop': self.session.delete}
         if not valid_arguments(action, vnf_name, metric, cookie):
             return "Function arguments not valid"
         if actions.get(action) is None:
@@ -425,16 +320,17 @@ class emu():
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
 
-        url = construct_url(self.url, 'restapi/flowmon',
+        url = construct_url(self.url, 'restapi/monitor/flow',
                             vnf_name2, vnf_interface, metric, cookie)
 
         response = actions[action](url)
 
         return response.json()
 
+    # install a flow match entry in the datacenter and export the flow counters
     def flow_entry(self, action, source, destination, **args):
         # check required arguments
-        actions = {'start': put, 'stop': delete}
+        actions = {'start': self.session.put, 'stop':self.session.delete}
         if not valid_arguments(source, destination):
             return "arguments not valid"
         if actions.get(action) is None:
@@ -450,9 +346,12 @@ class emu():
             match=args.get("match"),
             bidirectional=args.get("bidirectional"),
             priority=args.get("priority"),
-            cookie=args.get("cookie"))
+            cookie=args.get("cookie"),
+            skip_vlan_tag=True,
+            monitor=args.get("monitor"),
+            monitor_placement=args.get("monitor_placement") )
 
-        response = actions[action]("{0}/restapi/network/{1}/{2}".format(
+        response = actions[action]("{0}/restapi/monitor/link/{1}/{2}".format(
                     self.url,
                     vnf_src_name,
                     vnf_dst_name),
@@ -460,9 +359,11 @@ class emu():
 
         return response.json()
 
+    # install monitoring of a specific flow on a pre-existing link in the service.
+    # the traffic counters of the newly installed monitor flow are exported
     def flow_total(self, action, source, destination, metric, cookie, **kwargs):
         # check required arguments
-        actions = {'start': put, 'stop': delete}
+        actions = {'start': self.session.put, 'stop': self.session.delete}
         if not valid_arguments(source, destination, cookie):
             return "arguments not valid"
         if actions.get(action) is None:
@@ -471,6 +372,13 @@ class emu():
         vnf_src_name = parse_vnf_name(source)
         vnf_dst_name = parse_vnf_name(destination)
 
+        monitor_placement = None
+        if 'rx' in metric:
+            monitor_placement = 'rx'
+        elif 'tx' in metric:
+            monitor_placement = 'tx'
+
+
         params = create_dict(
             vnf_src_interface=parse_vnf_interface(source),
             vnf_dst_interface=parse_vnf_interface(destination),
@@ -478,24 +386,15 @@ class emu():
             match=kwargs.get("match"),
             bidirectional=kwargs.get("bidirectional"),
             priority=kwargs.get("priority"),
-            cookie=cookie)
+            cookie=cookie,
+            skip_vlan_tag=True,
+            monitor=True,
+            monitor_placement=monitor_placement,
+            metric=metric)
 
         # first add this specific flow to the emulator network
         ret1 = self.flow_entry(action ,source, destination, **params)
-        # then export its metrics (from the src and dst vnf_interface)
-        if kwargs.get("bidirectional") == True:
-            ret3 = self.flow_mon(action, destination, metric, cookie)
-            ret2 = self.flow_mon(action, source, metric, cookie)
-
-        elif 'rx' in metric:
-            ret3 = self.flow_mon(action, destination, metric, cookie)
-            ret2 = ''
-
-        elif 'tx' in metric:
-            ret2 = self.flow_mon(action, source, metric, cookie)
-            ret3 = ''
-
-        return_value = "flow-entry:\n{0} \nflow-mon src:\n{1} \nflow-mon dst:\n{2}".format(ret1, ret2, ret3)
+        return_value = "flow-entry:\n{0}".format(ret1)
         return return_value
 
     def query(self, vnf_name, query, datacenter=None, **kwargs):
@@ -550,8 +449,99 @@ class emu():
                 datacenter = vnf[1]['datacenter']
         return datacenter
 
+    def _find_dc_interface(self, vnf_name, vnf_interface):
+        datacenter = None
+        vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+        network = []
+        dc_portname = None
+        for vnf in vnf_list:
+            if vnf[0] == vnf_name:
+                network = vnf[1]['network']
+                break
+        for intf_dict in network:
+            if intf_dict['intf_name'] == vnf_interface:
+                dc_portname = intf_dict['dc_portname']
+                break
+        return dc_portname
+
     # find the public ip address where we can log into the node
     def _find_public_ip(self, vnf_name):
         dc_label = self._find_dc(vnf_name)
         vnf_status = get("{0}/restapi/compute/{1}/{2}".format(self.url, dc_label, vnf_name)).json()
         return vnf_status['docker_network']
+
+    # start tcpdump for this interface
+    def dump(self, action, vnf_name, file, **kwargs):
+
+        if action == 'stop':
+            #kill tcpdump
+            Popen(['pkill', '-9', 'tcpdump'])
+            return 'tcpdump stopped'
+
+        elif action == 'start':
+            vnf_name2 = parse_vnf_name(vnf_name)
+            vnf_interface = parse_vnf_interface(vnf_name)
+            dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
+            log_string = "dump {0} at {1}".format(vnf_name, dc_portname)
+            logging.info(log_string)
+
+            process = self._tcpdump(dc_portname, file=file, title=log_string)
+            logging.info("Close tcpdump window to stop capturing or do son-monitor dump stop")
+
+            return 'tcpdump started'
+
+    def _tcpdump(self, interface, file=None, options='', title='tcpdump'):
+
+        tcpdump_cmd = "tcpdump -i {0} ".format(interface) + options
+        #wireshark can also be started with -i option
+
+        pcap_option = ' '
+        if file:
+            # start tcpdump in background
+            pcap_option = ' -w {0} -U'.format(file)
+            tcpdump_cmd = tcpdump_cmd + pcap_option
+            return Popen(shlex.split(tcpdump_cmd))
+        else:
+            #start tcpdump in xterm
+            xterm_cmd = "xterm -xrm 'XTerm.vt100.allowTitleOps: false' -T {0} -hold -e {1}".format("'"+title+"'", tcpdump_cmd)
+            #logging.info(xterm_cmd)
+            return Popen(shlex.split(xterm_cmd))
+
+    # start an xterm for the specfified vnfs
+    def xterm(self, vnf_names, **kwargs):
+        # start xterm for all vnfs
+        if len(vnf_names) == 0:
+            vnf_list = get("{0}/restapi/compute".format(self.url)).json()
+            vnf_names = [vnf[0] for vnf in vnf_list]
+
+        for vnf_name in vnf_names:
+            terminal_cmd = "docker exec -it mn.{0} /bin/bash".format(vnf_name)
+            if self.emu_in_vm:
+                terminal_cmd = "./ssh_login.exp {0} {1} {2} '{3}'".format(self.son_emu_ip, self.ssh_user,
+                                                                       self.ssh_password, terminal_cmd)
+            cmd = ['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
+                   '-e', terminal_cmd]
+            Popen(cmd)
+
+        return 'xterms started for {0}'.format(vnf_names)
+
+    # exec ute a command in a VNF
+    def exec(self, vnf_name, docker_command, action, loop=False):
+        sap = {}
+        sap['sap_name'] = vnf_name
+        sap['method'] = 'son-emu-VM-ssh'
+        sap['wait'] = True
+        sap['commands'] = []
+        p = re.compile("{(.*)}M")
+        m = p.search(docker_command)
+        arg_list = m.group(1).split(',')
+
+        #construct commands
+
+        msd = {'saps':[sap]}
+        #execute commands
+        self.install_sap_commands(self, msd, action)
+
+
+
+

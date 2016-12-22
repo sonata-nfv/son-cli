@@ -54,7 +54,7 @@ setup(
         package_data= {
             'son': ['schema/tests/son-schema/*', 'workspace/samples/*',
                     'monitor/docker/*', 'monitor/grafana/*',
-                    'monitor/prometheus/*']
+                    'monitor/prometheus/*', 'monitor/*.exp']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
