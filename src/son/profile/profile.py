@@ -29,62 +29,111 @@ import tempfile
 import argparse
 import logging
 import coloredlogs
-import yaml
+import time
+from termcolor import colored
+from tabulate import tabulate
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
+from son.profile.sonpkg import extract_son_package, SonataServicePackage
+from son.profile.helper import read_yaml
 
 LOG = logging.getLogger(__name__)
 
+"""
+Configurations:
+"""
+SON_PKG_INPUT_DIR = "input_service"  # location of input package contents in args.work_dir
+SON_PKG_SERVICE_DIR = "output_services"  # location of generated services in args.work_dir
+SON_PKG_OUTPUT_DIR = "output_packages"  # location of generated packages in args.work_dir
+
 
 class ProfileManager(object):
+    """
+    Main component class.
+    """
 
     def __init__(self, args):
+        self.start_time = time.time()
         self.service_experiments = list()
         self.function_experiments = list()
+        self.generated_services = list()
         # arguments
         self.args = args
         self.args.config = os.path.join(os.getcwd(), self.args.config)
+        self.son_pkg_input_dir = os.path.join(self.args.work_dir, SON_PKG_INPUT_DIR)
+        self.son_pkg_service_dir = os.path.join(self.args.work_dir, SON_PKG_SERVICE_DIR)
+        self.son_pkg_output_dir = os.path.join(self.args.work_dir, SON_PKG_OUTPUT_DIR)
         # logging setup
         coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
         LOG.info("SONATA profiling tool initialized")
         LOG.debug("Arguments: %r" % self.args)
+
+    def run(self):
+        """
+        Run son-profile
+        :return:
+        """
         # try to load PED file
         self.ped = self._load_ped_file(self.args.config)
         self._validate_ped_file(self.ped)
-        # load and populate experiments
-        self.service_experiments, self.function_experiments = self._generate_experiments(self.ped)
+        # unzip *.son package to be profiled and load its contents
+        extract_son_package(self.ped, self.son_pkg_input_dir)
+        self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
+        # load and populate experiment specifications
+        self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
+        # generate experiment services (modified NSDs, VNFDs for each experiment run)
+        self.generated_services = self.generate_experiment_services()
+        # package experiment services
+        self.package_experiment_services()
+        # print generation statistics
+        self.print_generation_and_packaging_statistics()
 
     @staticmethod
     def _load_ped_file(ped_path):
+        """
+        Loads the specified PED file.
+        :param ped_path: path to file
+        :return: dictionary
+        """
         yml = None
         try:
-            with open(ped_path, "r") as f:
-                try:
-                    yml = yaml.load(f)
-                except yaml.YAMLError as ex:
-                    LOG.exception("YAML error in PED file. Abort.")
-                    exit(1)
+            yml = read_yaml(ped_path)
+            if yml is None:
+                raise BaseException("PED file YMAL error.")
         except:
             LOG.error("Couldn't load PED file %r. Abort." % ped_path)
             exit(1)
+        # add path annotation to ped file (simpler handling of referenced artifacts)
+        yml["ped_path"] = ped_path
         LOG.info("Loaded PED file %r." % ped_path)
         return yml
 
     @staticmethod
-    def _validate_ped_file(ped_data):
+    def _validate_ped_file(input_ped):
+        """
+        Semantic validation of PED file contents.
+        Check for all things we need to have in PED file.
+        :param input_ped: ped dictionary
+        :return: None
+        """
         try:
-            if "service_package" not in ped_data:
+            if "service_package" not in input_ped:
                 raise BaseException("No service_package field found.")
-            if "service_experiments" not in ped_data:
+            if "service_experiments" not in input_ped:
                 raise BaseException("No service_experiments field found.")
-            if "function_experiments" not in ped_data:
+            if "function_experiments" not in input_ped:
                 raise BaseException("No function_experiments field found.")
             # TODO extend this when PED format is finally fixed
         except:
             LOG.exception("PED file verification error:")
 
     @staticmethod
-    def _generate_experiments(input_ped):
+    def _generate_experiment_specifications(input_ped):
+        """
+        Create experiment objects based on the contents of the PED file.
+        :param input_ped: ped dictionary
+        :return: service experiments list, function experiments list
+        """
         service_experiments = list()
         function_experiments = list()
 
@@ -102,18 +151,88 @@ class ProfileManager(object):
 
         return service_experiments, function_experiments
 
-    def _load_son_package(self, son_path):
-        pass
+    def generate_experiment_services(self):
+        """
+        Generate SONATA service projects for each experiment and its configurations. The project is based
+        on the contents of the service package referenced in the PED file and loaded to self.son_pkg_input.
+        The generated project files are stored in self.args.work_dir.
+        :return: list of service objects
+        """
+        services = list()
+        # generate service objects
+        for e in self.service_experiments:
+            services += e.generate_sonata_services(self.son_pkg_input)
+        for e in self.function_experiments:
+            services += e.generate_sonata_services(self.son_pkg_input)
+        LOG.info("Generated %d services." % len(services))
+        # write services to disk
+        for s in services:
+            s.write(self.son_pkg_service_dir)
+        LOG.info("Wrote %d services to disk." % len(services))
+        return services
 
-    def generate_profiling_services(self):
-        pass
+    def package_experiment_services(self):
+        """
+        Use son-package to package all previously generated service projects.
+        :param services: list of service objects.
+        :return:
+        """
+        for s in self.generated_services:
+            son_pkg_path = s.pack(self.son_pkg_output_dir)
+            # reset loglevel (ugly, but workspace and packaging tool overwrite it)
+            coloredlogs.install(level="DEBUG" if self.args.verbose else "INFO")
+            LOG.debug(
+                "Packaged service %r to %r" % (s, son_pkg_path))
+        LOG.info("Packaged %d services." % len(self.generated_services))
 
-    def package_profiling_services(self):
-        pass
+    def print_generation_and_packaging_statistics(self):
+
+        def b(txt):
+            return colored(txt, attrs=['bold'])
+
+        def get_pkg_time(e):
+            return sum([s.pack_time for s in e.generated_services])
+
+        def get_pkg_size(e):
+            return sum([float(s.pkg_file_size) / 1024 for s in e.generated_services])
+
+        def generate_table():
+            rows = list()
+            # header
+            rows.append([b("Experiment"), b("Num. Pkg."), b("Pkg. Time (s)"), b("Pkg. Sizes (kB)")])
+            # body
+            sum_pack_time = 0.0
+            sum_file_size = 0.0
+            for e in self.service_experiments:
+                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
+                sum_pack_time += get_pkg_time(e)
+                sum_file_size += get_pkg_size(e)
+            for e in self.function_experiments:
+                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
+                sum_pack_time += get_pkg_time(e)
+                sum_file_size += get_pkg_size(e)
+            # footer
+            rows.append([b("Total"), b(len(self.generated_services)), b(sum_pack_time), b(sum_file_size)])
+            return rows
+
+        print(b("-" * 80))
+        print(b("SONATA Profiler: Experiment Package Generation Report"))
+        print(b("-" * 80))
+        print("")
+        print(tabulate(generate_table(), headers="firstrow", tablefmt="orgtbl"))
+        print("")
+        print("Temporary service projects path: %s" % b(self.son_pkg_service_dir))
+        print("Generated service packages path: %s" % b(self.son_pkg_output_dir))
+        print("Total time: %s" % b("%.4f" % (time.time() - self.start_time)))
+        print("")
 
 
-def parse_args():
 
+def parse_args(manual_args=None):
+    """
+    CLI interface definition.
+    :return:
+    """
     parser = argparse.ArgumentParser(
         description="Manage and control VNF and service profiling experiments.")
 
@@ -163,9 +282,16 @@ def parse_args():
         dest="no_execution",
         action="store_true")
 
+    if manual_args is not None:
+        return parser.parse_args(manual_args)
     return parser.parse_args()
 
 
 def main():
+    """
+    Program entry point
+    :return: None
+    """
     args = parse_args()
     p = ProfileManager(args)
+    p.run()

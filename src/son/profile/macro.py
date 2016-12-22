@@ -26,7 +26,7 @@
 
 import logging
 import coloredlogs
-#import numpy as np
+# import numpy as np
 import re
 LOG = logging.getLogger(__name__)
 
@@ -36,20 +36,37 @@ DEFAULT_STEP = 1.0
 
 
 def rewrite_parameter_macros_to_lists(d):
-
+    """
+    Search for macros in dictionary values and expand the to lists.
+    :param d: input dict
+    :return: result dict
+    """
     for k, v in d.items():
         if is_macro(v):
             d[k] = macro_to_list(v)
+    return d
 
 
 def is_macro(s):
-        if isinstance(s, str):
-            if "${" in s:  # TODO improve: use regex
-                return True
-        return False
+    """
+    Checks if string is a parameter macro.
+    :param s: string
+    :return: bool
+    """
+    if isinstance(s, str):
+        if "${" in s:  # TODO improve: use regex
+            return True
+    return False
 
 
 def macro_to_list(m):
+    """
+    Parses macro and translates it to a list.
+    Loop macro: Unroll loop and create list.
+    List macro: Translate macro list to Python list.
+    :param m: macro as string
+    :return: list
+    """
     if "to" in m:
         # loop macro
         return loop_macro_to_list(m)
@@ -59,6 +76,11 @@ def macro_to_list(m):
 
 
 def loop_macro_to_list(m):
+    """
+    Unroll macro loop to list.
+    :param m: macro string
+    :return: list
+    """
     r = list()
     m = m.strip("${}")
     m = re.split('to|step', m)
@@ -73,6 +95,11 @@ def loop_macro_to_list(m):
 
 
 def list_macro_to_list(m):
+    """
+    Translate macro list to Python list.
+    :param m: macro sting
+    :return: list
+    """
     m = m.strip("${}")
     m = re.split(',', m)
     m = [float(i) for i in m]
@@ -80,6 +107,15 @@ def list_macro_to_list(m):
 
 
 def frange(start, stop, step):
+    """
+    Floating point range generator.
+    Own implementation to avoid numpy dependency.
+    :param start: float
+    :param stop: float
+    :param step: float
+    :return: None
+    """
+    # TODO ugly. Replace by numpy.arange or linspace.
     x = start
     while True:
         if x >= stop:

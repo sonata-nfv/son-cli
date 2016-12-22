@@ -185,8 +185,7 @@ class SchemaValidator(object):
         except ValidationError as e:
             log.error("Failed to validate Descriptor against schema '{}'"
                       .format(schema_id))
-
-            log.debug(e)
+            log.debug(e.message)
             return
 
         except SchemaError as e:

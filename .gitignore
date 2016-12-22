@@ -1,5 +1,5 @@
 # from https://github.com/github/gitignore/blob/master/Python.gitignore
-
+venv/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -71,5 +71,5 @@ bin/
 # ide trash
 .idea
 
-# ignore son-validate, for now
-validate/
+# ignore graphml files
+*.graphml

@@ -54,6 +54,14 @@ class Project:
         return self._prj_root
 
     @property
+    def nsd_root(self):
+        return os.path.join(self._prj_root, 'sources', 'nsd')
+
+    @property
+    def vnfd_root(self):
+        return os.path.join(self._prj_root, 'sources', 'vnf')
+
+    @property
     def project_config(self):
         return self._prj_config
 
@@ -105,7 +113,7 @@ class Project:
         :param name:The VNF name
         """
         vnf_subdirs = {'fsm'}
-        vnf_path = os.path.join(self._prj_root, 'sources', 'vnf', name)
+        vnf_path = os.path.join(self.vnfd_root, name)
         self._create_sample('vnf', vnf_path)
         for d in vnf_subdirs:
             path = os.path.join(vnf_path, d)
@@ -115,8 +123,7 @@ class Project:
         """
         Function to create a new NSD inside project source.
         """
-        nsd_path = os.path.join(self._prj_root, 'sources', 'nsd')
-        self._create_sample('nsd', nsd_path)
+        self._create_sample('nsd', self.nsd_root)
 
     def _create_prj_stub(self):
         """
@@ -143,10 +150,9 @@ class Project:
         Obtain the file list of VNF descriptors
         :return:
         """
-        nsd_root = os.path.join(self._prj_root, 'sources', 'nsd')
-        nsd_list = [os.path.join(nsd_root, file)
-                    for file in os.listdir(nsd_root)
-                    if os.path.isfile(os.path.join(nsd_root, file)) and
+        nsd_list = [os.path.join(self.nsd_root, file)
+                    for file in os.listdir(self.nsd_root)
+                    if os.path.isfile(os.path.join(self.nsd_root, file)) and
                     file.endswith(self._descriptor_extension)]
 
         if len(nsd_list) == 0:
@@ -163,9 +169,8 @@ class Project:
         Obtain the file list of VNF descriptors
         :return:
         """
-        vnf_root = os.path.join(self._prj_root, 'sources', 'vnf')
         vnfd_list = []
-        for root, dirs, files in os.walk(vnf_root):
+        for root, dirs, files in os.walk(self.vnfd_root):
             for file in files:
                 if file.endswith(self._workspace.descriptor_extension):
                     vnfd_list.append(os.path.join(root, file))
