@@ -46,10 +46,13 @@ class mcolors:
          self.ENDC = ''
 
 
-class Push:
+class Push(object):
     """
     This is an updated implementation of the son-push tool
     to re-use son-publish/CatalogueClient and push components.
+    Modified CatalogueClient class is integrated to communicate
+    to SP Catalogue component through son-gtkapi on SP Gatekeeper
+    (only descriptors).
 
     This tool is responsible of POSTing descriptors.
 
@@ -60,15 +63,6 @@ class Push:
 
     This version currently interoperates with the dummy
     gatekeeper provided by the son-emu tool.
-    """
-    def __init__(self):
-        platform_url = "http://sp.int3.sonata-nfv.eu:32001/packages"
-    pass
-
-class PushCatalogueClient(object):
-    """
-    Modified CatalogueClient class to communicate to SP Catalogue component
-    through son-gtkapi on SP Gatekeeper (only descriptors)
     """
 
     CAT_URI_BASE = "/"
@@ -104,7 +98,7 @@ class PushCatalogueClient(object):
         :return: True=server OK,
                  False=server unavailable
         """
-        url = self._base_url + PushCatalogueClient.CAT_URI_BASE
+        url = self._base_url + Push.CAT_URI_BASE
         try:
             response = requests.get(url,
                                     auth=self._auth,
@@ -127,37 +121,6 @@ class PushCatalogueClient(object):
 
         return response.status_code == requests.codes.ok
 
-    def post_ns(self, nsd_data):
-        """
-        Publishes a NS descriptor to the catalogue server
-        :param nsd_data:
-        :return:
-        """
-        response = self.__post_cat_object__(
-            PushCatalogueClient.CAT_URI_NS, nsd_data)
-
-        if response and response.status_code != requests.codes.ok:
-            log.error("Publishing failed. "
-                      "HTTP code: {}".format(response.status_code))
-            return
-
-        return response
-
-    def post_vnf(self, vnf_data):
-        """
-        Publishes a VNF descriptor to the catalogue server
-        :param vnf_data:
-        :return:
-        """
-        response = self.__post_cat_object__(
-            PushCatalogueClient.CAT_URI_VNF, vnf_data)
-        if response is not None and response.status_code != requests.codes.ok:
-            log.error("Publishing failed. "
-                      "HTTP code: {}".format(response.status_code))
-            return
-
-        return response
-
     def __post_cat_object__(self, cat_uri, obj_data):
         """
         Generic POST function.
@@ -177,122 +140,118 @@ class PushCatalogueClient(object):
 
         except requests.exceptions.ConnectionError:
             log.error("Connection error to server '{}'. VNF publishing "
-                      "failed".format(PushCatalogueClient.CAT_URI_VNF))
+                      "failed".format(Push.CAT_URI_VNF))
             return
 
+    def post_ns(self, nsd_data):
+        """
+        Publishes a NS descriptor to the catalogue server
+        :param nsd_data:
+        :return:
+        """
+        response = self.__post_cat_object__(
+            Push.CAT_URI_NS, nsd_data)
 
-def upload_package(platform_url, package_file_name):
-    """
-    Upload package to platform
+        if response and response.status_code != requests.codes.ok:
+            log.error("Publishing failed. "
+                      "HTTP code: {}".format(response.status_code))
+            return
 
-    :param platform_url: url of the SONATA service
-                         platform/gatekeeper or emulator
-                         to upload package to
+        return response
 
-    :param package_file_name: filename including full
-                              path of the package
-                              to be uploaded
+    def post_vnf(self, vnf_data):
+        """
+        Publishes a VNF descriptor to the catalogue server
+        :param vnf_data:
+        :return:
+        """
+        response = self.__post_cat_object__(
+            Push.CAT_URI_VNF, vnf_data)
+        if response is not None and response.status_code != requests.codes.ok:
+            log.error("Publishing failed. "
+                      "HTTP code: {}".format(response.status_code))
+            return
 
-    :returns: text response message of the server or
-              error message
-    """
-    import os
+        return response
 
-    if not os.path.isfile(package_file_name):
-        return package_file_name, "is not a file."
+    def upload_package(self, platform_url, package_file_name):
+        """
+        Upload package to platform
 
-    # Packages on GK
-    url = platform_url + "/packages"
-    # son-packages on catalogue
-    #url = platform_url + "/son-packages"
+        :param platform_url: url of the SONATA service
+                             platform/gatekeeper or emulator
+                             to upload package to
 
-    if not validators.url(url):
-        return url, "is not a valid url."
+        :param package_file_name: filename including full
+                                  path of the package
+                                  to be uploaded
 
-    print mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC
-    try:
-        with open(package_file_name, 'rb') as pkg_file:
-            r = requests.post(url, files={'package': pkg_file})
-            if r.status_code == 201:
-                msg = "Upload succeeded"
-            elif r.status_code == 409:
-                msg = "Package already exists"
-            else:
-                msg = "Upload error"
-            return "%s (%d): %r" % (msg, r.status_code, r.text)
+        :returns: text response message of the server or
+                  error message
+        """
+        import os
 
-    except Exception as e:
-        return "Service package upload failed. " + e
+        if not os.path.isfile(package_file_name):
+            return package_file_name, "is not a file."
 
-'''
-def instantiate_package(platform_url, service_uuid=""):
-    """
-    Instantiate service on SONATA service platform
+        # Packages on GK
+        url = platform_url + "/packages"
+        # son-packages on catalogue
+        #url = platform_url + "/son-packages"
 
-    :param platform_url: url of the SONATA service
-                         platform/gatekeeper or emulator
-                         to upload package to
+        if not validators.url(url):
+            return url, "is not a valid url."
 
-    :param service_uuid: uuid of the service package
-                         (requires it to be available
-                         on the platform)
+        print mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC
+        try:
+            with open(package_file_name, 'rb') as pkg_file:
+                r = requests.post(url, files={'package': pkg_file})
+                if r.status_code == 201:
+                    msg = "Upload succeeded"
+                elif r.status_code == 409:
+                    msg = "Package already exists"
+                else:
+                    msg = "Upload error"
+                return "%s (%d): %r" % (msg, r.status_code, r.text)
 
-    :returns: text response message of the server
-    """
-    # TODO: to be removed (default choice) after testing
-    try:
-        if len(service_uuid) == 0:
-            service_uuid = package_list(platform_url)[0]
-        if service_uuid == "last":
-            service_uuid = package_list(platform_url)[0]
+        except Exception as e:
+            return "Service package upload failed. " + e
 
-        if service_uuid not in package_list(platform_url):
-            return "Given service uuid does not exist on the platform."
+    '''
+    def instantiate_package(platform_url, service_uuid=""):
+        """
+        Instantiate service on SONATA service platform
 
-        url = platform_url+"/instantiations"
+        :param platform_url: url of the SONATA service
+                             platform/gatekeeper or emulator
+                             to upload package to
 
-        r = requests.post(url, json={"service_uuid": service_uuid})
+        :param service_uuid: uuid of the service package
+                             (requires it to be available
+                             on the platform)
 
-        return r.text
+        :returns: text response message of the server
+        """
+        # TODO: to be removed (default choice) after testing
+        try:
+            if len(service_uuid) == 0:
+                service_uuid = package_list(platform_url)[0]
+            if service_uuid == "last":
+                service_uuid = package_list(platform_url)[0]
 
-    except Exception as e:
-        return "Service could not be instantiated. " + e
-'''
+            if service_uuid not in package_list(platform_url):
+                return "Given service uuid does not exist on the platform."
 
+            url = platform_url+"/instantiations"
 
-def _get_from_url(url):
-    """
-    Generic/internal function to fetch content of a given URL
+            r = requests.post(url, json={"service_uuid": service_uuid})
 
-    :param url: url of the website to be queried
-    :returns: text response of the server
-    """
-    if not validators.url(url):
-        raise Exception(url+" is not a valid url.")
+            return r.text
 
-    try:
-        r = requests.get(url)
-        return r.text
-    except:
-        raise Exception("Content cannot be downloaded from "+url)
+        except Exception as e:
+            return "Service could not be instantiated. " + e
+    '''
 
-
-def get_packages(url):
-    return _get_from_url(url+"/packages")
-
-'''
-def get_instances(url):
-    return _get_from_url(url + "/instantiations")
-
-'''
-
-def package_list(url):
-    return loads(get_packages(url)).get("service_uuid_list")
-
-'''
-def instance_list(url):
-    return loads(get_instances(url)).get("service_instantiations_list")
-'''
 
 def main():
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
@@ -305,9 +264,7 @@ def main():
     examples = """Example usage:
 
     son-push http://127.0.0.1:5000 -U sonata-demo.son
-    son-push http://127.0.0.1:5000 --list_packages
     son-push http://127.0.0.1:5000 --deploy_package <uuid>
-    son-push http://127.0.0.1:5000 -I
     """
     parser = ArgumentParser(
         description=description,
@@ -317,16 +274,6 @@ def main():
     parser.add_argument(
         "platform_url",
         help="url of the gatekeeper/platform/emulator")
-
-    parser.add_argument(
-        "-P", "--list_packages",
-        help="List packages uploaded to the platform",
-        action="store_true")
-
-    parser.add_argument(
-        "-I", "--list_instances",
-        help="List deployed packages on the platform",
-        action="store_true")
 
     parser.add_argument(
         "-U", "--upload_package",
@@ -341,19 +288,16 @@ def main():
     if not args.platform_url:
         print("Platform url is required.")
 
-    if args.list_packages:
-        print mcolors.OKGREEN + "PUSH - Getting Package list...\n", mcolors.ENDC
-        print(get_packages(args.platform_url))
-
-    #if args.list_instances:
-    #    print(get_instances(args.platform_url))
+    # TODO: Add url -> Read from settings
+    push_client = Push(base_url=args.platform_url)
+    # push_client = Push(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.upload_package:
         print mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC
-        print(upload_package(args.platform_url, args.upload_package))
+        print(push_client.upload_package(args.platform_url, args.upload_package))
 
     #if args.deploy_package_uuid:
-    #    print(instantiate_package(args.platform_url, args.deploy_package_uuid))
+    #    print(push_client.instantiate_package(args.platform_url, args.deploy_package_uuid))
 
 if __name__ == '__main__':
     main()

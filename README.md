@@ -254,6 +254,29 @@ Example usage:
 
 ```
 
+### son-access
+Authenticate the developer to gain access to the Service Platform.
+Once authenticated, it allows the developer to submit packages to the Service Platform
+Catalogues and request resources (packages and/or descriptors) from the Service Platform Catalogues.
+```
+usage: son-access [-h]
+                  [--auth URL] [-u USERNAME] [-p PASSWORD]
+                  [--push TOKEN_PATH PACKAGE_PATH]
+                  [--pull TOKEN_PATH PACKAGE_ID]
+                  [--pull TOKEN_PATH DESCRIPTOR_ID]
+                  [--debug]
+
+  -h, --help                        show this help message and exit
+  --auth URL                        requests an Access token to authenticate the user,
+                                    it requires platform url to login,
+  -u USERNAME                       username of the user,
+  -p PASSWORD                       password of the user
+  --push TOKEN_PATH PACKAGE_PATH    submits a package to the SP, requires path to the token file and package
+  --pull TOKEN_PATH PACKAGE_ID      requests a package or descriptor to the SP by its identifier,
+                    DESCRIPTOR_ID   requires path to the token file
+  --debug                           increases logging level to debug
+```
+
 ### son-monitor
 Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
 Generate and/or export metrics that are useful for debugging and analyzing the service performance.

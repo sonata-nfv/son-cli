@@ -46,11 +46,12 @@ class mcolors:
          self.ENDC = ''
 
 
-class Pull:
+class Pull(object):
     """
-    Early implementation of the retrieving tool. it will be a
+    Early implementation of the retrieving tool. It will be a
     extension/modification of CatalogueClient from SDK Catalogue
-    API.
+    API.Modified CatalogueClient class to communicate to SP Catalogue
+    component through son-gtkapi on SP Gatekeeper (only descriptors).
 
     This tool is responsible of GETting descriptors.
 
@@ -58,17 +59,6 @@ class Pull:
     Platform Gatekeeper. As these API's are still under
     construction, functionality as well as implementation
     of this module probably change continuously.
-    """
-
-    def __init__(self):
-        platform_url = "http://sp.int3.sonata-nfv.eu:32001/"
-    pass
-
-
-class PullCatalogueClient(object):
-    """
-    Modified CatalogueClient class to communicate to SP Catalogue component
-    through son-gtkapi on SP Gatekeeper (only descriptors)
     """
 
     CAT_URI_BASE = "/"
@@ -104,7 +94,7 @@ class PullCatalogueClient(object):
         :return: True=server OK,
                  False=server unavailable
         """
-        url = self._base_url + CatalogueClient.CAT_URI_BASE
+        url = self._base_url + self.CAT_URI_BASE
         try:
             response = requests.get(url,
                                     auth=self._auth,
@@ -128,7 +118,7 @@ class PullCatalogueClient(object):
         return response.status_code == requests.codes.ok
 
     def get_list_all_ns(self):
-        return self.__get_cat_object__(CatalogueClient.CAT_URI_NS, "")
+        return self.__get_cat_object__(self.CAT_URI_NS, "")
 
     def get_ns(self, ns_id):
         """
@@ -136,7 +126,7 @@ class PullCatalogueClient(object):
         :param ns_id: ID of NS in the form 'vendor.ns_name.version'
         :return: yaml object containing NS
         """
-        cat_obj = self.__get_cat_object__(CatalogueClient.CAT_URI_NS_ID, ns_id)
+        cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_id)
         if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_id))
@@ -152,11 +142,11 @@ class PullCatalogueClient(object):
         :return: (str) list of network services
         """
         return self.__get_cat_object__(
-            CatalogueClient.CAT_URI_NS_NAME, ns_name)
+            self.CAT_URI_NS_NAME, ns_name)
 
 
     def get_list_all_vnf(self):
-        return self.__get_cat_object__(CatalogueClient.CAT_URI_VNF, "")
+        return self.__get_cat_object__(self.CAT_URI_VNF, "")
 
     def get_vnf(self, vnf_id):
         """
@@ -165,7 +155,7 @@ class PullCatalogueClient(object):
         :return: yaml object containing VNF
         """
         cat_obj = self.__get_cat_object__(
-            CatalogueClient.CAT_URI_VNF_ID, vnf_id)
+            self.CAT_URI_VNF_ID, vnf_id)
         if not cat_obj:
             return
 
@@ -183,7 +173,7 @@ class PullCatalogueClient(object):
         :return: (str) list of VNFs
         """
         return self.__get_cat_object__(
-            CatalogueClient.CAT_URI_VNF_NAME, vnf_name)
+            self.CAT_URI_VNF_NAME, vnf_name)
 
     def __get_cat_object__(self, cat_uri, obj_id):
         """
@@ -198,4 +188,89 @@ class PullCatalogueClient(object):
             return
         return response.text
 
+    def _get_from_url(self, url):
+        """
+        Generic/internal function to fetch content of a given URL
 
+        :param url: url of the website to be queried
+        :returns: text response of the server
+        """
+        if not validators.url(url):
+            raise Exception(url+" is not a valid url.")
+
+        try:
+            r = requests.get(url)
+            return r.text
+        except:
+            raise Exception("Content cannot be downloaded from "+url)
+
+    def get_packages(self, url):
+        return self._get_from_url(url+"/packages")
+
+    '''
+    def get_instances(url):
+        return _get_from_url(url + "/instantiations")
+
+    '''
+
+    def package_list(self, url):
+        return loads(self.get_packages(url)).get("service_uuid_list")
+
+    '''
+    def instance_list(self, url):
+        return loads(get_instances(url)).get("service_instantiations_list")
+    '''
+
+
+def main():
+    from argparse import ArgumentParser, RawDescriptionHelpFormatter
+    print mcolors.OKGREEN + "Running PULL\n", mcolors.ENDC
+
+    description = """
+    Pull resources (packages/descriptors) from the SONATA service platform/emulator
+    or list packages/descriptors/instances available on the SONATA platform/emulator.
+    """
+    examples = """Example usage:
+
+    son-pull http://127.0.0.1:5000 -U sonata-demo.son
+    son-pull http://127.0.0.1:5000 --list_packages
+    son-pull http://127.0.0.1:5000 -I
+    """
+    parser = ArgumentParser(
+        description=description,
+        formatter_class=RawDescriptionHelpFormatter,
+        epilog=examples)
+
+    parser.add_argument(
+        "platform_url",
+        help="url of the gatekeeper/platform/emulator")
+
+    parser.add_argument(
+        "-P", "--list_packages",
+        help="List packages uploaded to the platform",
+        action="store_true")
+
+    parser.add_argument(
+        "-I", "--list_instances",
+        help="List deployed packages on the platform",
+        action="store_true")
+
+    args = parser.parse_args()
+
+    if not args.platform_url:
+        print("Platform url is required.")
+
+    # TODO: Add url -> Read from settings
+    pull_client = Pull(base_url=args.platform_url)
+    # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
+
+    if args.list_packages:
+        print mcolors.OKGREEN + "PUSH - Getting Package list...\n", mcolors.ENDC
+        print(pull_client.get_packages(args.platform_url))
+
+    #if args.list_instances:
+    #    print(pull_client.get_instances(args.platform_url))
+
+
+if __name__ == '__main__':
+    main()

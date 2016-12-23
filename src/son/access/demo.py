@@ -57,6 +57,7 @@ def main():
     time.sleep(3)
 
     # Get son-packages list from the Service Platform to check submitted son-package
+    mode = "pull"
     command = "sudo python %s.py %s --list_packages" % (mode, url)
     print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
     result = os.popen(command).read()
