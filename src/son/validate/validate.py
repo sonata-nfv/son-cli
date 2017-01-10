@@ -291,7 +291,7 @@ class Validator(object):
 
         # get referenced function descriptors (VNFDs)
         if not self._load_service_functions(service):
-            log.critical("Failed to read service function descriptors")
+            log.error("Failed to read service function descriptors")
             return
 
         # load service interfaces

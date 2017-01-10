@@ -21,7 +21,7 @@ description: >
 ## The various network functions this service
 ## is composed of.
 ##
-network_functionsX:
+network_functionsX:  # modified here
   - vnf_id: "vnf_firewall"
     vnf_vendor: "eu.sonata-nfv"
     vnf_name: "firewall-vnf"

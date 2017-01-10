@@ -21,10 +21,10 @@ description: >
 ## The various network functions this service
 ## is composed of.
 ##
-network_functionsX:
+network_functions:
   - vnf_id: "vnf_firewall"
     vnf_vendor: "eu.sonata-nfv"
-    vnf_name: "firewall-vnf"
+    vnf_name: "firewall.vnf"  # modified here
     vnf_version: "0.3"
   - vnf_id: "vnf_iperf"
     vnf_vendor: "eu.sonata-nfv"

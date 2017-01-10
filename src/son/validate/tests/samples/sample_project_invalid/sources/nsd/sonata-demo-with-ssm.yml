@@ -120,7 +120,7 @@ forwarding_graphs:
       - fp_id: "ns:fg01:fp01"
         policy: "none"
         connection_points:
-          - connection_point_ref: "nsx:input"
+          - connection_point_ref: "nsx:input"  # modified here
             position: 1
           - connection_point_ref: "vnf_iperf:input"
             position: 2

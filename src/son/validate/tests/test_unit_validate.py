@@ -83,7 +83,7 @@ class UnitValidateTests(unittest.TestCase):
         Tests the validation of a valid SONATA service.
         """
         service_path = os.path.join(SAMPLES_DIR, 'services', 'valid.yml')
-        functions_path = os.path.join(SAMPLES_DIR, 'function', 'valid')
+        functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
 
         validator = Validator()
         validator.configure(dpath=functions_path)
@@ -91,6 +91,67 @@ class UnitValidateTests(unittest.TestCase):
 
         self.assertEqual(val.log.error.counter, 0)
         self.assertEqual(val.log.warning.counter, 0)
+
+    def test_validate_service_invalid_syntax(self):
+        """
+        Tests the validation of an syntax-invalid SONATA service.
+        """
+        service_path = os.path.join(SAMPLES_DIR, 'services',
+                                    'invalid_syntax.yml')
+
+        validator = Validator()
+        validator.configure(syntax=True, integrity=False, topology=False)
+        validator.validate_service(service_path)
+
+        self.assertGreater(val.log.error.counter, 0)
+
+    def test_validate_service_invalid_integrity(self):
+        """
+        Test the validation of an integrity-invalid SONATA service.
+        It ensures that syntax is valid.
+        """
+        service_path = os.path.join(SAMPLES_DIR, 'services',
+                                    'invalid_integrity.yml')
+        functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
+
+        validator = Validator()
+
+        # syntax validation -> should return OK
+        validator.configure(dpath=functions_path,
+                            syntax=True, integrity=False, topology=False)
+        validator.validate_service(service_path)
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
+
+        # syntax and integrity validation -> should return ERROR(S)
+        validator.configure(integrity=True)
+        validator.validate_service(service_path)
+        self.assertGreater(val.log.error.counter, 0)
+
+    def test_validate_service_invalid_topology(self):
+        """
+        Test the validation of an integrity-invalid SONATA service.
+        It ensures that syntax is valid.
+        It ensures that integrity is valid.
+        """
+        service_path = os.path.join(SAMPLES_DIR, 'services',
+                                    'invalid_topology.yml')
+        functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
+
+        validator = Validator()
+
+        # syntax and integrity validation -> should return OK
+        validator.configure(dpath=functions_path,
+                            syntax=True, integrity=True, topology=False)
+        validator.validate_service(service_path)
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
+
+        # syntax, integrity and topology validation -> should return ERROR(S)
+        validator.configure(topology=True)
+        validator.validate_service(service_path)
+        self.assertGreater(val.log.error.counter, 0)
+
 
 
 class CountCalls(object):

@@ -123,13 +123,13 @@ forwarding_graphs:
           - connection_point_ref: "ns:input"
             position: 1
           - connection_point_ref: "vnf_iperf:input"
-            position: 5
+            position: 5  # modified here
           - connection_point_ref: "vnf_iperf:output"
             position: 3
           - connection_point_ref: "vnf_firewall:input"
             position: 4
           - connection_point_ref: "vnf_firewall:output"
-            position: 2
+            position: 2  # modified here
           - connection_point_ref: "vnf_tcpdump:input"
             position: 6
           - connection_point_ref: "vnf_tcpdump:output"
