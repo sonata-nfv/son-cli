@@ -30,28 +30,36 @@ import son.validate.validate as val
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
 
+SAMPLES_DIR = os.path.join('src', 'son', 'validate', 'tests', 'samples')
+
 
 class UnitValidateTests(unittest.TestCase):
 
     def test_validate_project_valid(self):
         """
-        Tests the correct validation of a SONATA project.
-        :return:
+        Tests the validation of a valid SONATA project.
         """
-        workspace = Workspace(".")
-
-        prj_path = os.path.join('src', 'son', 'validate', 'tests', 'samples',
-                                'sample_project_valid')
+        workspace = Workspace('.')
+        prj_path = os.path.join(SAMPLES_DIR, 'sample_project_valid')
         project = Project(workspace, prj_path)
-        validator = Validator(workspace, log_level='debug')
-
+        validator = Validator(workspace=workspace, log_level='debug')
         val.log.error = CountCalls(val.log.error)
-
+        val.log.warning = CountCalls(val.log.warning)
         validator.validate_project(project)
-
         self.assertEqual(val.log.error.counter, 0)
-        self.assertEqual(validator.warnings_count, 0)
+        self.assertEqual(val.log.warning.counter, 0)
 
+    def test_validate_project_invalid(self):
+        """
+        Tests the validation of an invalid SONATA project.
+        """
+        workspace = Workspace('.')
+        prj_path = os.path.join(SAMPLES_DIR, 'sample_project_invalid')
+        project = Project(workspace, prj_path)
+        validator = Validator(workspace=workspace, log_level='debug')
+        val.log.error = CountCalls(val.log.error)
+        validator.validate_project(project)
+        self.assertGreater(val.log.error.counter, 0)
 
 class CountCalls(object):
     """Decorator to determine number of calls for a method"""
