@@ -35,17 +35,23 @@ SAMPLES_DIR = os.path.join('src', 'son', 'validate', 'tests', 'samples')
 
 class UnitValidateTests(unittest.TestCase):
 
+    def __init__(self, *args, **kwargs):
+        super(UnitValidateTests, self).__init__(*args, **kwargs)
+
+        # tap log functions to count for errors and warnings
+        self._workspace = Workspace('.')
+        val.log.error = CountCalls(val.log.error)
+        val.log.warning = CountCalls(val.log.warning)
+
     def test_validate_project_valid(self):
         """
         Tests the validation of a valid SONATA project.
         """
-        workspace = Workspace('.')
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_valid')
-        project = Project(workspace, prj_path)
-        validator = Validator(workspace=workspace, log_level='debug')
-        val.log.error = CountCalls(val.log.error)
-        val.log.warning = CountCalls(val.log.warning)
+        project = Project(self._workspace, prj_path)
+        validator = Validator(workspace=self._workspace, log_level='debug')
         validator.validate_project(project)
+
         self.assertEqual(val.log.error.counter, 0)
         self.assertEqual(val.log.warning.counter, 0)
 
@@ -53,13 +59,27 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of an invalid SONATA project.
         """
-        workspace = Workspace('.')
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_invalid')
-        project = Project(workspace, prj_path)
-        validator = Validator(workspace=workspace, log_level='debug')
-        val.log.error = CountCalls(val.log.error)
+        project = Project(self._workspace, prj_path)
+        validator = Validator(workspace=self._workspace, log_level='debug')
         validator.validate_project(project)
+
         self.assertGreater(val.log.error.counter, 0)
+
+    def test_validate_project_warning(self):
+        """
+        Tests the validation of a SONATA project with warnings.
+        """
+        prj_path = os.path.join(SAMPLES_DIR, 'sample_project_warning')
+        project = Project(self._workspace, prj_path)
+        validator = Validator(workspace=self._workspace, log_level='debug')
+        validator.validate_project(project)
+
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertGreater(val.log.warning.counter, 0)
+
+
+
 
 class CountCalls(object):
     """Decorator to determine number of calls for a method"""
