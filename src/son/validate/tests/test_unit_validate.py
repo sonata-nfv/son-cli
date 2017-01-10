@@ -78,7 +78,19 @@ class UnitValidateTests(unittest.TestCase):
         self.assertEqual(val.log.error.counter, 0)
         self.assertGreater(val.log.warning.counter, 0)
 
+    def test_validate_service_valid(self):
+        """
+        Tests the validation of a valid SONATA service.
+        """
+        service_path = os.path.join(SAMPLES_DIR, 'services', 'valid.yml')
+        functions_path = os.path.join(SAMPLES_DIR, 'function', 'valid')
 
+        validator = Validator()
+        validator.configure(dpath=functions_path)
+        validator.validate_service(service_path)
+
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
 
 
 class CountCalls(object):
