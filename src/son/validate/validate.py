@@ -446,17 +446,8 @@ class Validator(object):
         # build function topology graph
         function.build_topology_graph(link_type='e-line')
 
-        # # build function topology graph
-        # ftg = self._build_function_graph(function)
-        # if not ftg:
-        #     return
-        #
         log.debug("Built topology graph of function '{0}': {1}"
                   .format(function.id, function.graph.edges()))
-        #
-        # # store function topology graph
-        # function.graph = ftg
-        #
 
         # check for path cycles
         cycles = Validator._find_graph_cycles(function.graph,
