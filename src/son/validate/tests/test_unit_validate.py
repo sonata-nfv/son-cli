@@ -152,6 +152,54 @@ class UnitValidateTests(unittest.TestCase):
         validator.validate_service(service_path)
         self.assertGreater(val.log.error.counter, 0)
 
+    def test_validate_function_valid(self):
+        """
+        Tests the validation of a valid SONATA function.
+        """
+        functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
+        validator = Validator()
+        validator.configure(syntax=True, integrity=True, topology=True)
+        validator.validate_function(functions_path)
+
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
+
+    def test_validate_function_invalid_syntax(self):
+        """
+        Tests the validation of a syntax-invalid SONATA function.
+        """
+        functions_path = os.path.join(SAMPLES_DIR, 'functions',
+                                      'invalid_syntax')
+
+        validator = Validator()
+        validator.configure(syntax=True, integrity=False, topology=False)
+        validator.validate_function(functions_path)
+
+        self.assertGreater(val.log.error.counter, 0)
+
+    def test_validate_function_invalid_integrity(self):
+        """
+        Tests the validation of a integrity-invalid SONATA function.
+        It ensures that syntax is valid.
+        """
+        functions_path = os.path.join(SAMPLES_DIR, 'functions',
+                                      'invalid_integrity')
+        validator = Validator()
+
+        # syntax validation -> should return OK
+        validator.configure(syntax=True, integrity=False, topology=False)
+        validator.validate_function(functions_path)
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
+
+        # syntax and integrity validation -> should return ERROR(S)
+        validator.configure(integrity=True)
+        validator.validate_function(functions_path)
+        self.assertGreater(val.log.error.counter, 0)
+
+    def test_validate_function_invalid_topology(self):
+        # TODO TBD: how is a topology invalid in a function?
+        pass
 
 
 class CountCalls(object):
