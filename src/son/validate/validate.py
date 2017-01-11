@@ -225,6 +225,8 @@ class Validator(object):
 
         # validate multiple VNFs
         if os.path.isdir(vnfd_path):
+            log.info("Validating functions in path '{0}'".format(vnfd_path))
+
             vnfd_files = list_files(vnfd_path, self._dext)
             for vnfd_file in vnfd_files:
                 if not self.validate_function(vnfd_file):
@@ -291,14 +293,20 @@ class Validator(object):
 
         # get referenced function descriptors (VNFDs)
         if not self._load_service_functions(service):
-            log.critical("Failed to read service function descriptors")
+            log.error("Failed to read service function descriptors")
             return
 
         # load service interfaces
-        service.load_interfaces()
+        if not service.load_interfaces():
+            log.error("Couldn't load the interfaces of service id='{0}'"
+                      .format(service.id))
+            return
 
         # load service links
-        service.load_links()
+        if not service.load_links():
+            log.error("Couldn't load the links of service id='{0}'"
+                      .format(service.id))
+            return
 
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
@@ -338,15 +346,40 @@ class Validator(object):
                  .format(function.id))
 
         # load function interfaces
-        function.load_interfaces()
+        if not function.load_interfaces():
+            log.error("Couldn't load the interfaces of function id='{0}'"
+                      .format(function.id))
+            return
 
-        # load units and their interfaces
-        function.load_units()
-        function.load_unit_interfaces()
+        # load units
+        if not function.load_units():
+            log.error("Couldn't load the units of function id='{0}'"
+                      .format(function.id))
+            return
+
+        # load interfaces of units
+        if not function.load_unit_interfaces():
+            log.error("Couldn't load unit interfaces of function id='{0}'"
+                      .format(function.id))
+            return
+
+        # load function links
+        if not function.load_links():
+            log.error("Couldn't load the links of function id='{0}'"
+                      .format(function.id))
+            return
 
         # verify integrity between unit interfaces and units
-        # TODO
-
+        for lid, link in function.links.items():
+            for iface in link.iface_pair:
+                iface_tokens = iface.split(':')
+                if len(iface_tokens) > 1:
+                    print(function.units.keys())
+                    if iface_tokens[0] not in function.units.keys():
+                        log.error("Invalid interface id='{0}' of link id='{1}'"
+                                  ": Unit id='{2}' is not defined"
+                                  .format(iface, lid, iface_tokens[0]))
+                        return
         return True
 
     def _validate_service_topology(self, service):
@@ -410,23 +443,11 @@ class Validator(object):
         log.info("Validating topology of function '{0}'"
                  .format(function.id))
 
-        # load function links
-        function.load_links()
-
         # build function topology graph
         function.build_topology_graph(link_type='e-line')
 
-        # # build function topology graph
-        # ftg = self._build_function_graph(function)
-        # if not ftg:
-        #     return
-        #
         log.debug("Built topology graph of function '{0}': {1}"
                   .format(function.id, function.graph.edges()))
-        #
-        # # store function topology graph
-        # function.graph = ftg
-        #
 
         # check for path cycles
         cycles = Validator._find_graph_cycles(function.graph,

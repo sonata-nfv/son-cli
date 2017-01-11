@@ -156,8 +156,11 @@ class Node:
             log.error("The interface id='{0}' is already stored in node "
                       "id='{1}'".format(interface, self.id))
             return
+        log.debug("Node id='{0}': adding interface '{1}'"
+                  .format(self.id, interface))
         self._interfaces.append(interface)
 
+        return True
 
 class Link:
     def __init__(self, u, v, ltype='e-line'):
@@ -355,7 +358,9 @@ class Descriptor(Node):
         It reads the section 'connection_points' of the descriptor contents.
         """
         for cxpt in self.content['connection_points']:
-            self.add_interface(cxpt['id'])
+            if not self.add_interface(cxpt['id']):
+                return
+        return True
 
     def add_link(self, lid, ltype, interfaces):
         """
@@ -388,6 +393,9 @@ class Descriptor(Node):
         else:
             log.error("Invalid link type='{0}' in link id='{1}' of "
                       "descriptor id='{2}'".format(ltype, lid, self.id))
+            return
+
+        return True
 
     def load_links(self):
         """
@@ -400,6 +408,8 @@ class Descriptor(Node):
         for link in self.content['virtual_links']:
             self.add_link(link['id'], link['connectivity_type'],
                           link['connection_points_reference'])
+
+        return True
 
 
 class Service(Descriptor):
@@ -661,19 +671,21 @@ class Function(Descriptor):
         'virtual_deployment_units'
         """
         if 'virtual_deployment_units' not in self.content:
+            log.error("Function id={0} is missing the "
+                      "'virtual_deployment_units' section"
+                      .format(self.id))
             return
 
         for vdu in self.content['virtual_deployment_units']:
             unit = Unit(vdu['id'])
             self.associate_unit(unit)
 
+        return True
+
     def load_unit_interfaces(self):
         """
         Load interfaces of the units of the function.
         """
-        if 'virtual_deployment_units' not in self.content:
-            return
-
         for vdu in self.content['virtual_deployment_units']:
             if vdu['id'] not in self.units.keys():
                 log.error("Unit id='{0}' is not associated with function "
@@ -685,6 +697,8 @@ class Function(Descriptor):
             for cxpt in vdu['connection_points']:
                 unit.add_interface(cxpt['id'])
                 self.add_interface(cxpt['id'])
+
+        return True
 
     def build_topology_graph(self, link_type=None):
         """
