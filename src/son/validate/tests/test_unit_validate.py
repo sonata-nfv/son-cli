@@ -39,14 +39,91 @@ class UnitValidateTests(unittest.TestCase):
         super(UnitValidateTests, self).__init__(*args, **kwargs)
 
         # tap log functions to count for errors and warnings
-        self._workspace = Workspace('.')
+        self._workspace = Workspace('.', log_level='debug')
         val.log.error = CountCalls(val.log.error)
         val.log.warning = CountCalls(val.log.warning)
+
+    @staticmethod
+    def reset_counters():
+        val.log.error.counter = 0
+        val.log.warning.counter = 0
+
+    def test_validate_package_valid(self):
+        """
+        Tests the validation of a valid SONATA package.
+        """
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-valid.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 0)
+
+    def test_validate_package_invalid_struct(self):
+        """
+        Tests the validation of a multiple SONATA packages with a bad file
+        structure.
+        """
+        # invalid struct #1
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-struct-1.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+        self.assertEqual(val.log.error.counter, 1)
+
+        # invalid struct #2
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-struct-2.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+        self.assertEqual(val.log.error.counter, 1)
+
+
+    def test_validate_package_invalid_md5(self):
+        """
+        Tests the validation of a SONATA package with incorrect MD5 sums
+        """
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        self.assertEqual(val.log.error.counter, 0)
+        self.assertEqual(val.log.warning.counter, 4)
+
+    def test_validate_package_invalid_integrigy(self):
+        """
+        Tests the validation of several SONATA packages with incorrect
+        integrity.
+        """
+        # invalid integrity #1
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-integrity-1.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+        self.assertEqual(val.log.error.counter, 1)
+        self.assertEqual(val.log.warning.counter, 0)
+
+        # invalid integrity #2
+        self.reset_counters()
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-integrity-2.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+        self.assertEqual(val.log.error.counter, 1)
+        self.assertEqual(val.log.warning.counter, 0)
 
     def test_validate_project_valid(self):
         """
         Tests the validation of a valid SONATA project.
         """
+        self.reset_counters()
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_valid')
         project = Project(self._workspace, prj_path)
         validator = Validator(workspace=self._workspace)
@@ -59,6 +136,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of an invalid SONATA project.
         """
+        self.reset_counters()
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_invalid')
         project = Project(self._workspace, prj_path)
         validator = Validator(workspace=self._workspace)
@@ -70,6 +148,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of a SONATA project with warnings.
         """
+        self.reset_counters()
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_warning')
         project = Project(self._workspace, prj_path)
         validator = Validator(workspace=self._workspace)
@@ -82,6 +161,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of a valid SONATA service.
         """
+        self.reset_counters()
         service_path = os.path.join(SAMPLES_DIR, 'services', 'valid.yml')
         functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
 
@@ -96,6 +176,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of an syntax-invalid SONATA service.
         """
+        self.reset_counters()
         service_path = os.path.join(SAMPLES_DIR, 'services',
                                     'invalid_syntax.yml')
 
@@ -110,6 +191,7 @@ class UnitValidateTests(unittest.TestCase):
         Test the validation of an integrity-invalid SONATA service.
         It ensures that syntax is valid.
         """
+        self.reset_counters()
         service_path = os.path.join(SAMPLES_DIR, 'services',
                                     'invalid_integrity.yml')
         functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
@@ -134,6 +216,7 @@ class UnitValidateTests(unittest.TestCase):
         It ensures that syntax is valid.
         It ensures that integrity is valid.
         """
+        self.reset_counters()
         service_path = os.path.join(SAMPLES_DIR, 'services',
                                     'invalid_topology.yml')
         functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
@@ -156,6 +239,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of a valid SONATA function.
         """
+        self.reset_counters()
         functions_path = os.path.join(SAMPLES_DIR, 'functions', 'valid')
         validator = Validator()
         validator.configure(syntax=True, integrity=True, topology=True)
@@ -168,6 +252,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         Tests the validation of a syntax-invalid SONATA function.
         """
+        self.reset_counters()
         functions_path = os.path.join(SAMPLES_DIR, 'functions',
                                       'invalid_syntax')
 
@@ -182,6 +267,7 @@ class UnitValidateTests(unittest.TestCase):
         Tests the validation of a integrity-invalid SONATA function.
         It ensures that syntax is valid.
         """
+        self.reset_counters()
         functions_path = os.path.join(SAMPLES_DIR, 'functions',
                                       'invalid_integrity')
         validator = Validator()

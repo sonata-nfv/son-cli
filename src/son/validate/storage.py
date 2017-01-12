@@ -24,6 +24,7 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
+import os
 import logging
 import networkx as nx
 from collections import OrderedDict
@@ -87,6 +88,8 @@ class DescriptorStorage(object):
         :param descriptor_file: package descriptor filename
         :return: created package object or, if id exists, the stored package.
         """
+        if not os.path.isfile(descriptor_file):
+            return
         new_package = Package(descriptor_file)
         if new_package.id in self._packages:
             return self._packages[new_package.id]
@@ -102,6 +105,8 @@ class DescriptorStorage(object):
         :param descriptor_file: service descriptor filename
         :return: created service object or, if id exists, the stored service.
         """
+        if not os.path.isfile(descriptor_file):
+            return
         new_service = Service(descriptor_file)
         if new_service.id in self._services:
             return self._services[new_service.id]
@@ -128,6 +133,8 @@ class DescriptorStorage(object):
         :param descriptor_file: function descriptor filename
         :return: created function object or, if id exists, the stored function.
         """
+        if not os.path.isfile(descriptor_file):
+            return
         new_function = Function(descriptor_file)
         if new_function.id in self._functions.keys():
             return self._functions[new_function.id]
@@ -459,8 +466,9 @@ class Package(Descriptor):
         service_list = []
         for item in self.content['package_content']:
             if item['content-type'] == \
-                    'application/sonata.service_descriptors':
+                    'application/sonata.service_descriptor':
                 service_list.append(item['name'])
+        print(service_list)
         return service_list
 
     @property
