@@ -415,8 +415,8 @@ class Validator(object):
 
             gen_md5 = generate_hash(filename)
             manif_md5 = package.md5(strip_root(f))
-            if gen_md5 != manif_md5:
-                log.error("MD5 hash of file '{0}' is not equal to the "
+            if manif_md5 and gen_md5 != manif_md5:
+                log.warning("MD5 hash of file '{0}' is not equal to the "
                           "defined in package descriptor:\nGen MD5:\t{1}\n"
                           "MANIF MD5:\t{2}"
                           .format(f, gen_md5, manif_md5))
