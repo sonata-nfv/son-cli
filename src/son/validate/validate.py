@@ -32,6 +32,7 @@ import zipfile
 import time
 import datetime
 import shutil
+import atexit
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -189,7 +190,11 @@ class Validator(object):
         package_dir = 'package.' + datetime.datetime.fromtimestamp(
                       time.time()).strftime('%Y-%m-%d %H:%M:%S')
         with closing(zipfile.ZipFile(package, 'r')) as pkg:
+            # extract package contents
             pkg.extractall(package_dir)
+
+            # set folder for deletion when program exits
+            atexit.register(shutil.rmtree, package_dir)
 
         # validate package file structure
         if not self._validate_package_struct(package_dir):
@@ -204,6 +209,7 @@ class Validator(object):
         if self._integrity and \
                 not self._validate_package_integrity(package, package_dir):
             return
+
 
         return True
 
