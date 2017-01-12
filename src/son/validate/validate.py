@@ -32,7 +32,6 @@ import coloredlogs
 import networkx as nx
 import zipfile
 import time
-import datetime
 import shutil
 import atexit
 from contextlib import closing
@@ -186,8 +185,7 @@ class Validator(object):
             log.error("Invalid SONATA package '{}'".format(package))
             return
 
-        package_dir = 'package.' + datetime.datetime.fromtimestamp(
-                      time.time()).strftime('%Y-%m-%d %H:%M:%S')
+        package_dir = '.' + str(time.time())
         with closing(zipfile.ZipFile(package, 'r')) as pkg:
             # extract package contents
             pkg.extractall(package_dir)
@@ -251,8 +249,8 @@ class Validator(object):
 
         service = self._storage.create_service(nsd_file)
         if not service:
-            log.critical("Failed to read the service descriptor of file '{}'"
-                         .format(nsd_file))
+            log.error("Failed to read the service descriptor of file '{}'"
+                      .format(nsd_file))
             return
 
         # validate service syntax
@@ -412,6 +410,7 @@ class Validator(object):
         # load referenced service descriptor files
         for f in package.descriptors:
             filename = os.path.join(root_dir, strip_root(f))
+            log.debug("Verifying file '{0}'".format(f))
             if not os.path.isfile(filename):
                 log.error("Referenced descriptor file '{0}' is not "
                           "packaged.".format(f))
