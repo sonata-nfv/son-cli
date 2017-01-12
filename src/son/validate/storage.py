@@ -24,29 +24,33 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
-import coloredlogs
+import logging
 import networkx as nx
 from collections import OrderedDict
-from son.validate.util import *
+from son.validate.util import descriptor_id, read_descriptor_file
 
 log = logging.getLogger(__name__)
 
 
 class DescriptorStorage(object):
 
-    def __init__(self, log_level='debug'):
+    def __init__(self):
         """
         Initialize an object to store descriptors.
-        :param log_level: verbosity level
         """
-        # configure log
-        self._log_level = log_level
-        coloredlogs.install(level=self._log_level)
-
         # dictionaries for services, functions and units
+        self._packages = {}
         self._services = {}
         self._functions = {}
         self._units = {}
+
+    @property
+    def packages(self):
+        """
+        Provides the stored packages.
+        :return: dictionary of packages.
+        """
+        return self._packages
 
     @property
     def services(self):
@@ -74,6 +78,21 @@ class DescriptorStorage(object):
             log.error("Service id='{0}' is not stored.".format(sid))
             return
         return self.services[sid]
+
+    def create_package(self, descriptor_file):
+        """
+        Create and store a package based on the provided descriptor filename.
+        If a package is already stored with the same id, it will return the
+        stored package.
+        :param descriptor_file: package descriptor filename
+        :return: created package object or, if id exists, the stored package.
+        """
+        new_package = Package(descriptor_file)
+        if new_package.id in self._packages:
+            return self._packages[new_package.id]
+
+        self._packages[new_package.id] = new_package
+        return new_package
 
     def create_service(self, descriptor_file):
         """
@@ -161,6 +180,7 @@ class Node:
         self._interfaces.append(interface)
 
         return True
+
 
 class Link:
     def __init__(self, u, v, ltype='e-line'):
@@ -378,7 +398,7 @@ class Descriptor(Node):
                       "id='{1}'".format(lid, self.id))
             return
 
-        if ltype.lower() == 'e-line':  #TODO or link_type.lower()=='e-tree':
+        if ltype.lower() == 'e-line':  # TODO or link_type.lower()=='e-tree':
             self.links[lid] = Link(interfaces[0], interfaces[1])
 
         elif ltype.lower() == 'e-lan':
@@ -410,6 +430,72 @@ class Descriptor(Node):
                           link['connection_points_reference'])
 
         return True
+
+
+class Package(Descriptor):
+
+    def __init__(self, descriptor_file):
+        """
+        Initialize a package object. This inherits the descriptor object.
+        :param descriptor_file: descriptor filename
+        """
+        super().__init__(descriptor_file)
+
+    @property
+    def entry_service_file(self):
+        """
+        Provides the entry point service of the package.
+        :return: service id
+        """
+        return self.content['entry_service_template']
+
+    @property
+    def service_descriptors(self):
+        """
+        Provides a list of the service descriptor file names, referenced in
+        the package.
+        :return: list of service descriptor file names
+        """
+        service_list = []
+        for item in self.content['package_content']:
+            if item['content-type'] == \
+                    'application/sonata.service_descriptors':
+                service_list.append(item['name'])
+        return service_list
+
+    @property
+    def function_descriptors(self):
+        """
+        Provides a list of the service descriptor file names, referenced in
+        the package.
+        :return: list of function descriptor file names
+        """
+        function_list = []
+        for item in self.content['package_content']:
+            if item['content-type'] == \
+                    'application/sonata.function_descriptor':
+                function_list.append(item['name'])
+        return function_list
+
+    @property
+    def descriptors(self):
+        """
+        Provides a list of the descriptors, referenced in the package.
+        :return: list of descriptor file names
+        """
+        return self.service_descriptors + self.function_descriptors
+
+    def md5(self, descriptor_file):
+        """
+        Retrieves the MD5 hash defined in the package content of the specified
+        descriptor
+        :param descriptor_file: descriptor filename
+        :return: md5 hash if descriptor found, None otherwise
+        """
+        descriptor_file = '/' + descriptor_file
+        for item in self.content['package_content']:
+            if item['name'] == descriptor_file:
+                return item['md5']
 
 
 class Service(Descriptor):
@@ -638,7 +724,6 @@ class Function(Descriptor):
         Initialize a function object. This inherits the descriptor object.
         :param descriptor_file: descriptor filename
         """
-
         super().__init__(descriptor_file)
         self._units = {}
 
