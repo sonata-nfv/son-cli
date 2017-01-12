@@ -24,25 +24,20 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
-import coloredlogs
+import logging
 import networkx as nx
 from collections import OrderedDict
-from son.validate.util import *
+from son.validate.util import descriptor_id, read_descriptor_file
 
 log = logging.getLogger(__name__)
 
 
 class DescriptorStorage(object):
 
-    def __init__(self, log_level='debug'):
+    def __init__(self):
         """
         Initialize an object to store descriptors.
-        :param log_level: verbosity level
         """
-        # configure log
-        self._log_level = log_level
-        coloredlogs.install(level=self._log_level)
-
         # dictionaries for services, functions and units
         self._packages = {}
         self._services = {}
@@ -92,7 +87,7 @@ class DescriptorStorage(object):
         :param descriptor_file: package descriptor filename
         :return: created package object or, if id exists, the stored package.
         """
-        new_package = Package(descriptor_file, log_level=self._log_level)
+        new_package = Package(descriptor_file)
         if new_package.id in self._packages:
             return self._packages[new_package.id]
 
@@ -107,7 +102,7 @@ class DescriptorStorage(object):
         :param descriptor_file: service descriptor filename
         :return: created service object or, if id exists, the stored service.
         """
-        new_service = Service(descriptor_file, log_level=self._log_level)
+        new_service = Service(descriptor_file)
         if new_service.id in self._services:
             return self._services[new_service.id]
 
@@ -133,7 +128,7 @@ class DescriptorStorage(object):
         :param descriptor_file: function descriptor filename
         :return: created function object or, if id exists, the stored function.
         """
-        new_function = Function(descriptor_file, log_level=self._log_level)
+        new_function = Function(descriptor_file)
         if new_function.id in self._functions.keys():
             return self._functions[new_function.id]
 
@@ -142,13 +137,12 @@ class DescriptorStorage(object):
 
 
 class Node:
-    def __init__(self, nid, log_level='debug'):
+    def __init__(self, nid):
         """
         Initialize a node object.
         Typically, a node holds multiple network interfaces.
         :param nid: node id
         """
-        coloredlogs.install(level=log_level)
         self._id = nid
         self._interfaces = []
 
@@ -240,7 +234,7 @@ class Link:
 
 
 class Descriptor(Node):
-    def __init__(self, descriptor_file, log_level='debug'):
+    def __init__(self, descriptor_file):
         """
         Initialize a generic descriptor object.
         This object inherits the node object.
@@ -250,7 +244,6 @@ class Descriptor(Node):
             - filename: filename of the descriptor
         :param descriptor_file: filename of the descriptor
         """
-        coloredlogs.install(level=log_level)
         self._id = None
         self._content = None
         self._filename = None
@@ -405,7 +398,7 @@ class Descriptor(Node):
                       "id='{1}'".format(lid, self.id))
             return
 
-        if ltype.lower() == 'e-line':  #TODO or link_type.lower()=='e-tree':
+        if ltype.lower() == 'e-line':  # TODO or link_type.lower()=='e-tree':
             self.links[lid] = Link(interfaces[0], interfaces[1])
 
         elif ltype.lower() == 'e-lan':
@@ -441,12 +434,11 @@ class Descriptor(Node):
 
 class Package(Descriptor):
 
-    def __init__(self, descriptor_file, log_level='debug'):
+    def __init__(self, descriptor_file):
         """
         Initialize a package object. This inherits the descriptor object.
         :param descriptor_file: descriptor filename
         """
-        coloredlogs.install(level=log_level)
         super().__init__(descriptor_file)
 
     @property
@@ -491,7 +483,6 @@ class Package(Descriptor):
         Provides a list of the descriptors, referenced in the package.
         :return: list of descriptor file names
         """
-        print(self.service_descriptors + self.function_descriptors)
         return self.service_descriptors + self.function_descriptors
 
     def md5(self, descriptor_file):
@@ -507,15 +498,13 @@ class Package(Descriptor):
                 return item['md5']
 
 
-
 class Service(Descriptor):
 
-    def __init__(self, descriptor_file, log_level='debug'):
+    def __init__(self, descriptor_file):
         """
         Initialize a service object. This inherits the descriptor object.
         :param descriptor_file: descriptor filename
         """
-        coloredlogs.install(level=log_level)
         super().__init__(descriptor_file)
         self._functions = {}
         self._vnf_id_map = {}
@@ -730,12 +719,11 @@ class Service(Descriptor):
 
 class Function(Descriptor):
 
-    def __init__(self, descriptor_file, log_level='debug'):
+    def __init__(self, descriptor_file):
         """
         Initialize a function object. This inherits the descriptor object.
         :param descriptor_file: descriptor filename
         """
-        coloredlogs.install(level=log_level)
         super().__init__(descriptor_file)
         self._units = {}
 

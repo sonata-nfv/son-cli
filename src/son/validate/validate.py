@@ -24,8 +24,10 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
+import os
 import sys
 import inspect
+import logging
 import coloredlogs
 import networkx as nx
 import zipfile
@@ -38,25 +40,22 @@ from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
-from son.validate.util import *
+from son.validate.util import read_descriptor_files, list_files, strip_root, \
+    build_descriptor_id
 
 log = logging.getLogger(__name__)
 
 
 class Validator(object):
 
-    CXPT_KEY_SEPARATOR = ':'         # connection point key separator
-
-    def __init__(self, workspace=None, log_level='debug'):
+    def __init__(self, workspace=None):
         """
         Initialize the Validator.
         A workspace may be provided for an easy parameter configuration,
         such as location and extension of descriptors, verbosity level, etc.
         :param workspace: SONATA workspace object
-        :param log_level: verbosity level
         """
         self._workspace = workspace
-        self._log_level = log_level
         self._syntax = True
         self._integrity = True
         self._topology = True
@@ -66,7 +65,7 @@ class Validator(object):
         if not self._workspace:
             self._workspace = Workspace('.', log_level='info')
 
-        # load configuration from workspace
+        # load configurations from workspace
         self._dext = self._workspace.default_descriptor_extension
         self._dpath = '.'
         self._log_level = self._workspace.log_level
@@ -74,27 +73,25 @@ class Validator(object):
         # configure logs
         coloredlogs.install(level=self._log_level)
 
-        # storage descriptors
-        self._storage = DescriptorStorage(log_level=self._log_level)
+        # descriptors storage
+        self._storage = DescriptorStorage()
 
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
         # number of warnings
         self._warnings_count = 0
-        print(log.level)
 
     @property
     def warnings_count(self):
         """
         Provides the number of warnings given during validation.
         This property should be read after the validation process.
-        :return:
         """
         return self._warnings_count
 
     def configure(self, syntax=None, integrity=None, topology=None,
-                  dpath=None, dext=None, log_level=None):
+                  dpath=None, dext=None, debug=False):
         """
         Configure parameters for validation. It is recommended to call this
         function before performing a validation.
@@ -103,7 +100,7 @@ class Validator(object):
         :param topology: specifies whether to validate network topology
         :param dpath: directory to search for function descriptors (VNFDs)
         :param dext: extension of descriptor files (default: 'yml')
-        :param log_level: verbosity level of logger
+        :param debug: increase verbosity level of logger
         """
         # assign parameters
         if syntax is not None:
@@ -116,8 +113,8 @@ class Validator(object):
             self._dext = dext
         if dpath is not None:
             self._dpath = dpath
-        if log_level:
-            coloredlogs.set_level(log_level)
+        if debug:
+            coloredlogs.install(level='debug')
 
     def _assert_configuration(self):
         """
@@ -182,6 +179,8 @@ class Validator(object):
         """
         self._assert_configuration()
 
+        log.info("Validating package '{0}'".format(os.path.abspath(package)))
+
         # check if package is packed in the correct format
         if not zipfile.is_zipfile(package):
             log.error("Invalid SONATA package '{}'".format(package))
@@ -209,7 +208,6 @@ class Validator(object):
         if self._integrity and \
                 not self._validate_package_integrity(package, package_dir):
             return
-
 
         return True
 
@@ -719,6 +717,8 @@ class Validator(object):
 
 
 def main():
+    coloredlogs.install(level='info')
+
     import argparse
 
     # specify arguments
@@ -844,7 +844,7 @@ def main():
         validator.configure(syntax=args.syntax,
                             integrity=args.integrity,
                             topology=args.topology,
-                            log_level=args.debug)
+                            debug=args.debug)
 
         if not validator.validate_package(args.package_file):
             log.critical("Package validation has failed.")
@@ -881,7 +881,7 @@ def main():
         validator.configure(syntax=args.syntax,
                             integrity=args.integrity,
                             topology=args.topology,
-                            log_level=args.debug)
+                            debug=args.debug)
 
         if not validator.validate_project(project):
             log.critical("Project validation has failed.")
@@ -900,7 +900,7 @@ def main():
                             syntax=args.syntax,
                             integrity=args.integrity,
                             topology=args.topology,
-                            log_level=args.debug)
+                            debug=args.debug)
 
         if not validator.validate_service(args.nsd):
             log.critical("Project validation has failed.")
@@ -918,7 +918,7 @@ def main():
                             syntax=args.syntax,
                             integrity=args.integrity,
                             topology=args.topology,
-                            log_level=args.debug)
+                            debug=args.debug)
 
         if not validator.validate_function(args.vnfd):
             log.critical("Function validation has failed.")
