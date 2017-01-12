@@ -49,7 +49,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_valid')
         project = Project(self._workspace, prj_path)
-        validator = Validator(workspace=self._workspace, log_level='debug')
+        validator = Validator(workspace=self._workspace)
         validator.validate_project(project)
 
         self.assertEqual(val.log.error.counter, 0)
@@ -61,7 +61,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_invalid')
         project = Project(self._workspace, prj_path)
-        validator = Validator(workspace=self._workspace, log_level='debug')
+        validator = Validator(workspace=self._workspace)
         validator.validate_project(project)
 
         self.assertGreater(val.log.error.counter, 0)
@@ -72,7 +72,7 @@ class UnitValidateTests(unittest.TestCase):
         """
         prj_path = os.path.join(SAMPLES_DIR, 'sample_project_warning')
         project = Project(self._workspace, prj_path)
-        validator = Validator(workspace=self._workspace, log_level='debug')
+        validator = Validator(workspace=self._workspace)
         validator.validate_project(project)
 
         self.assertEqual(val.log.error.counter, 0)
