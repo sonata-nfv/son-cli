@@ -36,7 +36,7 @@ from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
-from son.validate.objects import DescriptorStorage
+from son.validate.storage import DescriptorStorage
 from son.validate.util import *
 
 log = logging.getLogger(__name__)
