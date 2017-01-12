@@ -28,6 +28,12 @@ import sys
 import inspect
 import coloredlogs
 import networkx as nx
+import zipfile
+import time
+import datetime
+import shutil
+from contextlib import closing
+from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
 from son.validate.objects import DescriptorStorage
@@ -57,7 +63,7 @@ class Validator(object):
         # create "virtual" workspace if not provided (don't actually create
         # file structure)
         if not self._workspace:
-            self._workspace = Workspace('.', log_level=log_level)
+            self._workspace = Workspace('.', log_level='info')
 
         # load configuration from workspace
         self._dext = self._workspace.default_descriptor_extension
@@ -75,6 +81,7 @@ class Validator(object):
 
         # number of warnings
         self._warnings_count = 0
+        print(log.level)
 
     @property
     def warnings_count(self):
@@ -117,6 +124,7 @@ class Validator(object):
         validation to perform. If issues are found the application is
         interrupted with the appropriate error.
         This is an internal function which must be invoked only by:
+            - 'validate_package'
             - 'validate_project'
             - 'validate_service'
             - 'validate_function'
@@ -124,7 +132,7 @@ class Validator(object):
         # ensure this function is called by specific functions
         caller = inspect.stack()[1][3]
         if caller != 'validate_function' and caller != 'validate_service' and \
-           caller != 'validate_project':
+           caller != 'validate_project' and caller != 'validate_package':
             log.error("Cannot assert a correct configuration. Validation "
                       "scope couldn't be determined. Aborting")
             sys.exit(1)
@@ -140,7 +148,14 @@ class Validator(object):
                       "first. Aborting.")
             sys.exit(1)
 
-        if caller == 'validate_project':
+        if not self._syntax:
+            log.error("Nothing to validate. Aborting.")
+            sys.exit(1)
+
+        if caller == 'validate_package':
+            pass
+
+        elif caller == 'validate_project':
             pass
 
         elif caller == 'validate_service':
@@ -155,6 +170,42 @@ class Validator(object):
 
         elif caller == 'validate_function':
             pass
+
+    def validate_package(self, package):
+        """
+        Validate a SONATA package.
+        By default, it performs the following validations: syntax, integrity
+        and network topology.
+        :param package: SONATA package filename
+        :return: True if all validations were successful, False otherwise
+        """
+        self._assert_configuration()
+
+        # check if package is packed in the correct format
+        if not zipfile.is_zipfile(package):
+            log.error("Invalid SONATA package '{}'".format(package))
+            return
+
+        package_dir = 'package.' + datetime.datetime.fromtimestamp(
+                      time.time()).strftime('%Y-%m-%d %H:%M:%S')
+        with closing(zipfile.ZipFile(package, 'r')) as pkg:
+            pkg.extractall(package_dir)
+
+        # validate package file structure
+        if not self._validate_package_struct(package_dir):
+            return
+
+        pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
+        package = self._storage.create_package(pd_filename)
+
+        if self._syntax and not self._validate_package_syntax(package):
+            return
+
+        if self._integrity and \
+                not self._validate_package_integrity(package, package_dir):
+            return
+
+        return True
 
     def validate_project(self, project):
         """
@@ -253,6 +304,71 @@ class Validator(object):
 
         return True
 
+    def _validate_package_struct(self, package_dir):
+        """
+        Validate the file structure of a SONATA package.
+        :param package_dir: directory of extracted package
+        :return: True if successful, False otherwise
+        """
+        # validate directory 'META-INF'
+        meta_dir = os.path.join(package_dir, 'META-INF')
+        if not os.path.isdir(meta_dir):
+            log.error("A directory named 'META-INF' must exist, "
+                      "located at the root of the package")
+            return
+
+        if len(os.listdir(meta_dir)) > 1:
+            log.error("The 'META-INF' directory must only contain the file "
+                      "'MANIFEST.MF'")
+            return
+
+        if not os.path.exists(os.path.join(meta_dir, 'MANIFEST.MF')):
+            log.error("A file named 'MANIFEST.MF' must exist in directory "
+                      "'META-INF'")
+            return
+
+        # validate directory 'service_descriptors'
+        services_dir = os.path.join(package_dir, 'service_descriptors')
+        if not os.path.isdir(services_dir):
+            log.error("A directory named 'service_descriptors' must exist, "
+                      "located at the root of the package")
+            return
+
+        if len(os.listdir(services_dir)) == 0:
+            log.error("The 'service_descriptors' directory must contain at "
+                      "least one service descriptor file")
+            return
+
+        # validate directory 'function_descriptors'
+        functions_dir = os.path.join(package_dir, 'function_descriptors')
+        if not os.path.isdir(functions_dir):
+            log.error("A directory named 'function_descriptors' must exist, "
+                      "located at the root of the package")
+            return
+
+        if len(os.listdir(functions_dir)) == 0:
+            log.error("The 'function_descriptors' directory must contain at "
+                      "least one function descriptor file")
+            return
+
+        return True
+
+    def _validate_package_syntax(self, package):
+        """
+        Validate the syntax of the package descriptor of a SONATA
+        package against its schema.
+        :param package: package object to validate
+        :return: True if syntax is correct, None otherwise
+        """
+        log.info("Validating syntax of package descriptor '{0}'"
+                 .format(package.id))
+        if not self._schema_validator.validate(
+              package.content, SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
+            log.error("Invalid syntax in MANIFEST of package: '{0}'"
+                      .format(package.id))
+            return
+        return True
+
     def _validate_service_syntax(self, service):
         """
         Validate a the syntax of a service (NS) against its schema.
@@ -278,6 +394,41 @@ class Validator(object):
             log.error("Invalid syntax in function '{0}'".format(function.id))
             return
         return True
+
+    def _validate_package_integrity(self, package, root_dir):
+        """
+        Validate the integrity of a package.
+        It will validate the entry service of the package as well as its
+        referenced functions.
+        :param package: package object
+        :return: True if syntax is correct, None otherwise
+        """
+        log.info("Validating integrity of package '{0}'".format(package.id))
+
+        # load referenced service descriptor files
+        for f in package.descriptors:
+            filename = os.path.join(root_dir, strip_root(f))
+            if not os.path.isfile(filename):
+                log.error("Referenced descriptor file '{0}' is not "
+                          "packaged.".format(f))
+                return
+
+            gen_md5 = generate_hash(filename)
+            manif_md5 = package.md5(strip_root(f))
+            if gen_md5 != manif_md5:
+                log.error("MD5 hash of file '{0}' is not equal to the "
+                          "defined in package descriptor:\nGen MD5:\t{1}\n"
+                          "MANIF MD5:\t{2}"
+                          .format(f, gen_md5, manif_md5))
+
+        # configure dpath for function referencing
+        self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
+
+        # finally, validate the package entry service file
+        entry_service_file = os.path.join(
+            root_dir, strip_root(package.entry_service_file))
+
+        return self.validate_service(entry_service_file)
 
     def _validate_service_integrity(self, service):
         """
@@ -374,7 +525,6 @@ class Validator(object):
             for iface in link.iface_pair:
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
-                    print(function.units.keys())
                     if iface_tokens[0] not in function.units.keys():
                         log.error("Invalid interface id='{0}' of link id='{1}'"
                                   ": Unit id='{2}' is not defined"
@@ -495,8 +645,8 @@ class Validator(object):
                                       function['vnf_name'],
                                       function['vnf_version'])
             if fid not in path_vnfs.keys():
-                log.error("Referenced VNF descriptor '{0}' couldn't be "
-                          "found in path '{1}'".format(fid, self._dpath))
+                log.error("Referenced function descriptor id='{0}' couldn't "
+                          "be found in path '{1}'".format(fid, self._dpath))
                 return
 
             vnf_id = function['vnf_id']
@@ -603,7 +753,7 @@ def main():
     )
     exclusive_parser.add_argument(
         "--package",
-        dest="pd",
+        dest="package_file",
         help="Validate the specified package descriptor. "
     )
     exclusive_parser.add_argument(
@@ -668,7 +818,40 @@ def main():
     if not args.syntax and not args.integrity and not args.topology:
         args.syntax = args.integrity = args.topology = True
 
-    if args.project_path:
+    if args.package_file:
+        if not os.path.isfile(args.package_file):
+            log.error("Provided package is not a valid file")
+            exit(1)
+
+        if args.workspace_path:
+            ws_root = args.workspace_path
+        else:
+            ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+
+        # Obtain Workspace object
+        workspace = Workspace.__create_from_descriptor__(ws_root)
+        if not workspace:
+            log.error("Invalid workspace path: '%s'\n" % ws_root)
+            exit(1)
+
+        validator = Validator(workspace=workspace)
+        validator.configure(syntax=args.syntax,
+                            integrity=args.integrity,
+                            topology=args.topology,
+                            log_level=args.debug)
+
+        if not validator.validate_package(args.package_file):
+            log.critical("Package validation has failed.")
+            exit(1)
+        if validator.warnings_count == 0:
+            log.info("Validation of package '{0}' has succeeded."
+                     .format(args.package_file))
+        else:
+            log.warning("Validation of package '{0}' returned {1} warning(s)"
+                        .format(args.package_file,
+                                validator.warnings_count))
+
+    elif args.project_path:
 
         if args.workspace_path:
             ws_root = args.workspace_path
@@ -704,8 +887,6 @@ def main():
             log.warning("Validation of project '{0}' returned {1} warning(s)"
                         .format(project.project_root,
                                 validator.warnings_count))
-    elif args.pd:
-        pass
 
     elif args.nsd:
         validator = Validator()

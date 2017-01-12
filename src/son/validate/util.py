@@ -112,3 +112,10 @@ def list_files(path, extension):
     return file_list
 
 
+def strip_root(path):
+    """
+    Remove leading slash of a path
+    """
+    if type(path) is not str:
+        return path
+    return path[1:] if path[0] == '/' else path

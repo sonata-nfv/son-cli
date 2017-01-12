@@ -73,3 +73,7 @@ bin/
 
 # ignore graphml files
 *.graphml
+
+# ignore extracted package folders (temp?)
+package*
+
