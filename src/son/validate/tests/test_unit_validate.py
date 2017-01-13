@@ -27,6 +27,7 @@
 import unittest
 import os
 import son.validate.validate as val
+from son.validate.util import CountCalls
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
 
@@ -288,13 +289,3 @@ class UnitValidateTests(unittest.TestCase):
         pass
 
 
-class CountCalls(object):
-    """Decorator to determine number of calls for a method"""
-
-    def __init__(self, method):
-        self.method = method
-        self.counter = 0
-
-    def __call__(self, *args, **kwargs):
-        self.counter += 1
-        return self.method(*args, **kwargs)

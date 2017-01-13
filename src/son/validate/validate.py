@@ -40,7 +40,7 @@ from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
-    build_descriptor_id
+    build_descriptor_id, CountCalls
 
 log = logging.getLogger(__name__)
 
@@ -78,14 +78,22 @@ class Validator(object):
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-        # number of warnings
+        # wrapper to count number of errors and warnings
+        log.error = CountCalls(log.error)
+        log.warning = CountCalls(log.warning)
         self._warnings_count = 0
 
     @property
-    def warnings_count(self):
+    def error_count(self):
+        """
+        Provides the number of errors given during validation.
+        """
+        return log.error.counter
+
+    @property
+    def warning_count(self):
         """
         Provides the number of warnings given during validation.
-        This property should be read after the validation process.
         """
         return self._warnings_count
 
@@ -848,13 +856,15 @@ def main():
         if not validator.validate_package(args.package_file):
             log.critical("Package validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of package '{0}' has succeeded."
                      .format(args.package_file))
         else:
             log.warning("Validation of package '{0}' returned {1} warning(s)"
                         .format(args.package_file,
-                                validator.warnings_count))
+                                validator.warning_count))
+
+        print(validator.error_count)
 
     elif args.project_path:
 
@@ -885,13 +895,13 @@ def main():
         if not validator.validate_project(project):
             log.critical("Project validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of project '{0}' has succeeded."
                      .format(project.project_root))
         else:
             log.warning("Validation of project '{0}' returned {1} warning(s)"
                         .format(project.project_root,
-                                validator.warnings_count))
+                                validator.warning_count))
 
     elif args.nsd:
         validator = Validator()
@@ -904,12 +914,12 @@ def main():
         if not validator.validate_service(args.nsd):
             log.critical("Project validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of service '{0}' has succeeded."
                      .format(args.nsd))
         else:
             log.warning("Validation of service '{0}' returned {1} warning(s)"
-                        .format(args.nsd, validator.warnings_count))
+                        .format(args.nsd, validator.warning_count))
 
     elif args.vnfd:
         validator = Validator()
@@ -922,12 +932,12 @@ def main():
         if not validator.validate_function(args.vnfd):
             log.critical("Function validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of function '{0}' has succeeded."
                      .format(args.vnfd))
         else:
             log.warning("Validation of function '{0}' returned {1} warning(s)"
-                        .format(args.vnfd, validator.warnings_count))
+                        .format(args.vnfd, validator.warning_count))
     else:
         log.error("Provided arguments are invalid.")
         exit(1)

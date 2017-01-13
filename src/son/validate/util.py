@@ -119,3 +119,15 @@ def strip_root(path):
     if type(path) is not str:
         return path
     return path[1:] if path[0] == '/' else path
+
+
+class CountCalls(object):
+    """Decorator to determine number of calls for a method"""
+
+    def __init__(self, method):
+        self.method = method
+        self.counter = 0
+
+    def __call__(self, *args, **kwargs):
+        self.counter += 1
+        return self.method(*args, **kwargs)
