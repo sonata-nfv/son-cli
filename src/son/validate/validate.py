@@ -338,27 +338,19 @@ class Validator(object):
 
         # validate directory 'service_descriptors'
         services_dir = os.path.join(package_dir, 'service_descriptors')
-        if not os.path.isdir(services_dir):
-            log.error("A directory named 'service_descriptors' must exist, "
-                      "located at the root of the package")
-            return
-
-        if len(os.listdir(services_dir)) == 0:
-            log.error("The 'service_descriptors' directory must contain at "
-                      "least one service descriptor file")
-            return
+        if os.path.isdir(services_dir):
+            if len(os.listdir(services_dir)) == 0:
+                log.error("The 'service_descriptors' directory must contain at"
+                          " least one service descriptor file")
+                return
 
         # validate directory 'function_descriptors'
         functions_dir = os.path.join(package_dir, 'function_descriptors')
-        if not os.path.isdir(functions_dir):
-            log.error("A directory named 'function_descriptors' must exist, "
-                      "located at the root of the package")
-            return
-
-        if len(os.listdir(functions_dir)) == 0:
-            log.error("The 'function_descriptors' directory must contain at "
-                      "least one function descriptor file")
-            return
+        if os.path.isdir(functions_dir):
+            if len(os.listdir(functions_dir)) == 0:
+                log.error("The 'function_descriptors' directory must contain "
+                          "at least one function descriptor file")
+                return
 
         return True
 

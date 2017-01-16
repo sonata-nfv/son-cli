@@ -168,17 +168,6 @@ class Packager(object):
             manifest.write(yaml.dump(self.package_descriptor,
                                      default_flow_style=False))
 
-        # Validate PD
-        log.debug("Validating Package Descriptor")
-        if not self._schema_validator.validate(
-                self._package_descriptor,
-                SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
-
-            log.debug("Failed to validate Package Descriptor. "
-                      "Aborting package creation.")
-            self._package_descriptor = None
-            return
-
     @performance
     def package_gds(self, prj_descriptor=None):
         """
@@ -332,9 +321,8 @@ class Packager(object):
         log.debug("Validating Service Descriptor NSD='{}'"
                   .format(nsd_filename))
 
-        if not self._schema_validator.validate(
-                nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-
+        if not self._validator.validate_service(os.path.join(base_path,
+                                                             nsd_filename)):
             log.error("Failed to validate Service Descriptor '{}'. "
                       "Aborting package creation".format(nsd_filename))
             return
@@ -607,9 +595,8 @@ class Packager(object):
 
         # Validate VNFD
         log.debug("Validating VNF descriptor file='{}'".format(vnfd_path))
-        if not self._schema_validator.validate(
-                vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-
+        if not self._validator.validate_function(os.path.join(base_path,
+                                                              vnfd_list[0])):
             log.exception("Failed to validate VNF descriptor '{}'"
                           .format(vnfd_path))
             return
@@ -765,6 +752,14 @@ class Packager(object):
 
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
+
+        # Validate PD
+        log.debug("Validating Package")
+        if not self._validator.validate_package(zip_name):
+            log.debug("Failed to validate Package Descriptor. "
+                      "Aborting package creation.")
+            self._package_descriptor = None
+            return
 
         package_md5 = generate_hash(zip_name)
         log.info("Package generated successfully.\nFile: {}\nMD5: {}\n"
