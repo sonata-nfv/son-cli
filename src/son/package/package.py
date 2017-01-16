@@ -30,14 +30,13 @@ import pathlib
 import shutil
 import sys
 import zipfile
-from contextlib import closing
-
 import coloredlogs
 import requests
 import validators
 import yaml
 import time
 import atexit
+from contextlib import closing
 from son.validate.validate import Validator
 from son.package.decorators import performance
 from son.package.md5 import generate_hash
@@ -104,7 +103,6 @@ class Packager(object):
         """
         Validate and initialize the destination folder
         for the creation of the package artifacts.
-        :param dst_path: The directory of the package components
         """
         if os.path.isdir(self._workdir):
             log.error("Internal error. Temporary workdir already exists.")
