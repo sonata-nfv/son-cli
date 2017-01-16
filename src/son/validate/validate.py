@@ -81,7 +81,6 @@ class Validator(object):
         # wrapper to count number of errors and warnings
         log.error = CountCalls(log.error)
         log.warning = CountCalls(log.warning)
-        self._warnings_count = 0
 
     @property
     def error_count(self):
@@ -95,7 +94,7 @@ class Validator(object):
         """
         Provides the number of warnings given during validation.
         """
-        return self._warnings_count
+        return log.warning.counter
 
     def configure(self, syntax=None, integrity=None, topology=None,
                   dpath=None, dext=None, debug=False):
@@ -587,7 +586,6 @@ class Validator(object):
             if cycles and len(cycles) > 0:
                 log.warning("Found cycles forwarding path id={0}: {1}"
                             .format(fpid, cycles))
-                self._warnings_count += 1
 
         # TODO: find a more coherent method to do this
         nx.write_graphml(service.graph, "{0}.graphml".format(service.id))
@@ -616,7 +614,6 @@ class Validator(object):
         if cycles and len(cycles) > 0:
             log.warning("Found cycles in network graph of function "
                         "'{0}':\n{0}".format(function.id, cycles))
-            self._warnings_count += 1
 
         return True
 
