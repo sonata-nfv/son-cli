@@ -110,8 +110,13 @@ class Packager(object):
             log.error("Internal error. Temporary workdir already exists.")
             return
 
+        # workdir
         os.mkdir(self._workdir)
         atexit.register(shutil.rmtree, os.path.abspath(self._workdir))
+
+        # destination path
+        if not os.path.isdir(self._dst_path):
+            os.mkdir(self._dst_path)
 
     @property
     def package_descriptor(self):
@@ -137,7 +142,8 @@ class Packager(object):
         # The general section must be created last,
         # some fields depend on prior processing
         log.info('Create General Description section')
-        general_description = self.package_gds()
+        general_description = self.package_gds(
+            prj_descriptor=self._project.project_config)
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -173,7 +179,7 @@ class Packager(object):
             return
 
     @performance
-    def package_gds(self):
+    def package_gds(self, prj_descriptor=None):
         """
         Compile information for the General Description Section.
         This section is exclusively filled by the project descriptor
@@ -187,15 +193,15 @@ class Packager(object):
             SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
 
         gds['sealed'] = self._sealed
-        if self._project:
+        if prj_descriptor:
             gds['entry_service_template'] = self._entry_service_template
 
             errors = []
             for field in gds_fields:
-                if field not in self._project.project_config.keys():
+                if field not in prj_descriptor.keys():
                     errors.append(field)
                 else:
-                    gds[field] = self._project.project_config[field]
+                    gds[field] = prj_descriptor[field]
 
             if errors:
                 print('Please define {} on {}'
