@@ -56,6 +56,7 @@ import os
 from os.path import expanduser
 from helpers.helpers import json_response
 from models.models import User
+from config.config import GK_ADDRESS, GK_PORT
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class mcolors:
 
 
 class AccessClient:
-    ACCESS_VERSION = "0.01"
+    ACCESS_VERSION = "0.1"
 
     DEFAULT_ACCESS_DIR = os.path.join(expanduser("~"), ".son-access")
 
@@ -121,7 +122,9 @@ class AccessClient:
 
         response = requests.post(url, data=form_data, verify=False)
         print "Access Token received: ", mcolors.OKGREEN + (response.text) + "\n", mcolors.ENDC
-        # TODO: Write temp file with Access token
+        with open("config/token.txt", "w") as token_file:
+            token_file.write(str(response.text))
+
         return response.text
 
     def client_logout(self):
@@ -149,12 +152,12 @@ class AccessClient:
 
     def push_package(self, token, path):
         """
-        tbd
-        :return:
+        Call push feature to upload a package to the SP Catalogue
+        :return: HTTP code 201 or 40X
         """
-        mode = "push"
-        url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
-        #path = "samples/sonata-demo.son"
+        # mode = "push"
+        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
+        # path = "samples/sonata-demo.son"
 
         # Push son-package to the Service Platform
         raise NotImplementedError
@@ -165,11 +168,11 @@ class AccessClient:
 
     def pull_resource(self, token, id):
         """
-        tbd
-        :return:
+        Call pull feature to request a resource from the SP Catalogue
+        :return: A valid resource (Package, descriptor)
         """
-        mode = "pull"
-        url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
+        # mode = "pull"
+        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
 
         # Push son-package to the Service Platform
         raise NotImplementedError
@@ -236,6 +239,8 @@ def main():
         coloredlogs.install(level=log_level)
 
     if args.auth:
+        # TODO: Make url an optional parameter
+        print "args.auth", args.auth
         # Ensure that three arguments are given (URL, USERNAME and PASSWORD)
         if all(i is not None for i in [args.u, args.p]):
             usrname = args.u
@@ -256,6 +261,7 @@ def main():
         package_path = args.push[1]
         print token_path
         print package_path
+        # TODO: implement
         raise NotImplementedError
 
     if args.pull:
@@ -263,6 +269,7 @@ def main():
         identifier = args.pull[1]
         print token_path
         print identifier
+        # TODO: implement
         raise NotImplementedError
 
     else:

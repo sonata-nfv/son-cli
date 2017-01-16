@@ -66,20 +66,20 @@ class Push(object):
     """
 
     CAT_URI_BASE = "/"
-    CAT_URI_NS = "/services?"             # List all NS
-    CAT_URI_NS_ID = "/services/"      # Get a specific NS by ID
-    CAT_URI_NS_NAME = "/services?name="  # Get NS list by name
-    CAT_URI_VNF = "/functions?"           # List all VNFs
-    CAT_URI_VNF_ID = "/functions/"    # Get a specific VNF by id
-    CAT_URI_VNF_NAME = "/functions?name="   # GET VNF list by name
-    CAT_URI_PD = "/packages?"             # List all Packages
-    CAT_URI_PD_ID = "/packages/"      # Get a specific Package by ID
-    CAT_URI_PD_NAME = "/packages?name="  # Get Package list by name
+    # CAT_URI_NS = "/services?"               # List all NS
+    # CAT_URI_NS_ID = "/services/"            # Get a specific NS by ID
+    # CAT_URI_NS_NAME = "/services?name="     # Get NS list by name
+    # CAT_URI_VNF = "/functions?"             # List all VNFs
+    # CAT_URI_VNF_ID = "/functions/"          # Get a specific VNF by id
+    # CAT_URI_VNF_NAME = "/functions?name="   # GET VNF list by name
+    CAT_URI_PD = "/packages?"               # List all Packages
+    # CAT_URI_PD_ID = "/packages/"            # Get a specific Package by ID
+    # CAT_URI_PD_NAME = "/packages?name="     # Get Package list by name
 
     def __init__(self, base_url, auth=('', '')):
         # Assign parameters
         self._base_url = base_url
-        self._auth = auth   # Just basic auth for now
+        self._auth = auth   # Username and password for auth call
         self._headers = {'Content-Type': 'application/x-yaml'}
 
         # Ensure parameters are valid
@@ -100,9 +100,8 @@ class Push(object):
         """
         url = self._base_url + Push.CAT_URI_BASE
         try:
-            response = requests.get(url,
-                                    auth=self._auth,
-                                    headers=self._headers)
+            response = requests.get(url, auth=self._auth)
+            # headers=self._headers)
 
         except requests.exceptions.InvalidURL:
             log.warning("Invalid URL: '{}'. Please specify "
@@ -124,7 +123,7 @@ class Push(object):
     def __post_cat_object__(self, cat_uri, obj_data):
         """
         Generic POST function.
-        :param cat_uri:
+        :param cat_uri: Platform GKAPI address
         :param obj_data:
         :return:
         """
@@ -139,8 +138,8 @@ class Push(object):
             return response
 
         except requests.exceptions.ConnectionError:
-            log.error("Connection error to server '{}'. VNF publishing "
-                      "failed".format(Push.CAT_URI_VNF))
+            log.error("Connection error to server '{}'. Publishing "
+                      "failed".format(cat_uri))
             return
 
     def post_ns(self, nsd_data):
@@ -215,7 +214,7 @@ class Push(object):
                 return "%s (%d): %r" % (msg, r.status_code, r.text)
 
         except Exception as e:
-            return "Service package upload failed. " + e
+            return "Service package upload failed. " + str(e)
 
     '''
     def instantiate_package(platform_url, service_uuid=""):
