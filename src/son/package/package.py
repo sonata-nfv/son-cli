@@ -72,7 +72,11 @@ class Packager(object):
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
 
-        self._dst_path = dst_path
+        # location to write the package
+        self._dst_path = dst_path if dst_path else '.'
+
+        # temporary working directory
+        self._workdir = '.package-' + str(time.time())
 
         # Specifies THE service template of this package
         self._entry_service_template = None
@@ -93,56 +97,30 @@ class Packager(object):
 
         # Clear and create package specific folder
         if generate_pd:
-            self.init_package_skeleton(dst_path)
-            self.package_descriptor = self._project
+            self.init_package_skeleton()
+            self.build_package()
 
-    def init_package_skeleton(self, dst_path):
+    def init_package_skeleton(self):
         """
         Validate and initialize the destination folder
         for the creation of the package artifacts.
         :param dst_path: The directory of the package components
         """
-        if not dst_path:
-            if self._project:
-                self._dst_path = os.path.join(self._project.project_root,
-                                              "target")
-            else:
-                dst_path = '.target-' + str(time.time())
-                os.mkdir(dst_path)
-                log.debug("Destination path not specified, writing temp "
-                          "directory '{}'".format(dst_path))
-                atexit.register(shutil.rmtree, os.path.abspath(dst_path))
+        if os.path.isdir(self._workdir):
+            log.error("Internal error. Temporary workdir already exists.")
+            return
 
-        elif os.path.isdir(dst_path):  # dir exists?
-
-            if len(os.listdir(dst_path)) > 0:  # dir not empty?
-                log.error("Destination directory '{}' is not empty"
-                          .format(os.path.abspath(dst_path)))
-
-                sys.stderr.write("ERROR: Destination directory '{}' "
-                                 "is not empty\n"
-                                 .format(os.path.abspath(dst_path)))
-                exit(1)
-
-            self._dst_path = os.path.abspath(dst_path)
-
-        else:
-            self._dst_path = os.path.abspath(dst_path)
-
-        if os.path.exists(self._dst_path):
-            shutil.rmtree(self._dst_path)
-            os.makedirs(self._dst_path, exist_ok=False)
+        os.mkdir(self._workdir)
+        atexit.register(shutil.rmtree, os.path.abspath(self._workdir))
 
     @property
     def package_descriptor(self):
         return self._package_descriptor
 
-    @package_descriptor.setter
-    def package_descriptor(self, project):
+    def build_package(self):
         """
         Create and set the full package descriptor as a dictionary.
         It process the file by each individual section.
-        :param project: The project object
         """
         log.info('Create Package Content Section')
         package_content = self.package_pcs()
@@ -159,7 +137,7 @@ class Packager(object):
         # The general section must be created last,
         # some fields depend on prior processing
         log.info('Create General Description section')
-        general_description = self.package_gds(project.project_config)
+        general_description = self.package_gds()
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -177,7 +155,7 @@ class Packager(object):
         self._package_descriptor.update(artifact_dependencies)
 
         # Create the manifest folder and file
-        meta_inf = os.path.join(self._dst_path, "META-INF")
+        meta_inf = os.path.join(self._workdir, "META-INF")
         os.makedirs(meta_inf, exist_ok=True)
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor,
@@ -195,12 +173,11 @@ class Packager(object):
             return
 
     @performance
-    def package_gds(self, prj_descriptor):
+    def package_gds(self):
         """
         Compile information for the General Description Section.
         This section is exclusively filled by the project descriptor
         file located on the root of every project.
-        :param prj_descriptor: The file to gather all needed information.
         """
         # List of mandatory fields to be included in the GDS
         gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
@@ -210,20 +187,28 @@ class Packager(object):
             SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
 
         gds['sealed'] = self._sealed
-        gds['entry_service_template'] = self._entry_service_template
+        if self._project:
+            gds['entry_service_template'] = self._entry_service_template
 
-        errors = []
-        for field in gds_fields:
-            if field not in prj_descriptor.keys():
-                errors.append(field)
-            else:
-                gds[field] = prj_descriptor[field]
+            errors = []
+            for field in gds_fields:
+                if field not in self._project.project_config.keys():
+                    errors.append(field)
+                else:
+                    gds[field] = self._project.project_config[field]
 
-        if errors:
-            print('Please define {} on {}'
-                  .format(', '.join(errors), Project.__descriptor_name__),
-                  file=sys.stderr)
-            return False
+            if errors:
+                print('Please define {} on {}'
+                      .format(', '.join(errors), Project.__descriptor_name__),
+                      file=sys.stderr)
+                return False
+        else:
+            #TODO: what properties to set in a custom package? TBD...
+            gds['vendor'] = 'custom'
+            gds['name'] = 'package'
+            gds['version'] = '1.0'
+            gds['maintainer'] = 'developer'
+            gds['description'] = 'custom generated package'
 
         return gds
 
@@ -359,7 +344,7 @@ class Packager(object):
 
         # Create SD location
         nsd = os.path.join(base_path, nsd_filename)
-        sd_path = os.path.join(self._dst_path, "service_descriptors")
+        sd_path = os.path.join(self._workdir, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
         # Copy service descriptor file
@@ -392,7 +377,7 @@ class Packager(object):
                 continue
 
         # Create SD location
-        sd_path = os.path.join(self._dst_path, "service_descriptors")
+        sd_path = os.path.join(self._workdir, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
         # Copy service descriptors and generate their entry points
@@ -462,7 +447,7 @@ class Packager(object):
                 continue
 
         # Create FD location
-        sd_path = os.path.join(self._dst_path, "function_descriptors")
+        sd_path = os.path.join(self._workdir, "function_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
         # Copy function descriptors and generate their entry points
@@ -633,7 +618,7 @@ class Packager(object):
 
         pce = []
         # Create fd location
-        fd_path = os.path.join(self._dst_path, "function_descriptors")
+        fd_path = os.path.join(self._workdir, "function_descriptors")
         os.makedirs(fd_path, exist_ok=True)
 
         # Copy the descriptor file
@@ -738,7 +723,7 @@ class Packager(object):
 
     def __pce_img_gen_fc__(self, img_format, vnf, f, root, dir_o=''):
         fd_path = os.path.join("{}_files".format(img_format), vnf, dir_o)
-        fd_path = os.path.join(self._dst_path, fd_path)
+        fd_path = os.path.join(self._workdir, fd_path)
         os.makedirs(fd_path, exist_ok=True)
         fd = os.path.join(fd_path, f)
         shutil.copyfile(os.path.join(root, f), fd)
@@ -765,11 +750,11 @@ class Packager(object):
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.son')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
-            for base, dirs, files in os.walk(self._dst_path):
+            for base, dirs, files in os.walk(self._workdir):
                 for file_name in files:
                     full_path = os.path.join(base, file_name)
                     relative_path = \
-                        full_path[len(self._dst_path) + len(os.sep):]
+                        full_path[len(self._workdir) + len(os.sep):]
 
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
@@ -968,6 +953,9 @@ def main():
         pck.generate_package(args.name)
 
     elif args.custom:
-        pck = Packager(workspace, services=args.service,
-                       functions=args.function, dst_path=args.destination)
+        services = [args.service] if type(args.service) is str else None
+        functions = [args.function] if type(args.function) is str else None
+
+        pck = Packager(workspace, services=services,
+                       functions=functions, dst_path=args.destination)
         pck.generate_package(args.name)
