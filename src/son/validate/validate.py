@@ -40,7 +40,7 @@ from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
-    build_descriptor_id
+    build_descriptor_id, CountCalls
 
 log = logging.getLogger(__name__)
 
@@ -78,16 +78,23 @@ class Validator(object):
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-        # number of warnings
-        self._warnings_count = 0
+        # wrapper to count number of errors and warnings
+        log.error = CountCalls(log.error)
+        log.warning = CountCalls(log.warning)
 
     @property
-    def warnings_count(self):
+    def error_count(self):
+        """
+        Provides the number of errors given during validation.
+        """
+        return log.error.counter
+
+    @property
+    def warning_count(self):
         """
         Provides the number of warnings given during validation.
-        This property should be read after the validation process.
         """
-        return self._warnings_count
+        return log.warning.counter
 
     def configure(self, syntax=None, integrity=None, topology=None,
                   dpath=None, dext=None, debug=False):
@@ -331,27 +338,19 @@ class Validator(object):
 
         # validate directory 'service_descriptors'
         services_dir = os.path.join(package_dir, 'service_descriptors')
-        if not os.path.isdir(services_dir):
-            log.error("A directory named 'service_descriptors' must exist, "
-                      "located at the root of the package")
-            return
-
-        if len(os.listdir(services_dir)) == 0:
-            log.error("The 'service_descriptors' directory must contain at "
-                      "least one service descriptor file")
-            return
+        if os.path.isdir(services_dir):
+            if len(os.listdir(services_dir)) == 0:
+                log.error("The 'service_descriptors' directory must contain at"
+                          " least one service descriptor file")
+                return
 
         # validate directory 'function_descriptors'
         functions_dir = os.path.join(package_dir, 'function_descriptors')
-        if not os.path.isdir(functions_dir):
-            log.error("A directory named 'function_descriptors' must exist, "
-                      "located at the root of the package")
-            return
-
-        if len(os.listdir(functions_dir)) == 0:
-            log.error("The 'function_descriptors' directory must contain at "
-                      "least one function descriptor file")
-            return
+        if os.path.isdir(functions_dir):
+            if len(os.listdir(functions_dir)) == 0:
+                log.error("The 'function_descriptors' directory must contain "
+                          "at least one function descriptor file")
+                return
 
         return True
 
@@ -579,7 +578,6 @@ class Validator(object):
             if cycles and len(cycles) > 0:
                 log.warning("Found cycles forwarding path id={0}: {1}"
                             .format(fpid, cycles))
-                self._warnings_count += 1
 
         # TODO: find a more coherent method to do this
         nx.write_graphml(service.graph, "{0}.graphml".format(service.id))
@@ -608,7 +606,6 @@ class Validator(object):
         if cycles and len(cycles) > 0:
             log.warning("Found cycles in network graph of function "
                         "'{0}':\n{0}".format(function.id, cycles))
-            self._warnings_count += 1
 
         return True
 
@@ -848,13 +845,15 @@ def main():
         if not validator.validate_package(args.package_file):
             log.critical("Package validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of package '{0}' has succeeded."
                      .format(args.package_file))
         else:
             log.warning("Validation of package '{0}' returned {1} warning(s)"
                         .format(args.package_file,
-                                validator.warnings_count))
+                                validator.warning_count))
+
+        print(validator.error_count)
 
     elif args.project_path:
 
@@ -885,13 +884,13 @@ def main():
         if not validator.validate_project(project):
             log.critical("Project validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of project '{0}' has succeeded."
                      .format(project.project_root))
         else:
             log.warning("Validation of project '{0}' returned {1} warning(s)"
                         .format(project.project_root,
-                                validator.warnings_count))
+                                validator.warning_count))
 
     elif args.nsd:
         validator = Validator()
@@ -904,12 +903,12 @@ def main():
         if not validator.validate_service(args.nsd):
             log.critical("Project validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of service '{0}' has succeeded."
                      .format(args.nsd))
         else:
             log.warning("Validation of service '{0}' returned {1} warning(s)"
-                        .format(args.nsd, validator.warnings_count))
+                        .format(args.nsd, validator.warning_count))
 
     elif args.vnfd:
         validator = Validator()
@@ -922,12 +921,12 @@ def main():
         if not validator.validate_function(args.vnfd):
             log.critical("Function validation has failed.")
             exit(1)
-        if validator.warnings_count == 0:
+        if validator.warning_count == 0:
             log.info("Validation of function '{0}' has succeeded."
                      .format(args.vnfd))
         else:
             log.warning("Validation of function '{0}' returned {1} warning(s)"
-                        .format(args.vnfd, validator.warnings_count))
+                        .format(args.vnfd, validator.warning_count))
     else:
         log.error("Provided arguments are invalid.")
         exit(1)

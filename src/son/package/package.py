@@ -30,14 +30,14 @@ import pathlib
 import shutil
 import sys
 import zipfile
-from contextlib import closing
-
 import coloredlogs
 import requests
 import validators
 import yaml
-
-from son.catalogue.catalogue_client import CatalogueClient
+import time
+import atexit
+from contextlib import closing
+from son.validate.validate import Validator
 from son.package.decorators import performance
 from son.package.md5 import generate_hash
 from son.workspace.project import Project
@@ -49,8 +49,8 @@ log = logging.getLogger(__name__)
 
 class Packager(object):
 
-    def __init__(self, workspace, project, dst_path=None, generate_pd=True,
-                 version="1.0"):
+    def __init__(self, workspace, project=None, services=None, functions=None,
+                 dst_path=None, generate_pd=True, version="1.0"):
 
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
@@ -58,21 +58,24 @@ class Packager(object):
         self._package_descriptor = None
         self._workspace = workspace
         self._project = project
+        self._services = services
+        self._functions = functions
+
+        # Create a validator
+        self._validator = Validator(workspace=workspace)
+        self._validator.configure(syntax=True, integrity=False, topology=False)
 
         # Create a schema validator
         self._schema_validator = SchemaValidator(workspace)
 
-        self._catalogueClients = []
-
-        # Read catalogue servers from workspace
-        # configfile and create clients
-        for cat in workspace.catalogue_servers:
-            self._catalogueClients.append(CatalogueClient(cat['url']))
-
         # Keep track of VNF packaging referenced in NS
         self._ns_vnf_registry = {}
 
-        self._dst_path = dst_path
+        # location to write the package
+        self._dst_path = dst_path if dst_path else '.'
+
+        # temporary working directory
+        self._workdir = '.package-' + str(time.time())
 
         # Specifies THE service template of this package
         self._entry_service_template = None
@@ -93,48 +96,34 @@ class Packager(object):
 
         # Clear and create package specific folder
         if generate_pd:
-            self.init_package_skeleton(dst_path)
-            self.package_descriptor = self._project
+            self.init_package_skeleton()
+            self.build_package()
 
-    def init_package_skeleton(self, dst_path):
+    def init_package_skeleton(self):
         """
         Validate and initialize the destination folder
         for the creation of the package artifacts.
-        :param dst_path: The directory of the package components
         """
-        if not dst_path:
-            self._dst_path = os.path.join(self._project.project_root, "target")
+        if os.path.isdir(self._workdir):
+            log.error("Internal error. Temporary workdir already exists.")
+            return
 
-        elif os.path.isdir(dst_path):  # dir exists?
+        # workdir
+        os.mkdir(self._workdir)
+        atexit.register(shutil.rmtree, os.path.abspath(self._workdir))
 
-            if len(os.listdir(dst_path)) > 0:  # dir not empty?
-                log.error("Destination directory '{}' is not empty"
-                          .format(os.path.abspath(dst_path)))
-
-                sys.stderr.write("ERROR: Destination directory '{}' "
-                                 "is not empty\n"
-                                 .format(os.path.abspath(dst_path)))
-                exit(1)
-
-            self._dst_path = os.path.abspath(dst_path)
-
-        else:
-            self._dst_path = os.path.abspath(dst_path)
-
-        if os.path.exists(self._dst_path):
-            shutil.rmtree(self._dst_path)
-            os.makedirs(self._dst_path, exist_ok=False)
+        # destination path
+        if not os.path.isdir(self._dst_path):
+            os.mkdir(self._dst_path)
 
     @property
     def package_descriptor(self):
         return self._package_descriptor
 
-    @package_descriptor.setter
-    def package_descriptor(self, project):
+    def build_package(self):
         """
         Create and set the full package descriptor as a dictionary.
         It process the file by each individual section.
-        :param project: The project object
         """
         log.info('Create Package Content Section')
         package_content = self.package_pcs()
@@ -151,7 +140,11 @@ class Packager(object):
         # The general section must be created last,
         # some fields depend on prior processing
         log.info('Create General Description section')
-        general_description = self.package_gds(project.project_config)
+        if self._project:
+            general_description = self.package_gds(
+                prj_descriptor=self._project.project_config)
+        else:
+            general_description = self.package_gds()
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -169,30 +162,18 @@ class Packager(object):
         self._package_descriptor.update(artifact_dependencies)
 
         # Create the manifest folder and file
-        meta_inf = os.path.join(self._dst_path, "META-INF")
+        meta_inf = os.path.join(self._workdir, "META-INF")
         os.makedirs(meta_inf, exist_ok=True)
         with open(os.path.join(meta_inf, "MANIFEST.MF"), "w") as manifest:
             manifest.write(yaml.dump(self.package_descriptor,
                                      default_flow_style=False))
 
-        # Validate PD
-        log.debug("Validating Package Descriptor")
-        if not self._schema_validator.validate(
-                self._package_descriptor,
-                SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
-
-            log.debug("Failed to validate Package Descriptor. "
-                      "Aborting package creation.")
-            self._package_descriptor = None
-            return
-
     @performance
-    def package_gds(self, prj_descriptor):
+    def package_gds(self, prj_descriptor=None):
         """
         Compile information for the General Description Section.
         This section is exclusively filled by the project descriptor
         file located on the root of every project.
-        :param prj_descriptor: The file to gather all needed information.
         """
         # List of mandatory fields to be included in the GDS
         gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
@@ -202,20 +183,28 @@ class Packager(object):
             SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR)
 
         gds['sealed'] = self._sealed
-        gds['entry_service_template'] = self._entry_service_template
+        if prj_descriptor:
+            gds['entry_service_template'] = self._entry_service_template
 
-        errors = []
-        for field in gds_fields:
-            if field not in prj_descriptor.keys():
-                errors.append(field)
-            else:
-                gds[field] = prj_descriptor[field]
+            errors = []
+            for field in gds_fields:
+                if field not in prj_descriptor.keys():
+                    errors.append(field)
+                else:
+                    gds[field] = prj_descriptor[field]
 
-        if errors:
-            print('Please define {} on {}'
-                  .format(', '.join(errors), Project.__descriptor_name__),
-                  file=sys.stderr)
-            return False
+            if errors:
+                print('Please define {} on {}'
+                      .format(', '.join(errors), Project.__descriptor_name__),
+                      file=sys.stderr)
+                return False
+        else:
+            #TODO: what properties to set in a custom package? TBD...
+            gds['vendor'] = 'custom'
+            gds['name'] = 'package'
+            gds['version'] = '1.0'
+            gds['maintainer'] = 'developer'
+            gds['description'] = 'custom generated package'
 
         return gds
 
@@ -229,18 +218,33 @@ class Packager(object):
         pcs = []
 
         # Load and add service descriptor
-        nsd = self.generate_nsd()
-        if not nsd or len(nsd) == 0:
-            log.error("Failed to package service descriptor")
-            return None
-        pcs += nsd
+        if self._project:
+            nsd = self.generate_project_nsd()
+
+            if not nsd or len(nsd) == 0:
+                log.error("Failed to package service descriptor")
+                return
+            pcs += nsd
+        elif self._services:
+            nsds = self.generate_custom_nsds()
+            if not nsds:
+                log.error("Failed to package service descriptors")
+                return
+            pcs += nsds
 
         # Load and add the function descriptors
-        vnfds = self.generate_vnfds()
-        if not vnfds or len(vnfds) == 0:
-            log.error("Failed to package function descriptors")
-            return None
-        pcs += vnfds
+        if self._project:
+            vnfds = self.generate_project_vnfds()
+            if not vnfds or len(vnfds) == 0:
+                log.error("Failed to package function descriptors")
+                return
+            pcs += vnfds
+        elif self._functions:
+            vnfds = self.generate_custom_vnfds()
+            if not vnfds:
+                log.error("Failed to package function descriptors")
+                return
+            pcs += vnfds
 
         return dict(package_content=pcs)
 
@@ -286,7 +290,7 @@ class Packager(object):
 
         return dict(artifact_dependencies=self._artifact_dependencies)
 
-    def generate_nsd(self):
+    def generate_project_nsd(self):
         """
         Compile information for the service descriptor section.
         """
@@ -317,9 +321,8 @@ class Packager(object):
         log.debug("Validating Service Descriptor NSD='{}'"
                   .format(nsd_filename))
 
-        if not self._schema_validator.validate(
-                nsd, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-
+        if not self._validator.validate_service(os.path.join(base_path,
+                                                             nsd_filename)):
             log.error("Failed to validate Service Descriptor '{}'. "
                       "Aborting package creation".format(nsd_filename))
             return
@@ -336,7 +339,7 @@ class Packager(object):
 
         # Create SD location
         nsd = os.path.join(base_path, nsd_filename)
-        sd_path = os.path.join(self._dst_path, "service_descriptors")
+        sd_path = os.path.join(self._workdir, "service_descriptors")
         os.makedirs(sd_path, exist_ok=True)
 
         # Copy service descriptor file
@@ -346,7 +349,7 @@ class Packager(object):
         # Generate NSD package content entry
         pce = []
         pce_sd = dict()
-        pce_sd["content-type"] = "application/sonata.service_descriptors"
+        pce_sd["content-type"] = "application/sonata.service_descriptor"
         pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
         pce_sd["md5"] = generate_hash(nsd)
         pce.append(pce_sd)
@@ -356,10 +359,40 @@ class Packager(object):
 
         return pce
 
-    def generate_vnfds(self):
+    def generate_custom_nsds(self):
         """
-        Compile information for the function descriptors.
-        This function
+        Compile information for the service descriptors, when creating a
+        custom package.
+        """
+        log.info("Packaging service descriptors...")
+        for nsd_filename in self._services:
+            if not self._validator.validate_service(nsd_filename):
+                log.error("Failed to package service '{}'"
+                          .format(nsd_filename))
+                return
+
+        # Create SD location
+        sd_path = os.path.join(self._workdir, "service_descriptors")
+        os.makedirs(sd_path, exist_ok=True)
+
+        # Copy service descriptors and generate their entry points
+        pce = []
+        for nsd_filename in self._services:
+            nsd_basename = os.path.basename(nsd_filename)
+            sd = os.path.join(sd_path, nsd_basename)
+            self.copy_descriptor_file(nsd_filename, sd)
+            pce_sd = dict()
+            pce_sd["content-type"] = "application/sonata.service_descriptor"
+            pce_sd["name"] = "/service_descriptors/{}".format(nsd_basename)
+            pce_sd["md5"] = generate_hash(sd)
+            pce.append(pce_sd)
+
+        return pce
+
+    def generate_project_vnfds(self):
+        """
+        Compile information for the function descriptors, when packaging an
+        SDK project.
         """
         # Add VNFs from project source
         log.info("Packaging VNF descriptors from project source...")
@@ -396,6 +429,36 @@ class Packager(object):
 
         return pcs
 
+    def generate_custom_vnfds(self):
+        """
+        Compile information for the function descriptors, when creating a
+        custom package.
+        """
+        log.info("Packaging VNF descriptors...")
+        for vnfd_filename in self._functions:
+            if not self._validator.validate_function(vnfd_filename):
+                log.error("Failed to package function '{}'"
+                          .format(vnfd_filename))
+                return
+
+        # Create FD location
+        sd_path = os.path.join(self._workdir, "function_descriptors")
+        os.makedirs(sd_path, exist_ok=True)
+
+        # Copy function descriptors and generate their entry points
+        pce = []
+        for vnfd_filename in self._functions:
+            vnfd_basename = os.path.basename(vnfd_filename)
+            sd = os.path.join(sd_path, vnfd_basename)
+            self.copy_descriptor_file(vnfd_filename, sd)
+            pce_sd = dict()
+            pce_sd["content-type"] = "application/sonata.function_descriptor"
+            pce_sd["name"] = "/service_descriptors/{}".format(vnfd_basename)
+            pce_sd["md5"] = generate_hash(sd)
+            pce.append(pce_sd)
+
+        return pce
+
     def load_external_vnfds(self, vnf_id_list):
         """
         This method is responsible to load all VNFs, required
@@ -428,18 +491,17 @@ class Packager(object):
                 continue
 
             log.debug("VNF id='{}' is not present in workspace catalogue. "
-                      "Contacting catalogue servers...".format(vnf_id))
+                      "Contacting SP catalogues...".format(vnf_id))
 
-            # If not in WS catalogue, get the VNF from the catalogue servers
-            vnfd = self.load_vnf_from_catalogue_server(vnf_id)
-
+            # If not in WS catalogue, get the VNF from the SP Catalogues
+            vnfd = None
             if not vnfd:
-                log.warning("VNF id='{}' is not present in catalogue servers."
+                log.warning("VNF id='{}' is not present in SP Catalogues"
                             .format(vnf_id))
                 return False
 
             # Create dir to hold the retrieved VNF in workspace catalogue
-            log.debug("VNF id='{}' retrieved from the catalogue servers. "
+            log.debug("VNF id='{}' retrieved from the SP Catalogues. "
                       "Loading to workspace cache.".format(vnf_id))
 
             os.mkdir(catalogue_path)
@@ -533,9 +595,8 @@ class Packager(object):
 
         # Validate VNFD
         log.debug("Validating VNF descriptor file='{}'".format(vnfd_path))
-        if not self._schema_validator.validate(
-                vnfd, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-
+        if not self._validator.validate_function(os.path.join(base_path,
+                                                              vnfd_list[0])):
             log.exception("Failed to validate VNF descriptor '{}'"
                           .format(vnfd_path))
             return
@@ -551,7 +612,7 @@ class Packager(object):
 
         pce = []
         # Create fd location
-        fd_path = os.path.join(self._dst_path, "function_descriptors")
+        fd_path = os.path.join(self._workdir, "function_descriptors")
         os.makedirs(fd_path, exist_ok=True)
 
         # Copy the descriptor file
@@ -656,7 +717,7 @@ class Packager(object):
 
     def __pce_img_gen_fc__(self, img_format, vnf, f, root, dir_o=''):
         fd_path = os.path.join("{}_files".format(img_format), vnf, dir_o)
-        fd_path = os.path.join(self._dst_path, fd_path)
+        fd_path = os.path.join(self._workdir, fd_path)
         os.makedirs(fd_path, exist_ok=True)
         fd = os.path.join(fd_path, f)
         shutil.copyfile(os.path.join(root, f), fd)
@@ -683,14 +744,22 @@ class Packager(object):
         # Generate package file
         zip_name = os.path.join(self._dst_path, name + '.son')
         with closing(zipfile.ZipFile(zip_name, 'w')) as pck:
-            for base, dirs, files in os.walk(self._dst_path):
+            for base, dirs, files in os.walk(self._workdir):
                 for file_name in files:
                     full_path = os.path.join(base, file_name)
                     relative_path = \
-                        full_path[len(self._dst_path) + len(os.sep):]
+                        full_path[len(self._workdir) + len(os.sep):]
 
                     if not full_path == zip_name:
                         pck.write(full_path, relative_path)
+
+        # Validate PD
+        log.debug("Validating Package")
+        if not self._validator.validate_package(zip_name):
+            log.debug("Failed to validate Package Descriptor. "
+                      "Aborting package creation.")
+            self._package_descriptor = None
+            return
 
         package_md5 = generate_hash(zip_name)
         log.info("Package generated successfully.\nFile: {}\nMD5: {}\n"
@@ -775,38 +844,6 @@ class Packager(object):
         # Set package sealed to false as it will not be self-contained
         self._sealed = False
 
-    def load_vnf_from_catalogue_server(self, vnf_id):
-
-        # Check if there are catalogue clients available
-        if not len(self._catalogueClients) > 0:
-            log.warning("No catalogue servers available! "
-                        "Please check the workspace configuration.")
-            return
-
-        # For now, perform sequential requests.
-        # In the future, this should be parallel
-        # the first to arrive, the first to be consumed!
-        for client in self._catalogueClients:
-
-            log.debug("Contacting catalogue server '{}'..."
-                      .format(client.base_url))
-            # Check if catalogue server is alive!
-            if not client.alive():
-                log.warning("Catalogue server '{}' is not available."
-                            .format(client.base_url))
-                continue
-
-            vnfd = client.get_vnf(vnf_id)
-            if not vnfd:
-                continue
-
-            # Mark this catalogue server as a dependency
-            self._add_package_resolver(client.base_url)
-
-            return vnfd
-
-        return
-
 
 def get_vnf_id(vnfd):
     return get_vnf_id_full(vnfd['vendor'], vnfd['name'], vnfd['version'])
@@ -845,13 +882,44 @@ def main():
              "will assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
         required=False)
 
-    parser.add_argument(
+    exclusive_parser = parser.add_mutually_exclusive_group(
+        required=True
+    )
+
+    exclusive_parser.add_argument(
         "--project",
+        dest="project",
         help="create a new package based on the project at the specified "
              "location. If not specified will assume current directory '{}'"
              .format(os.getcwd()),
         required=False)
 
+    exclusive_parser.add_argument(
+        "--custom",
+        dest="custom",
+        help="Create a custom package. Contents and descriptors can be added "
+             "using the '--service' and '--function' arguments.",
+        action="store_true",
+        required=False
+    )
+    parser.add_argument(
+        "--service",
+        dest="service",
+        nargs='*',
+        help="Only applicable to custom packages. Add a service descriptor "
+             "to the package. Multiple services may be specified separated "
+             "with a space",
+        required=False
+    )
+    parser.add_argument(
+        "--function",
+        dest="function",
+        nargs='*',
+        help="Only applicable to custom packages. Add a function descriptor "
+             "to the package. Multiple functions may be specified separated "
+             "with a space",
+        required=False
+    )
     parser.add_argument(
         "-d", "--destination",
         help="create the package on the specified location",
@@ -869,18 +937,32 @@ def main():
     else:
         ws_root = Workspace.DEFAULT_WORKSPACE_DIR
 
-    prj_root = args.project if args.project else os.getcwd()
-
-    # Validate given arguments
-    path_ids = dict()
-    path_ids[ws_root] = Workspace.__descriptor_name__
-    path_ids[prj_root] = Project.__descriptor_name__
-    if not __validate_directory__(paths=path_ids):
-        return
-
     # Obtain Workspace object
     workspace = Workspace.__create_from_descriptor__(ws_root)
-    project = Project.__create_from_descriptor__(workspace, prj_root)
 
-    pck = Packager(workspace, project, dst_path=args.destination)
-    pck.generate_package(args.name)
+    prj_root = args.project if args.project else os.getcwd()
+
+    if args.project:
+
+        # Validate given arguments
+        path_ids = dict()
+        path_ids[ws_root] = Workspace.__descriptor_name__
+        path_ids[prj_root] = Project.__descriptor_name__
+        if not __validate_directory__(paths=path_ids):
+            return
+
+        project = Project.__create_from_descriptor__(workspace, prj_root)
+
+        pck = Packager(workspace, project=project, dst_path=args.destination)
+        pck.generate_package(args.name)
+
+    elif args.custom:
+
+        if not (args.service or args.function):
+            log.error("To create a custom package, the arguments '--service' "
+                      "and/or '--function' must be used.")
+            exit(1)
+
+        pck = Packager(workspace, services=args.service,
+                       functions=args.function, dst_path=args.destination)
+        pck.generate_package(args.name)

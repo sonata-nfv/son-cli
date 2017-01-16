@@ -35,9 +35,10 @@ from son.workspace.workspace import Project
 
 class UnitCreatePackageTests(unittest.TestCase):
 
+    @patch('son.package.package.Validator')
     @patch('son.package.package.os.path.join')
     @patch('son.package.package.zipfile')
-    def test_generate_package(self, m_zipfile, m_join):
+    def test_generate_package(self, m_zipfile, m_join, m_validator):
         """
         Ensures that a package file is created with correct name and location
         """
@@ -62,6 +63,7 @@ class UnitCreatePackageTests(unittest.TestCase):
         exit_mock = Mock()
         setattr(context_manager_mock, '__enter__', enter_mock)
         setattr(context_manager_mock, '__exit__', exit_mock)
+        m_validator.validate_package.return_value = True
 
         # execute
         packager.generate_package("package_name")
