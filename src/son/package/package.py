@@ -140,8 +140,11 @@ class Packager(object):
         # The general section must be created last,
         # some fields depend on prior processing
         log.info('Create General Description section')
-        general_description = self.package_gds(
-            prj_descriptor=self._project.project_config)
+        if self._project:
+            general_description = self.package_gds(
+                prj_descriptor=self._project.project_config)
+        else:
+            general_description = self.package_gds()
 
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
@@ -378,7 +381,7 @@ class Packager(object):
             if not self._validator.validate_service(nsd_filename):
                 log.error("Failed to package service '{}'"
                           .format(nsd_filename))
-                continue
+                return
 
         # Create SD location
         sd_path = os.path.join(self._workdir, "service_descriptors")
@@ -448,7 +451,7 @@ class Packager(object):
             if not self._validator.validate_function(vnfd_filename):
                 log.error("Failed to package function '{}'"
                           .format(vnfd_filename))
-                continue
+                return
 
         # Create FD location
         sd_path = os.path.join(self._workdir, "function_descriptors")
@@ -907,6 +910,7 @@ def main():
     parser.add_argument(
         "--service",
         dest="service",
+        nargs='*',
         help="Only applicable to custom packages. Add a service descriptor "
              "to the package. Multiple services may be specified separated "
              "with a space",
@@ -915,6 +919,7 @@ def main():
     parser.add_argument(
         "--function",
         dest="function",
+        nargs='*',
         help="Only applicable to custom packages. Add a function descriptor "
              "to the package. Multiple functions may be specified separated "
              "with a space",
@@ -957,9 +962,12 @@ def main():
         pck.generate_package(args.name)
 
     elif args.custom:
-        services = [args.service] if type(args.service) is str else None
-        functions = [args.function] if type(args.function) is str else None
 
-        pck = Packager(workspace, services=services,
-                       functions=functions, dst_path=args.destination)
+        if not (args.service or args.function):
+            log.error("To create a custom package, the arguments '--service' "
+                      "and/or '--function' must be used.")
+            exit(1)
+
+        pck = Packager(workspace, services=args.service,
+                       functions=args.function, dst_path=args.destination)
         pck.generate_package(args.name)
