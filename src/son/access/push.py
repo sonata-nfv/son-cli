@@ -27,9 +27,10 @@
 import validators
 import requests
 import logging
-import yaml
+# import yaml
 import sys
-from json import loads
+from config.config import GK_ADDRESS, GK_PORT
+# from json import loads
 
 log = logging.getLogger(__name__)
 
@@ -65,21 +66,23 @@ class Push(object):
     gatekeeper provided by the son-emu tool.
     """
 
+    GK_API_VERSION = "/api/v2"
     CAT_URI_BASE = "/"
-    # CAT_URI_NS = "/services?"               # List all NS
-    # CAT_URI_NS_ID = "/services/"            # Get a specific NS by ID
-    # CAT_URI_NS_NAME = "/services?name="     # Get NS list by name
-    # CAT_URI_VNF = "/functions?"             # List all VNFs
-    # CAT_URI_VNF_ID = "/functions/"          # Get a specific VNF by id
-    # CAT_URI_VNF_NAME = "/functions?name="   # GET VNF list by name
-    CAT_URI_PD = "/packages?"               # List all Packages
-    # CAT_URI_PD_ID = "/packages/"            # Get a specific Package by ID
-    # CAT_URI_PD_NAME = "/packages?name="     # Get Package list by name
+    CAT_URI_NS = "/services?"               # NS submitting endpoint
+    # CAT_URI_NS_ID = "/services/"            #
+    # CAT_URI_NS_NAME = "/services?name="     #
+    CAT_URI_VNF = "/functions?"             # VNF submitting endpoint
+    # CAT_URI_VNF_ID = "/functions/"          #
+    # CAT_URI_VNF_NAME = "/functions?name="   #
+    CAT_URI_PD = "/packages?"               # Package submitting endpoint
+    # CAT_URI_PD_ID = "/packages/"            #
+    # CAT_URI_PD_NAME = "/packages?name="     #
 
-    def __init__(self, base_url, auth=('', '')):
+    # def __init__(self, base_url, auth=('', '')):
+    def __init__(self, base_url):
         # Assign parameters
         self._base_url = base_url
-        self._auth = auth   # Username and password for auth call
+        # self._auth = auth   # Bearer token
         self._headers = {'Content-Type': 'application/x-yaml'}
 
         # Ensure parameters are valid
@@ -93,14 +96,14 @@ class Push(object):
 
     def alive(self):
         """
-        Checks if the catalogue API server is alive and
+        Checks if the GK API server is alive and
         responding to requests
         :return: True=server OK,
                  False=server unavailable
         """
         url = self._base_url + Push.CAT_URI_BASE
         try:
-            response = requests.get(url, auth=self._auth)
+            response = requests.get(url)    # , auth=self._auth)
             # headers=self._headers)
 
         except requests.exceptions.InvalidURL:
@@ -127,14 +130,12 @@ class Push(object):
         :param obj_data:
         :return:
         """
-        url = self._base_url + cat_uri
+        url = self._base_url + self.GK_API_VERSION + cat_uri
         log.debug("Object POST to: {}\n{}".format(url, obj_data))
 
         try:
-            response = requests.post(url,
-                                     data=obj_data,
-                                     auth=self._auth,
-                                     headers=self._headers)
+            # response = requests.post(url, data=obj_data, auth=self._auth, headers=self._headers)
+            response = requests.post(url, data=obj_data, headers=self._headers)
             return response
 
         except requests.exceptions.ConnectionError:
@@ -173,11 +174,12 @@ class Push(object):
 
         return response
 
-    def upload_package(self, platform_url, package_file_name):
+    def upload_package(self, access_token, package_file_name):
         """
         Upload package to platform
 
-        :param platform_url: url of the SONATA service
+        :param access_token: authentication token that enables
+                             access to the SONATA service
                              platform/gatekeeper or emulator
                              to upload package to
 
@@ -194,9 +196,9 @@ class Push(object):
             return package_file_name, "is not a file."
 
         # Packages on GK
-        url = platform_url + "/packages"
+        url = self._base_url + self.GK_API_VERSION + self.CAT_URI_PD
         # son-packages on catalogue
-        #url = platform_url + "/son-packages"
+        # url = platform_url + "/son-packages"
 
         if not validators.url(url):
             return url, "is not a valid url."
@@ -271,8 +273,8 @@ def main():
         epilog=examples)
 
     parser.add_argument(
-        "platform_url",
-        help="url of the gatekeeper/platform/emulator")
+        "A", "--access_token",
+        help="authentication token for the platform")
 
     parser.add_argument(
         "-U", "--upload_package",
@@ -284,16 +286,17 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.platform_url:
-        print("Platform url is required.")
+    platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
 
-    # TODO: Add url -> Read from settings
-    push_client = Push(base_url=args.platform_url)
+    if not platform_url:
+        print("Platform url is required in config file")
+
+    push_client = Push(base_url=platform_url)
     # push_client = Push(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.upload_package:
         print mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC
-        print(push_client.upload_package(args.platform_url, args.upload_package))
+        print(push_client.upload_package(args.access_token, args.upload_package))
 
     #if args.deploy_package_uuid:
     #    print(push_client.instantiate_package(args.platform_url, args.deploy_package_uuid))

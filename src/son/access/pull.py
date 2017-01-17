@@ -62,6 +62,7 @@ class Pull(object):
     of this module probably change continuously.
     """
 
+    GK_API_VERSION = "/api/v2"
     CAT_URI_BASE = "/"
     CAT_URI_NS = "/services?"             # List all NS
     CAT_URI_NS_ID = "/services/"      # Get a specific NS by ID
@@ -127,13 +128,13 @@ class Pull(object):
         :param obj_id: identifier of the resource
         :return: response of the SP
         """
-        url = self._base_url + cat_uri + obj_id
+        url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
         print "url", url
         print "headers", self._headers
         # response = requests.get(url, auth=self._auth, headers=self._headers)
         response = requests.get(url, headers=self._headers)
         print "response_code", response.status_code
-        print "response_code", response.text
+        print "response_text", response.text
         if not response.status_code == requests.codes.ok:
             return
         return response.text
@@ -164,7 +165,7 @@ class Pull(object):
         :return: yaml object containing NS
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_id)
-        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_id))
             return
@@ -196,7 +197,7 @@ class Pull(object):
         if not cat_obj:
             return
 
-        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple VNFs using ID '{}'".format(vnf_id))
             return
 
@@ -222,7 +223,7 @@ class Pull(object):
         :return: yaml object containing PD
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_id)
-        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
                       "using the ID '{}'".format(package_id))
             return
@@ -384,17 +385,5 @@ def main():
 
 
 if __name__ == '__main__':
-    #main()
+    main()
 
-    platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
-
-    pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
-
-    resource = pull_client.get_all_vnfs()
-    # resource = pull_client.get_vnf("eu.sonata-nfv.firewall-vnf.0.2")
-    # resource = pull_client.get_vnf("name=firewall-vnf&vendor=eu.sonata-nfv&version=0.2")
-    # resource = pull_client.get_ns("c95c9016-5bb2-468f-b5c9-8c23fd9c25ad")
-    # resource = pull_client.get_package("97b2e5e9-048a-44f5-b91e-69a90f525f2a")
-
-
-    print "FINAL RESPONSE", resource
