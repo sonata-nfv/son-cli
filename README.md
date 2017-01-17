@@ -6,10 +6,11 @@ SONATA SDK command line interface tools
 
 This set of command line tools are meant to aid the SONATA service developers on their tasks. The tools are briefly described as follows.
 - `son-workspace` creates, configures and manages development workspaces and projects.
-- `son-publish` allows the publication of projects, services and functions to private catalogues.
+- `son-publish` allows the publication of projects, services and functions to private catalogues (in process to be integrated to `son-access`).
 - `son-package` packages a project, containing services and functions, to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
-- `son-push` is used to upload the service package to the Service Platform Gatekeeper.
+- `son-push` is used to upload the service package to the Service Platform Gatekeeper (in process to be integrated to `son-access`).
 - `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
+- `son-access` enables authenticating users to the Service Platform and integrates functionalities to push and pull resources from the Service Platform Catalogues.
     
 
 ## Building
@@ -251,6 +252,29 @@ Example usage:
     son-push http://127.0.0.1:5000 --deploy-package <uuid>
     son-push http://127.0.0.1:5000 -I
 
+```
+
+### son-access
+Authenticate the developer to gain access to the Service Platform.
+Once authenticated, it allows the developer to submit packages to the Service Platform
+Catalogues and request resources (packages and/or descriptors) from the Service Platform Catalogues.
+```
+usage: son-access [-h]
+                  [--auth URL] [-u USERNAME] [-p PASSWORD]
+                  [--push TOKEN_PATH PACKAGE_PATH]
+                  [--pull TOKEN_PATH PACKAGE_ID]
+                  [--pull TOKEN_PATH DESCRIPTOR_ID]
+                  [--debug]
+
+  -h, --help                        show this help message and exit
+  --auth URL                        requests an Access token to authenticate the user,
+                                    it requires platform url to login,
+  -u USERNAME                       username of the user,
+  -p PASSWORD                       password of the user
+  --push TOKEN_PATH PACKAGE_PATH    submits a package to the SP, requires path to the token file and package
+  --pull TOKEN_PATH PACKAGE_ID      requests a package or descriptor to the SP by its identifier,
+                    DESCRIPTOR_ID   requires path to the token file
+  --debug                           increases logging level to debug
 ```
 
 ### son-monitor
