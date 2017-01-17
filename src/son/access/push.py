@@ -203,7 +203,7 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
-        print mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 r = requests.post(url, files={'package': pkg_file})
@@ -256,7 +256,7 @@ class Push(object):
 
 def main():
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
-    print mcolors.OKGREEN + "Running PUSH\n", mcolors.ENDC
+    print(mcolors.OKGREEN + "Running PUSH\n", mcolors.ENDC)
 
     description = """
     Push packages to the SONATA service platform/emulator or list
@@ -295,7 +295,7 @@ def main():
     # push_client = Push(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.upload_package:
-        print mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC)
         print(push_client.upload_package(args.access_token, args.upload_package))
 
     #if args.deploy_package_uuid:
