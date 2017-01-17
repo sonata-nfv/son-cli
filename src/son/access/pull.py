@@ -129,12 +129,12 @@ class Pull(object):
         :return: response of the SP
         """
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
-        print "url", url
-        print "headers", self._headers
+        print("url", url)
+        print("headers", self._headers)
         # response = requests.get(url, auth=self._auth, headers=self._headers)
         response = requests.get(url, headers=self._headers)
-        print "response_code", response.status_code
-        print "response_text", response.text
+        print("response_code", response.status_code)
+        print("response_text", response.text)
         if not response.status_code == requests.codes.ok:
             return
         return response.text
@@ -261,7 +261,7 @@ class Pull(object):
 
 def main():
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
-    print mcolors.OKGREEN + "Running PULL\n", mcolors.ENDC
+    print(mcolors.OKGREEN + "Running PULL\n", mcolors.ENDC)
 
     description = """
     Pull resources (packages/descriptors) from the SONATA service platform/emulator
@@ -349,35 +349,35 @@ def main():
     # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.alive:
-        print mcolors.OKGREEN + "PUSH - Checking Platform connectivity...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Checking Platform connectivity...\n", mcolors.ENDC)
         print(pull_client.alive())
 
     if args.list_packages:
-        print mcolors.OKGREEN + "PUSH - Getting Packages list...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Getting Packages list...\n", mcolors.ENDC)
         print(pull_client.get_all_packages())
 
     if args.list_functions:
-        print mcolors.OKGREEN + "PUSH - Getting Functions list...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Getting Functions list...\n", mcolors.ENDC)
         print(pull_client.get_all_vnfs())
 
     if args.list_services:
-        print mcolors.OKGREEN + "PUSH - Getting Services list...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Getting Services list...\n", mcolors.ENDC)
         print(pull_client.get_all_nss())
 
     if args.get_package:
-        print mcolors.OKGREEN + "PUSH - Getting Package...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Getting Package...\n", mcolors.ENDC)
         pull_client.get_package(args.get_package)
 
     if args.get_function:
-        print mcolors.OKGREEN + "PUSH - Getting Function...\n", mcolors.ENDC
-        print pull_client.get_vnf(args.get_function)
+        print(mcolors.OKGREEN + "PUSH - Getting Function...\n", mcolors.ENDC)
+        print(pull_client.get_vnf(args.get_function))
 
     if args.get_service:
-        print mcolors.OKGREEN + "PUSH - Getting Service...\n", mcolors.ENDC
-        print pull_client.get_ns(args.get_service)
+        print(mcolors.OKGREEN + "PUSH - Getting Service...\n", mcolors.ENDC)
+        print(pull_client.get_ns(args.get_service))
 
     if args.get_package:
-        print mcolors.OKGREEN + "PUSH - Getting SON-Package...\n", mcolors.ENDC
+        print(mcolors.OKGREEN + "PUSH - Getting SON-Package...\n", mcolors.ENDC)
         pull_client.get_son_package(args.get_son_package)
 
     # if args.list_instances:

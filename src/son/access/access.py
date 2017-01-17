@@ -121,7 +121,7 @@ class AccessClient:
         }
 
         response = requests.post(url, data=form_data, verify=False)
-        print "Access Token received: ", mcolors.OKGREEN + (response.text) + "\n", mcolors.ENDC
+        print("Access Token received: ", mcolors.OKGREEN + (response.text) + "\n", mcolors.ENDC)
         with open("config/token.txt", "w") as token_file:
             token_file.write(str(response.text))
 
@@ -162,9 +162,9 @@ class AccessClient:
         # Push son-package to the Service Platform
         raise NotImplementedError
         command = "sudo python %s.py %s -U %s" % (mode, url, path)
-        print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
+        print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
         result = os.popen(command).read()
-        print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC
+        print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
     def pull_resource(self, token, id):
         """
@@ -177,9 +177,9 @@ class AccessClient:
         # Push son-package to the Service Platform
         raise NotImplementedError
         command = "sudo python %s.py %s -U %s" % (mode, url, id)
-        print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
+        print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
         result = os.popen(command).read()
-        print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC
+        print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
 
 def main():
@@ -240,7 +240,7 @@ def main():
 
     if args.auth:
         # TODO: Make url an optional parameter
-        print "args.auth", args.auth
+        print("args.auth", args.auth)
         # Ensure that three arguments are given (URL, USERNAME and PASSWORD)
         if all(i is not None for i in [args.u, args.p]):
             usrname = args.u
@@ -259,16 +259,16 @@ def main():
     if args.push:
         token_path = args.push[0]
         package_path = args.push[1]
-        print token_path
-        print package_path
+        print(token_path)
+        print(package_path)
         # TODO: implement
         raise NotImplementedError
 
     if args.pull:
         token_path = args.pull[0]
         identifier = args.pull[1]
-        print token_path
-        print identifier
+        print(token_path)
+        print(identifier)
         # TODO: implement
         raise NotImplementedError
 
