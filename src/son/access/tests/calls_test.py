@@ -12,19 +12,19 @@ def pull_tests():
     # resource = pull_client.get_package("97b2e5e9-048a-44f5-b91e-69a90f525f2a")
 
     resource = pull_client.get_all_nss()
-    print "NSS RESPONSE", resource
+    print("NSS RESPONSE", resource)
 
     resource = pull_client.get_all_vnfs()
-    print "VFNS RESPONSE", resource
+    print("VFNS RESPONSE", resource)
 
     resource = pull_client.get_all_packages()
-    print "PACKAGES RESPONSE", resource
+    print("PACKAGES RESPONSE", resource)
 
     resource = pull_client.get_ns("a6707125-bf8d-4c6f-999d-2a5990311762")
-    print "NS RESPONSE", resource
+    print("NS RESPONSE", resource)
 
     resource = pull_client.get_vnf("dce3cffd-4957-40fe-adcc-cdc41c97a805")
-    print "VNF RESPONSE", resource
+    print("VNF RESPONSE", resource)
 
     #resource = pull_client.get_package("e84cf007-3e68-45a2-8f05-d1718c767220")
     #print "Package RESPONSE", resource
