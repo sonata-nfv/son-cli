@@ -38,7 +38,7 @@ def main():
     }
 
     response = requests.post(url, data=form_data, verify=False)
-    print "Access Token received: ", mcolors.OKGREEN + (response.text) + "\n", mcolors.ENDC
+    print "Access Token received: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC
 
     time.sleep(3)
 
@@ -49,7 +49,7 @@ def main():
     pkg = "samples/sonata-demo.son"
 
     # Push son-package to the Service Platform
-    command = "sudo python %s.py %s -U %s" % (mode, url, pkg)
+    command = "sudo python %s.py -U %s" % (mode, pkg)
     print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
     result = os.popen(command).read()
     print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC
@@ -58,7 +58,7 @@ def main():
 
     # Get son-packages list from the Service Platform to check submitted son-package
     mode = "pull"
-    command = "sudo python %s.py %s --list_packages" % (mode, url)
+    command = "sudo python %s.py --list_packages" % mode
     print "Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC
     result = os.popen(command).read()
     print "Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC

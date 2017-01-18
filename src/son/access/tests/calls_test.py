@@ -32,9 +32,17 @@ def pull_tests():
 
 def push_tests():
     platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
-    push_client = Push(base_url="http://sp.int.sonata-nfv.eu:32001")
-    print(push_client.upload_package(None, "../samples/sonata-demo.son"))
+    access_token = None
+    try:
+        with open('config/token.txt', 'rb') as token_file:
+            access_token = token_file.read()
+            access_token = access_token[1:-1]
+    except:
+        pass
+
+    push_client = Push(base_url="http://sp.int.sonata-nfv.eu:32001", auth_token=access_token)
+    print(push_client.upload_package("../samples/sonata-demo.son"))
 
 if __name__ == '__main__':
     push_tests()
-    pull_tests()
+    #pull_tests()
