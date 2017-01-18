@@ -1,10 +1,10 @@
 from son.access.pull import Pull
 from son.access.push import Push
-from son.access.config.config import GK_ADDRESS, GK_PORT
+# from son.access.config.config import GK_ADDRESS, GK_PORT
 
 
 def pull_tests():
-    platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+    # platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
     pull_client = Pull(base_url="http://sp.int.sonata-nfv.eu:32001")
 
     # resource = pull_client.get_vnf("eu.sonata-nfv.firewall-vnf.0.2")
@@ -31,7 +31,7 @@ def pull_tests():
 
 
 def push_tests():
-    platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+    # platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
     access_token = None
     try:
         with open('config/token.txt', 'rb') as token_file:
@@ -45,4 +45,4 @@ def push_tests():
 
 if __name__ == '__main__':
     push_tests()
-    #pull_tests()
+    pull_tests()
