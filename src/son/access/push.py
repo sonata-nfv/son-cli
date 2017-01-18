@@ -61,9 +61,6 @@ class Push(object):
     Platform Gatekeeper. As these API's are still under
     construction, functionality as well as implementation
     of this module probably change continuously.
-
-    This version currently interoperates with the dummy
-    gatekeeper provided by the son-emu tool.
     """
 
     GK_API_VERSION = "/api/v2"
@@ -79,11 +76,14 @@ class Push(object):
     # CAT_URI_PD_NAME = "/packages?name="     #
 
     # def __init__(self, base_url, auth=('', '')):
-    def __init__(self, base_url):
+    def __init__(self, base_url, auth_token=None):
         # Assign parameters
         self._base_url = base_url
         # self._auth = auth   # Bearer token
-        self._headers = {'Content-Type': 'application/x-yaml'}
+        self._headers = {'Content-Type': 'application/json'}
+        if auth_token:
+            self._headers["Authorization"] = "Bearer %s" % auth_token
+        # {'Content-Type': 'application/x-yaml'}
 
         # Ensure parameters are valid
         assert validators.url(self._base_url),\
@@ -103,8 +103,8 @@ class Push(object):
         """
         url = self._base_url + Push.CAT_URI_BASE
         try:
-            response = requests.get(url)    # , auth=self._auth)
-            # headers=self._headers)
+            response = requests.get(url,   # auth=self._auth,
+                                    headers=self._headers)
 
         except requests.exceptions.InvalidURL:
             log.warning("Invalid URL: '{}'. Please specify "
@@ -127,8 +127,8 @@ class Push(object):
         """
         Generic POST function.
         :param cat_uri: Platform GKAPI address
-        :param obj_data:
-        :return:
+        :param obj_data: Resource to be submitted
+        :return: response code of the SP
         """
         url = self._base_url + self.GK_API_VERSION + cat_uri
         log.debug("Object POST to: {}\n{}".format(url, obj_data))
@@ -174,7 +174,7 @@ class Push(object):
 
         return response
 
-    def upload_package(self, access_token, package_file_name):
+    def upload_package(self, package_file_name):
         """
         Upload package to platform
 
@@ -203,10 +203,15 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
+        file_name = package_file_name.split('/')
+        headers = self._headers
+        headers['Content-Type'] = 'application/zip'
+        headers['Content-Disposition'] = 'attachment; filename=' + str(file_name[-1])
+        print("HEADERS", headers)
         print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
         try:
             with open(package_file_name, 'rb') as pkg_file:
-                r = requests.post(url, files={'package': pkg_file})
+                r = requests.post(url, headers=headers, files={'package': pkg_file})
                 if r.status_code == 201:
                     msg = "Upload succeeded"
                 elif r.status_code == 409:
@@ -273,10 +278,6 @@ def main():
         epilog=examples)
 
     parser.add_argument(
-        "A", "--access_token",
-        help="authentication token for the platform")
-
-    parser.add_argument(
         "-U", "--upload_package",
         help="Filename incl. path of package to be uploaded")
 
@@ -291,14 +292,22 @@ def main():
     if not platform_url:
         print("Platform url is required in config file")
 
-    push_client = Push(base_url=platform_url)
+    access_token = None
+    try:
+        with open('config/token.txt', 'rb') as token_file:
+            access_token = token_file.read()
+            access_token = access_token[1:-1]
+    except:
+        pass
+
+    push_client = Push(base_url=platform_url, auth_token=access_token)
     # push_client = Push(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.upload_package:
         print(mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC)
-        print(push_client.upload_package(args.access_token, args.upload_package))
+        print(push_client.upload_package(args.upload_package))
 
-    #if args.deploy_package_uuid:
+    # if args.deploy_package_uuid:
     #    print(push_client.instantiate_package(args.platform_url, args.deploy_package_uuid))
 
 if __name__ == '__main__':

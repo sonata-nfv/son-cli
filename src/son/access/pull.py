@@ -76,11 +76,13 @@ class Pull(object):
     CAT_URI_SONP_ID = "/son-packages/"      # Get a specific SON-Package by ID
 
     # def __init__(self, base_url, auth=('', '')):
-    def __init__(self, base_url):
+    def __init__(self, base_url, auth_token=None):
         # Assign parameters
         self._base_url = base_url
-        # self._auth = auth   # Bearer token
+        # self._auth = auth
         self._headers = {'Content-Type': 'application/json'}
+        if auth_token:
+            self._headers["Authorization"] = "Bearer %s" % auth_token
         # {'Content-Type': 'application/x-yaml'}
 
         # Ensure parameters are valid
@@ -131,8 +133,8 @@ class Pull(object):
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
         print("url", url)
         print("headers", self._headers)
-        # response = requests.get(url, auth=self._auth, headers=self._headers)
-        response = requests.get(url, headers=self._headers)
+        response = requests.get(url,    # auth=self._auth,
+                                headers=self._headers)
         print("response_code", response.status_code)
         print("response_text", response.text)
         if not response.status_code == requests.codes.ok:
@@ -238,7 +240,7 @@ class Pull(object):
         :return: SON file object containing NSDs, VNFDs, PD
         """
         cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_id)
-        # TODO: Convert text to binary file?
+        # TODO: Convert binary data (text) to a file?
         # with open('file_to_write', 'wb') as f:
         #    f.write(cat_file)
 
@@ -269,8 +271,8 @@ def main():
     """
     examples = """Example usage:
 
-    son-pull http://127.0.0.1:5000 --list_packages
-    son-pull http://127.0.0.1:5000 -I
+    son-pull --list_packages
+    son-pull --url http://127.0.0.1:5000 -A
     """
     parser = ArgumentParser(
         description=description,
@@ -278,8 +280,11 @@ def main():
         epilog=examples)
 
     parser.add_argument(
-        "platform_url",
+        "--url",
+        type=str,
+        metavar="URL",
         help="url of the gatekeeper/platform/emulator")
+
 
     parser.add_argument(
         "-A", "--alive",
@@ -306,32 +311,32 @@ def main():
         type=str,
         nargs=1,
         metavar="ID",
-        help="Pull packages from the platform",
-        action="store_true")
+        help="Pull package from the platform")
+
 
     parser.add_argument(
         "--get_function",
         type=str,
         nargs=1,
         metavar="ID",
-        help="Pull packages from the platform",
-        action="store_true")
+        help="Pull function from the platform")
+
 
     parser.add_argument(
         "--get_service",
         type=str,
         nargs=1,
         metavar="ID",
-        help="Pull service from the platform",
-        action="store_true")
+        help="Pull service from the platform")
+
 
     parser.add_argument(
         "--get_son_package",
         type=str,
         nargs=1,
         metavar="ID",
-        help="Pull son_package from the platform",
-        action="store_true")
+        help="Pull son_package from the platform")
+
 
     parser.add_argument(
         "-I", "--list_instances",
@@ -340,45 +345,57 @@ def main():
 
     args = parser.parse_args()
 
-    platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+    if args.url:
+        platform_url = str(args.url)
+    else:
+        platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
 
     if not platform_url:
         print("Platform url is required in config file")
 
-    pull_client = Pull(base_url=platform_url)
+    access_token = None
+    try:
+        with open('config/token.txt', 'rb') as token_file:
+            access_token = token_file.read()
+            access_token = access_token[1:-1]
+    except:
+        pass
+
+    pull_client = Pull(base_url=platform_url, auth_token=access_token)
     # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.alive:
-        print(mcolors.OKGREEN + "PUSH - Checking Platform connectivity...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Checking Platform connectivity...\n", mcolors.ENDC)
         print(pull_client.alive())
 
     if args.list_packages:
-        print(mcolors.OKGREEN + "PUSH - Getting Packages list...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Packages list...\n", mcolors.ENDC)
         print(pull_client.get_all_packages())
 
     if args.list_functions:
-        print(mcolors.OKGREEN + "PUSH - Getting Functions list...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Functions list...\n", mcolors.ENDC)
         print(pull_client.get_all_vnfs())
 
     if args.list_services:
-        print(mcolors.OKGREEN + "PUSH - Getting Services list...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Services list...\n", mcolors.ENDC)
         print(pull_client.get_all_nss())
 
     if args.get_package:
-        print(mcolors.OKGREEN + "PUSH - Getting Package...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Package...\n", mcolors.ENDC)
         pull_client.get_package(args.get_package)
 
     if args.get_function:
-        print(mcolors.OKGREEN + "PUSH - Getting Function...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Function...\n", mcolors.ENDC)
         print(pull_client.get_vnf(args.get_function))
 
     if args.get_service:
-        print(mcolors.OKGREEN + "PUSH - Getting Service...\n", mcolors.ENDC)
+        print(mcolors.OKGREEN + "PULL - Getting Service...\n", mcolors.ENDC)
         print(pull_client.get_ns(args.get_service))
 
     if args.get_package:
-        print(mcolors.OKGREEN + "PUSH - Getting SON-Package...\n", mcolors.ENDC)
-        pull_client.get_son_package(args.get_son_package)
+        print(mcolors.OKGREEN + "PULL - Getting SON-Package...\n", mcolors.ENDC)
+        binary_data = pull_client.get_son_package(args.get_son_package)
+        # TODO: Where do we store the file?
 
     # if args.list_instances:
     #    print(pull_client.get_instances(platform_url))
@@ -386,4 +403,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
