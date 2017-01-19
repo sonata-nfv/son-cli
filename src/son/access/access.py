@@ -82,7 +82,9 @@ class AccessClient:
     GK_API_BASE = "/"
     GK_URI_REG = "/register"
     GK_URI_LOG = "/login"
+    GK_URI_AUT = "TBD"
     GK_URI_REF = "/refresh"
+    GK_URI_TKV = "TBD"
 
     def __init__(self, log_level='INFO'):
         """
@@ -107,7 +109,9 @@ class AccessClient:
 
     def client_register(self, username, password):
         """
-        Request registration from on the Service Platform
+        Request registration form on the Service Platform
+        :param username: user identifier
+        :param password: user password
         :return: Initial JWT access_token? Or HTTP Code to confirm registration
         """
         form_data = {
@@ -362,7 +366,7 @@ def main():
 
 
 if __name__ == '__main__':
-    #TODO: Call 'fake' User Management Auth on mock.py
+    #TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
     main()
 
 
