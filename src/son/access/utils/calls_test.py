@@ -1,7 +1,12 @@
-from son.access.pull import Pull
-from son.access.push import Push
-# from son.access.config.config import GK_ADDRESS, GK_PORT
+import os
+import sys; print('Python %s on %s' % (sys.version, sys.platform))
 
+dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.extend([str(dir)])
+
+from pull import Pull
+from push import Push
+# from son.access.config.config import GK_ADDRESS, GK_PORT
 
 def pull_tests():
     # platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
@@ -42,3 +47,4 @@ def push_tests():
 
     push_client = Push(base_url="http://sp.int.sonata-nfv.eu:32001", auth_token=access_token)
     print(push_client.upload_package("../samples/sonata-demo.son"))
+
