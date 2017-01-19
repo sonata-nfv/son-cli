@@ -42,7 +42,3 @@ def push_tests():
 
     push_client = Push(base_url="http://sp.int.sonata-nfv.eu:32001", auth_token=access_token)
     print(push_client.upload_package("../samples/sonata-demo.son"))
-
-if __name__ == '__main__':
-    push_tests()
-    pull_tests()
