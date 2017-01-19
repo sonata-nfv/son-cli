@@ -130,15 +130,15 @@ class Pull(object):
         :param obj_id: identifier of the resource
         :return: response of the SP
         """
-        print("cat_uri", cat_uri, type(cat_uri))
-        print("obj_id", obj_id, type(obj_id))
+        # print("cat_uri", cat_uri, type(cat_uri))
+        # print("obj_id", obj_id, type(obj_id))
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
-        print("url", url)
-        print("headers", self._headers)
+        # print("url", url)
+        # print("headers", self._headers)
         response = requests.get(url,    # auth=self._auth,
                                 headers=self._headers)
-        print("response_code", response.status_code)
-        print("response_text", response.text)
+        # print("response_code", response.status_code)
+        # print("response_text", response.text)
         if not response.status_code == requests.codes.ok:
             return
         return response.text
@@ -226,7 +226,6 @@ class Pull(object):
         :param package_id: ID of PD in the form 'vendor.ns_name.version'
         :return: yaml object containing PD
         """
-        print "PACKAGE_ID", package_id, type(package_id)
         cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_id)
         if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
