@@ -130,6 +130,8 @@ class Pull(object):
         :param obj_id: identifier of the resource
         :return: response of the SP
         """
+        print("cat_uri", cat_uri, type(cat_uri))
+        print("obj_id", obj_id, type(obj_id))
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
         print("url", url)
         print("headers", self._headers)
@@ -224,6 +226,7 @@ class Pull(object):
         :param package_id: ID of PD in the form 'vendor.ns_name.version'
         :return: yaml object containing PD
         """
+        print "PACKAGE_ID", package_id, type(package_id)
         cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_id)
         if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
@@ -309,7 +312,6 @@ def main():
     parser.add_argument(
         "--get_package",
         type=str,
-        nargs=1,
         metavar="ID",
         help="Pull package from the platform")
 
@@ -317,7 +319,6 @@ def main():
     parser.add_argument(
         "--get_function",
         type=str,
-        nargs=1,
         metavar="ID",
         help="Pull function from the platform")
 
@@ -325,7 +326,6 @@ def main():
     parser.add_argument(
         "--get_service",
         type=str,
-        nargs=1,
         metavar="ID",
         help="Pull service from the platform")
 
@@ -333,7 +333,6 @@ def main():
     parser.add_argument(
         "--get_son_package",
         type=str,
-        nargs=1,
         metavar="ID",
         help="Pull son_package from the platform")
 
@@ -392,7 +391,7 @@ def main():
         print(mcolors.OKGREEN + "PULL - Getting Service...\n", mcolors.ENDC)
         print(pull_client.get_ns(args.get_service))
 
-    if args.get_package:
+    if args.get_son_package:
         print(mcolors.OKGREEN + "PULL - Getting SON-Package...\n", mcolors.ENDC)
         binary_data = pull_client.get_son_package(args.get_son_package)
         # TODO: Where do we store the file?
