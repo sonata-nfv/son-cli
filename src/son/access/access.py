@@ -125,6 +125,8 @@ class AccessClient:
     def client_login(self, username, password):
         """
         Make a POST request with username and password
+        :param username: user identifier
+        :param password: user password
         :return: JW Access Token is returned from the GK server
         """
 
@@ -236,8 +238,21 @@ class AccessClient:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Authenticates users to submit and request resources from SONATA Service Platform")
+    from argparse import ArgumentParser, RawDescriptionHelpFormatter
+    print(mcolors.OKGREEN + "Running ACCESS\n", mcolors.ENDC)
+
+    examples = """Example usage:
+
+    access --auth -u tester -p 1234
+    access --push samples/sonata-demo.son
+    access --list services
+    access --pull packages 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    """
+
+    parser = ArgumentParser(
+        description="Authenticates users to submit and request resources from SONATA Service Platform",
+        formatter_class=RawDescriptionHelpFormatter,
+        epilog=examples)
 
     parser.add_argument(
         "--auth",
@@ -259,7 +274,7 @@ def main():
         required=False)
 
     parser.add_argument(
-        "--submit",
+        "--push",
         type=str,
         metavar="PACKAGE_PATH",
         help="submits a son-package to the SP",
@@ -313,9 +328,9 @@ def main():
             parser.print_help()
             return
 
-    if args.submit:
+    if args.push:
         # TODO: Check token expiration
-        package_path = args.submit
+        package_path = args.push
         print(package_path)
         ac.push_package(package_path)
 
@@ -331,9 +346,11 @@ def main():
     if args.pull:
         # TODO: Check token expiration
         print("args.pull", args.pull)
+
         # Ensure that both arguments are given (RESOURCE_TYPE and ID)
         res_type = args.pull[0]
         identifier = args.pull[1]
+
         # Ensure that argument given is a valid type (services, functions, packages)
         if res_type not in ['services', 'functions', 'packages']:
             parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
