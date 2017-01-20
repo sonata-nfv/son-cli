@@ -277,8 +277,7 @@ optional arguments:
   --push PACKAGE_PATH      submits a son-package to the SP
   --list RESOURCE_TYPE     lists resources based on its type (services,
                            functions, packages, file)
-  --pull RESOURCE_TYPE ID
-                           requests a resource based on its type (services,
+  --pull RESOURCE_TYPE ID  requests a resource based on its type (services,
                            functions, packages, file) to the SP by its identifier
   --debug                  increases logging level to debug
 
@@ -287,29 +286,6 @@ example usage:
     access --push samples/sonata-demo.son
     access --list services
     access --pull packages 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
-```
-
-
-
-
-
-```
-usage: son-access [-h]
-                  [--auth URL] [-u USERNAME] [-p PASSWORD]
-                  [--push TOKEN_PATH PACKAGE_PATH]
-                  [--pull TOKEN_PATH PACKAGE_ID]
-                  [--pull TOKEN_PATH DESCRIPTOR_ID]
-                  [--debug]
-
-  -h, --help                        show this help message and exit
-  --auth URL                        requests an Access token to authenticate the user,
-                                    it requires platform url to login,
-  -u USERNAME                       username of the user,
-  -p PASSWORD                       password of the user
-  --push TOKEN_PATH PACKAGE_PATH    submits a package to the SP, requires path to the token file and package
-  --pull TOKEN_PATH PACKAGE_ID      requests a package or descriptor to the SP by its identifier,
-                    DESCRIPTOR_ID   requires path to the token file
-  --debug                           increases logging level to debug
 ```
 
 ### son-monitor
