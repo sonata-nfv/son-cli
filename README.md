@@ -10,7 +10,7 @@ This set of command line tools are meant to aid the SONATA service developers on
 - `son-package` packages a project, containing services and functions, to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
 - `son-push` is used to upload the service package to the Service Platform Gatekeeper (in process to be integrated to `son-access`).
 - `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
-- `son-access` enables authenticating users to the Service Platform and integrates functionalities to push and pull resources from the Service Platform Catalogues.
+- `son-access` enables authenticating users to the Service Platform and integrates features to push and pull resources from the Service Platform Catalogues.
     
 
 ## Building
@@ -53,6 +53,8 @@ The son-cli tools have the following dependencies:
 * [coloredlogs](https://pypi.python.org/pypi/coloredlogs) >= 5.0 (MIT)
 * [paramiko](https://pypi.python.org/pypi/paramiko/1.16.0) >= 1.6 (LGPL)
 * [docker-compose](https://docs.docker.com/compose/) >= 1.6.0 (Apache 2.0)
+* [PyJWT](https://pypi.python.org/pypi/PyJWT/1.4.0) >= 1.4.0 (MIT)
+* [Flask](http://flask.pocoo.org/) >= 0.11.1 (BSD)
 
 
 ## Contributing
@@ -258,6 +260,39 @@ Example usage:
 Authenticate the developer to gain access to the Service Platform.
 Once authenticated, it allows the developer to submit packages to the Service Platform
 Catalogues and request resources (packages and/or descriptors) from the Service Platform Catalogues.
+```
+usage: access [-h]
+              [--auth] [-u USERNAME] [-p PASSWORD]
+              [--push PACKAGE_PATH]
+              [--list RESOURCE_TYPE]
+              [--pull RESOURCE_TYPE ID]
+              [--debug]
+
+
+optional arguments:
+  -h, --help               show this help message and exit
+  --auth                   authenticates a user, requires -u username -p password
+  -u USERNAME              specifies username of a user
+  -p PASSWORD              specifies password of a user
+  --push PACKAGE_PATH      submits a son-package to the SP
+  --list RESOURCE_TYPE     lists resources based on its type (services,
+                           functions, packages, file)
+  --pull RESOURCE_TYPE ID
+                           requests a resource based on its type (services,
+                           functions, packages, file) to the SP by its identifier
+  --debug                  increases logging level to debug
+
+example usage:
+    access --auth -u tester -p 1234
+    access --push samples/sonata-demo.son
+    access --list services
+    access --pull packages 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+```
+
+
+
+
+
 ```
 usage: son-access [-h]
                   [--auth URL] [-u USERNAME] [-p PASSWORD]
