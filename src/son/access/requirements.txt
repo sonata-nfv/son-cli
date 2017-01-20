@@ -1,2 +1,5 @@
-PyJWT==1.4.0
+PyJWT==1.4.2
 Flask==0.11.1
+pyaml==16.9.0
+validators==0.11.0
+requests==2.8.1

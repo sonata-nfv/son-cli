@@ -297,7 +297,7 @@ def main():
         nargs=2,
         metavar=("RESOURCE_TYPE", "ID"),
         help="requests a resource based on its type (services, functions, packages, file)"
-             " to the SP by its Identifier",
+             " to the SP by its identifier",
         required=False)
 
     parser.add_argument(
