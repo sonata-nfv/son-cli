@@ -107,6 +107,7 @@ class AccessClient:
             "Failed to init catalogue client. Invalid URL: '{}'"\
             .format(self.URL)
 
+    # DEPRECATED -> Users will only be able to register through SON-GUI
     def client_register(self, username, password):
         """
         Request registration form on the Service Platform
@@ -188,35 +189,54 @@ class AccessClient:
         result = os.popen(command).read()
         print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
-    def pull_resource(self, resource_type, id=None):
+    def pull_resource(self, resource_type, identifier=None, uuid=False):
         """
         Call pull feature to request a resource from the SP Catalogue
         :param resource_type: a valid resource classifier (services, functions, packages)
-        :param id: resource identifier
+        :param identifier: resource identifier
+        :param uuid: boolean that indicates the identifier is 'uuid-type'
         :return: A valid resource (Package, descriptor)
         """
         # mode = "pull"
         # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
 
-        if id:
+        if identifier and uuid is False:
             if resource_type == 'services':
-                command = "sudo python pull.py --get_service %s" % id
+                command = "sudo python pull.py --get_service %s" % identifier
                 print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
                 result = os.popen(command).read()
                 print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
             elif resource_type == 'functions':
-                command = "sudo python pull.py --get_function %s" % id
+                command = "sudo python pull.py --get_function %s" % identifier
                 print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
                 result = os.popen(command).read()
                 print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
             else:
-                command = "sudo python pull.py --get_package %s" % id
+                command = "sudo python pull.py --get_package %s" % identifier
                 print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
                 result = os.popen(command).read()
                 print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
+        elif identifier and uuid is True:
+            if resource_type == 'services':
+                command = "sudo python pull.py --get_service_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            elif resource_type == 'functions':
+                command = "sudo python pull.py --get_function_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            else:
+                command = "sudo python pull.py --get_package_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
         else:
             if resource_type == 'services':
@@ -294,10 +314,24 @@ def main():
     parser.add_argument(
         "--pull",
         type=str,
-        nargs=2,
-        metavar=("RESOURCE_TYPE", "ID"),
-        help="requests a resource based on its type (services, functions, packages, file)"
-             " to the SP by its identifier",
+        metavar="RESOURCE_TYPE",
+        help="requests a resource based on its type (services, functions, packages, file),"
+             " requires a query parameter --uuid or --id",
+        required=False)
+
+    parser.add_argument(
+        "--uuid",
+        type=str,
+        metavar="UUID",
+        help="Query value for SP identifiers (uuid-generated)",
+        required=False)
+
+    parser.add_argument(
+        "--id",
+        type=str,
+        nargs=3,
+        metavar=("VENDOR", "NAME", "VERSION"),
+        help="Query values for package identifiers (vendor name version)",
         required=False)
 
     parser.add_argument(
@@ -352,14 +386,31 @@ def main():
         print("args.pull", args.pull)
 
         # Ensure that both arguments are given (RESOURCE_TYPE and ID)
-        res_type = args.pull[0]
-        identifier = args.pull[1]
+        res_type = args.pull
+        # identifier = args.pull[1]
 
         # Ensure that argument given is a valid type (services, functions, packages)
         if res_type not in ['services', 'functions', 'packages']:
             parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
+        # else:
+            # ac.pull_resource(res_type, id=identifier)
+
+        # Ensure that any of next arguments are given (UUID or ID)
+        if any(i is not None for i in [args.uuid, args.id]):
+            if args.uuid:
+                ac.pull_resource(res_type, identifier=args.uuid, uuid=True)
+                return
+            else:
+                resource_vendor = args.id[0]
+                resource_name = args.id[1]
+                resource_version = args.id[2]
+                resource_query = 'vendor=%s&name=%s&version=%s' % (resource_vendor, resource_name, resource_version)
+                ac.pull_resource(res_type, identifier=resource_query, uuid=False)
+                return
         else:
-            ac.pull_resource(res_type, id=identifier)
+            parser.error(mcolors.FAIL + "A resource UUID or ID is required!" + mcolors.ENDC)
+            parser.print_help()
+            return
 
     else:
         return

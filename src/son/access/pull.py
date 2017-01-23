@@ -123,7 +123,7 @@ class Pull(object):
 
         return response.status_code == requests.codes.ok
 
-    def __get_cat_object__(self, cat_uri, obj_id):
+    def __get_cat_object__(self, cat_uri, obj_query):
         """
         Generic GET function to request a SONATA SP resource.
         :param cat_uri: catalogue to be queried
@@ -132,7 +132,7 @@ class Pull(object):
         """
         # print("cat_uri", cat_uri, type(cat_uri))
         # print("obj_id", obj_id, type(obj_id))
-        url = self._base_url + self.GK_API_VERSION + cat_uri + obj_id
+        url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
         # print("url", url)
         # print("headers", self._headers)
         response = requests.get(url,    # auth=self._auth,
@@ -162,13 +162,29 @@ class Pull(object):
     def get_all_nss(self):
         return self.__get_cat_object__(self.CAT_URI_NS, "")
 
-    def get_ns(self, ns_id):
+    def get_ns_by_uuid(self, ns_uuid):
+        """
+        Obtains a specific network service (NS)
+        :param ns_uuid: UUID of NS in the form 'uuid-generated'
+        :return: yaml object containing NS
+        """
+        cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_uuid)
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+            log.error("Obtained multiple network "
+                      "services using the ID '{}'".format(ns_uuid))
+            return
+
+        log.debug("Obtained NS schema:\n{}".format(cat_obj))
+        return yaml.load(cat_obj)
+
+    def get_ns_by_id(self, ns_id):
+        # TODO: Enable name.trio identifier
         """
         Obtains a specific network service (NS)
         :param ns_id: ID of NS in the form 'vendor.ns_name.version'
         :return: yaml object containing NS
         """
-        cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_id)
+        cat_obj = self.__get_cat_object__(self.CAT_URI_NS, ns_id)
         if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_id))
@@ -186,18 +202,36 @@ class Pull(object):
         return self.__get_cat_object__(
             self.CAT_URI_NS_NAME, ns_name)
 
-
     def get_all_vnfs(self):
         return self.__get_cat_object__(self.CAT_URI_VNF, "")
 
-    def get_vnf(self, vnf_id):
+    def get_vnf_by_uuid(self, vnf_uuid):
         """
         Obtains a specific VNF
-        :param vnf_id: ID of VNF in the form 'vendor.ns_name.version'
+        :param vnf_uuid: UUID of VNF in the form 'uuid-generated'
         :return: yaml object containing VNF
         """
         cat_obj = self.__get_cat_object__(
-            self.CAT_URI_VNF_ID, vnf_id)
+            self.CAT_URI_VNF_ID, vnf_uuid)
+        if not cat_obj:
+            return
+
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+            log.error("Obtained multiple VNFs using ID '{}'".format(vnf_uuid))
+            return
+
+        log.debug("Obtained VNF schema:\n{}".format(cat_obj))
+        return yaml.load(cat_obj)
+
+    def get_vnf_by_id(self, vnf_id):
+        # TODO: Enable name.trio identifier
+        """
+        Obtains a specific VNF
+        :param vnf_id: ID of VNF in the form 'vendor.name.version'
+        :return: yaml object containing VNF
+        """
+        cat_obj = self.__get_cat_object__(
+            self.CAT_URI_VNF, vnf_id)
         if not cat_obj:
             return
 
@@ -220,13 +254,29 @@ class Pull(object):
     def get_all_packages(self):
         return self.__get_cat_object__(self.CAT_URI_PD, "")
 
-    def get_package(self, package_id):
+    def get_package_by_uuid(self, package_uuid):
         """
         Obtains a specific package (PD)
-        :param package_id: ID of PD in the form 'vendor.ns_name.version'
+        :param package_uuid: UUID of PD in the form 'uuid-generated'
         :return: yaml object containing PD
         """
-        cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_id)
+        cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_uuid)
+        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+            log.error("Obtained multiple packages "
+                      "using the ID '{}'".format(package_uuid))
+            return
+
+        log.debug("Obtained NS schema:\n{}".format(cat_obj))
+        return yaml.load(cat_obj)
+
+    def get_package_by_id(self, package_id):
+        # TODO: Enable name.trio identifier
+        """
+        Obtains a specific package (PD)
+        :param package_id: ID of PD in the form 'vendor.name.version'
+        :return: yaml object containing PD
+        """
+        cat_obj = self.__get_cat_object__(self.CAT_URI_PD, package_id)
         if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
                       "using the ID '{}'".format(package_id))
@@ -235,13 +285,13 @@ class Pull(object):
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
         return yaml.load(cat_obj)
 
-    def get_son_package(self, son_package_id):
+    def get_son_package_by_uuid(self, son_package_uuid):
         """
         Obtains a specific package (PD)
-        :param son_package_id: ID of SON-PACKAGE in the form 'vendor.ns_name.version'
+        :param son_package_uuid: UUID of SON-PACKAGE in the form 'uuid-generated'
         :return: SON file object containing NSDs, VNFDs, PD
         """
-        cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_id)
+        cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_uuid)
         # TODO: Convert binary data (text) to a file?
         # with open('file_to_write', 'wb') as f:
         #    f.write(cat_file)
@@ -287,7 +337,6 @@ def main():
         metavar="URL",
         help="url of the gatekeeper/platform/emulator")
 
-
     parser.add_argument(
         "-A", "--alive",
         help="Checks connectivity with the GK",
@@ -314,13 +363,11 @@ def main():
         metavar="ID",
         help="Pull package from the platform")
 
-
     parser.add_argument(
         "--get_function",
         type=str,
         metavar="ID",
         help="Pull function from the platform")
-
 
     parser.add_argument(
         "--get_service",
@@ -328,13 +375,29 @@ def main():
         metavar="ID",
         help="Pull service from the platform")
 
+    parser.add_argument(
+        "--get_package_uuid",
+        type=str,
+        metavar="UUID",
+        help="Pull son_package from the platform")
+
+    parser.add_argument(
+        "--get_function_uuid",
+        type=str,
+        metavar="UUID",
+        help="Pull function from the platform")
+
+    parser.add_argument(
+        "--get_service_uuid",
+        type=str,
+        metavar="UUID",
+        help="Pull service from the platform")
 
     parser.add_argument(
         "--get_son_package",
         type=str,
-        metavar="ID",
+        metavar="UUID",
         help="Pull son_package from the platform")
-
 
     parser.add_argument(
         "-I", "--list_instances",
@@ -378,21 +441,33 @@ def main():
         print(mcolors.OKGREEN + "PULL - Getting Services list...\n", mcolors.ENDC)
         print(pull_client.get_all_nss())
 
+    if args.get_package_uuid:
+        print(mcolors.OKGREEN + "PULL - Getting Package...\n", mcolors.ENDC)
+        pull_client.get_package_by_uuid(args.get_package_uuid)
+
+    if args.get_function_uuid:
+        print(mcolors.OKGREEN + "PULL - Getting Function...\n", mcolors.ENDC)
+        print(pull_client.get_vnf_by_uuid(args.get_function_uuid))
+
+    if args.get_service_uuid:
+        print(mcolors.OKGREEN + "PULL - Getting Service...\n", mcolors.ENDC)
+        print(pull_client.get_ns_by_uuid(args.get_service_uuid))
+
     if args.get_package:
         print(mcolors.OKGREEN + "PULL - Getting Package...\n", mcolors.ENDC)
-        pull_client.get_package(args.get_package)
+        pull_client.get_package_by_id(args.get_package)
 
     if args.get_function:
         print(mcolors.OKGREEN + "PULL - Getting Function...\n", mcolors.ENDC)
-        print(pull_client.get_vnf(args.get_function))
+        print(pull_client.get_vnf_by_id(args.get_function))
 
     if args.get_service:
         print(mcolors.OKGREEN + "PULL - Getting Service...\n", mcolors.ENDC)
-        print(pull_client.get_ns(args.get_service))
+        print(pull_client.get_ns_by_id(args.get_service))
 
     if args.get_son_package:
         print(mcolors.OKGREEN + "PULL - Getting SON-Package...\n", mcolors.ENDC)
-        binary_data = pull_client.get_son_package(args.get_son_package)
+        binary_data = pull_client.get_son_package_by_uuid(args.get_son_package)
         # TODO: Where do we store the file?
 
     # if args.list_instances:
