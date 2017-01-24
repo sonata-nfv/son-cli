@@ -74,7 +74,7 @@ class mcolors:
 
 
 class AccessClient:
-    ACCESS_VERSION = "0.2"
+    ACCESS_VERSION = "0.3"
 
     DEFAULT_ACCESS_DIR = os.path.join(expanduser("~"), ".son-access")
 
@@ -193,8 +193,9 @@ class AccessClient:
         """
         Call pull feature to request a resource from the SP Catalogue
         :param resource_type: a valid resource classifier (services, functions, packages)
-        :param identifier: resource identifier
-        :param uuid: boolean that indicates the identifier is 'uuid-type'
+        :param identifier: resource identifier which can be of two types:
+        name.trio id ('vendor=%s&name=%s&version=%s') or uuid (xxx-xxxx-xxxx...)
+        :param uuid: boolean that indicates the identifier is 'uuid-type' if True
         :return: A valid resource (Package, descriptor)
         """
         # mode = "pull"
@@ -260,8 +261,6 @@ class AccessClient:
 
 
 def main():
-    import argparse
-
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
     print(mcolors.OKGREEN + "Running ACCESS\n", mcolors.ENDC)
 
@@ -270,7 +269,8 @@ def main():
     access --auth -u tester -p 1234
     access --push samples/sonata-demo.son
     access --list services
-    access --pull packages 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    access --pull services --id sonata.eu firewall-vnf 1.0
     """
 
     parser = ArgumentParser(
