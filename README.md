@@ -261,31 +261,36 @@ Authenticate the developer to gain access to the Service Platform.
 Once authenticated, it allows the developer to submit packages to the Service Platform
 Catalogues and request resources (packages and/or descriptors) from the Service Platform Catalogues.
 ```
-usage: access [-h]
-              [--auth] [-u USERNAME] [-p PASSWORD]
-              [--push PACKAGE_PATH]
-              [--list RESOURCE_TYPE]
-              [--pull RESOURCE_TYPE ID]
-              [--debug]
-
+usage: access.py [-h]
+                 [--auth] [-u USERNAME] [-p PASSWORD]
+                 [--push PACKAGE_PATH] 
+                 [--list RESOURCE_TYPE]
+                 [--pull RESOURCE_TYPE] [--uuid UUID]
+                                        [--id VENDOR NAME VERSION] 
+                 [--debug]
 
 optional arguments:
-  -h, --help               show this help message and exit
-  --auth                   authenticates a user, requires -u username -p password
-  -u USERNAME              specifies username of a user
-  -p PASSWORD              specifies password of a user
-  --push PACKAGE_PATH      submits a son-package to the SP
-  --list RESOURCE_TYPE     lists resources based on its type (services,
-                           functions, packages, file)
-  --pull RESOURCE_TYPE ID  requests a resource based on its type (services,
-                           functions, packages, file) to the SP by its identifier
-  --debug                  increases logging level to debug
+  -h, --help                show this help message and exit
+  --auth                    authenticates a user, requires -u username -p password
+  -u USERNAME               specifies username of a user
+  -p PASSWORD               specifies password of a user
+  --push PACKAGE_PATH       submits a son-package to the SP
+  --list RESOURCE_TYPE      lists resources based on its type (services,
+                            functions, packages, file)
+  --pull RESOURCE_TYPE      requests a resource based on its type (services,
+                            functions, packages, file), requires a query parameter
+                            --uuid or --id
+  --uuid UUID               Query value for SP identifiers (uuid-generated)
+  --id VENDOR NAME VERSION  Query values for package identifiers (vendor name
+                            version)
+  --debug                   increases logging level to debug
 
 example usage:
     access --auth -u tester -p 1234
     access --push samples/sonata-demo.son
     access --list services
-    access --pull packages 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    access --pull services --id sonata.eu firewall-vnf 1.0
 ```
 
 ### son-monitor
