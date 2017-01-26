@@ -54,9 +54,9 @@ import jwt
 import coloredlogs
 import os
 from os.path import expanduser
-from helpers.helpers import json_response
-from models.models import User
-from config.config import GK_ADDRESS, GK_PORT
+from son.access.helpers.helpers import json_response
+from son.access.models.models import User
+from son.access.config.config import GK_ADDRESS, GK_PORT
 
 log = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class AccessClient:
         url = self.URL + self.GK_API_VERSION + self.GK_URI_REG
 
         response = requests.post(url, data=form_data, verify=False)
-        print "Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC
+        print("Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
         # TODO: Create userdata file? Check KEYCLOAK register form
         return response
 
