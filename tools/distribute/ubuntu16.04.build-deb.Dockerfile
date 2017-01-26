@@ -7,6 +7,9 @@ RUN     apt-get update \
         && apt-get install -y build-essential libssl-dev libffi-dev \
         ## install py2deb package converter
         && pip3 install --upgrade pip \
+        # Installing setuptools (now in >v34.0.0 dependencies must be installed in advance)
+        && pip3 install wincertstore==0.2 certifi==2016.9.26 six>=1.10.0 packaging>=16.8 appdirs>=1.4.0 \
+        && pip3 install setuptools==34.0.2 \
         && pip3 install py2deb \
         ## generate utf8 locale, otherwise py2deb will result in error!
         && locale-gen en_US.UTF-8 \
