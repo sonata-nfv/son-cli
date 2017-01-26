@@ -24,6 +24,25 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
+"""
+usage: son-access [-h]
+                  [--auth URL] [-u USERNAME] [-p PASSWORD]
+                  [--push TOKEN_PATH PACKAGE_PATH]
+                  [--pull TOKEN_PATH PACKAGE_ID]
+                  [--pull TOKEN_PATH DESCRIPTOR_ID]
+                  [--debug]
+
+  -h, --help                        show this help message and exit
+  --auth URL                        requests an Access token to authenticate the user,
+                                    it requires platform url to login,
+  -u USERNAME                       username of the user,
+  -p PASSWORD                       password of the user
+  --push TOKEN_PATH PACKAGE_PATH    submits a package to the SP, requires path to the token file and package
+  --pull TOKEN_PATH PACKAGE_ID      requests a package or descriptor to the SP by its identifier,
+                    DESCRIPTOR_ID   requires path to the token file
+  --debug               increases logging level to debug
+"""
+
 import requests
 import logging
 import requests
@@ -32,40 +51,105 @@ import sys
 import validators
 from datetime import datetime, timedelta
 import jwt
+import coloredlogs
+import os
+from os.path import expanduser
 from helpers.helpers import json_response
 from models.models import User
+from config.config import GK_ADDRESS, GK_PORT
 
 log = logging.getLogger(__name__)
 
 
-class AccessClient:
+class mcolors:
+     OKGREEN = '\033[92m'
+     FAIL = '\033[91m'
+     ENDC = '\033[0m'
 
-    def __init__(self):
+
+     def disable(self):
+         self.OKGREEN = ''
+         self.FAIL = ''
+         self.ENDC = ''
+
+
+class AccessClient:
+    ACCESS_VERSION = "0.3"
+
+    DEFAULT_ACCESS_DIR = os.path.join(expanduser("~"), ".son-access")
+
+    GK_API_VERSION = "/api/v2"
+    GK_API_BASE = "/"
+    GK_URI_REG = "/register"
+    GK_URI_LOG = "/login"
+    GK_URI_AUT = "TBD"
+    GK_URI_REF = "/refresh"
+    GK_URI_TKV = "TBD"
+
+    def __init__(self, log_level='INFO'):
         """
         Header
         The JWT Header declares that the encoded object is a JSON Web Token (JWT) and the JWT is a JWS that is MACed
         using the HMAC SHA-256 algorithm
         """
-        JWT_SECRET = 'secret'
-        JWT_ALGORITHM = 'HS256'
-        JWT_EXP_DELTA_SECONDS = 20
-        URL = 'https://api.github.com/some/endpoint'
+        self.log_level = log_level
+        coloredlogs.install(level=log_level)
+        self.JWT_SECRET = 'secret'
+        self.JWT_ALGORITHM = 'HS256'
+        self.JWT_EXP_DELTA_SECONDS = 20
+        try:
+            self.URL = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+        except:
+            print("Platform url is required in config file")
 
-    def client_register(self):
+        # Ensure parameters are valid
+        assert validators.url(self.URL),\
+            "Failed to init catalogue client. Invalid URL: '{}'"\
+            .format(self.URL)
+
+    # DEPRECATED -> Users will only be able to register through SON-GUI
+    def client_register(self, username, password):
         """
-        Request registration from on the Service Platform
+        Request registration form on the Service Platform
+        :param username: user identifier
+        :param password: user password
         :return: Initial JWT access_token? Or HTTP Code to confirm registration
         """
-        pass
+        form_data = {
+            'username': username,
+            'password': password
+        }
 
-    def client_login(self, request):
+        url = self.URL + self.GK_API_VERSION + self.GK_URI_REG
+
+        response = requests.post(url, data=form_data, verify=False)
+        print "Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC
+        # TODO: Create userdata file? Check KEYCLOAK register form
+        return response
+
+    def client_login(self, username, password):
         """
         Make a POST request with username and password
+        :param username: user identifier
+        :param password: user password
         :return: JW Access Token is returned from the GK server
         """
-        # route = ('POST', '/login')
-        # payload = {'some': 'data'}
-        # r = requests.post(url, json=payload)
+
+        url = "http://" + self.URL + self.GK_API_VERSION + self.GK_URI_LOG
+
+        # Construct the POST request
+        form_data = {
+            'username': username,
+            'password': password
+        }
+
+        response = requests.post(url, data=form_data, verify=False)
+        print("Access Token received: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
+        token = response.text.replace('\n', '')
+        with open("config/token.txt", "wb") as token_file:
+            token_file.write(token)
+
+        return response.text
 
     def client_logout(self):
         """
@@ -89,6 +173,254 @@ class AccessClient:
         :return: HTTP code?
         """
         pass
+
+    def push_package(self, path):
+        """
+        Call push feature to upload a package to the SP Catalogue
+        :return: HTTP code 201 or 40X
+        """
+        # mode = "push"
+        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
+        # path = "samples/sonata-demo.son"
+
+        # Push son-package to the Service Platform
+        command = "sudo python push.py -U %s" % path
+        print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+        result = os.popen(command).read()
+        print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+    def pull_resource(self, resource_type, identifier=None, uuid=False):
+        """
+        Call pull feature to request a resource from the SP Catalogue
+        :param resource_type: a valid resource classifier (services, functions, packages)
+        :param identifier: resource identifier which can be of two types:
+        name.trio id ('vendor=%s&name=%s&version=%s') or uuid (xxx-xxxx-xxxx...)
+        :param uuid: boolean that indicates the identifier is 'uuid-type' if True
+        :return: A valid resource (Package, descriptor)
+        """
+        # mode = "pull"
+        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
+
+        if identifier and uuid is False:
+            if resource_type == 'services':
+                command = "sudo python pull.py --get_service %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            elif resource_type == 'functions':
+                command = "sudo python pull.py --get_function %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            else:
+                command = "sudo python pull.py --get_package %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+        elif identifier and uuid is True:
+            if resource_type == 'services':
+                command = "sudo python pull.py --get_service_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            elif resource_type == 'functions':
+                command = "sudo python pull.py --get_function_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            else:
+                command = "sudo python pull.py --get_package_uuid %s" % identifier
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+        else:
+            if resource_type == 'services':
+                command = "sudo python pull.py -S"
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+
+            elif resource_type == 'functions':
+                command = "sudo python pull.py -F"
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+            else:
+                command = "sudo python pull.py -P"
+                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
+                result = os.popen(command).read()
+                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+
+
+def main():
+    from argparse import ArgumentParser, RawDescriptionHelpFormatter
+    print(mcolors.OKGREEN + "Running ACCESS\n", mcolors.ENDC)
+
+    examples = """Example usage:
+
+    access --auth -u tester -p 1234
+    access --push samples/sonata-demo.son
+    access --list services
+    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    access --pull services --id sonata.eu firewall-vnf 1.0
+    """
+
+    parser = ArgumentParser(
+        description="Authenticates users to submit and request resources from SONATA Service Platform",
+        formatter_class=RawDescriptionHelpFormatter,
+        epilog=examples)
+
+    parser.add_argument(
+        "--auth",
+        help="authenticates a user, requires -u username -p password",
+        action="store_true")
+
+    parser.add_argument(
+        "-u",
+        type=str,
+        metavar="USERNAME",
+        help="specifies username of a user",
+        required=False)
+
+    parser.add_argument(
+        "-p",
+        type=str,
+        metavar="PASSWORD",
+        help="specifies password of a user",
+        required=False)
+
+    parser.add_argument(
+        "--push",
+        type=str,
+        metavar="PACKAGE_PATH",
+        help="submits a son-package to the SP",
+        required=False)
+
+    parser.add_argument(
+        "--list",
+        type=str,
+        metavar="RESOURCE_TYPE",
+        help="lists resources based on its type (services, functions, packages, file)",
+        required=False)
+
+    parser.add_argument(
+        "--pull",
+        type=str,
+        metavar="RESOURCE_TYPE",
+        help="requests a resource based on its type (services, functions, packages, file),"
+             " requires a query parameter --uuid or --id",
+        required=False)
+
+    parser.add_argument(
+        "--uuid",
+        type=str,
+        metavar="UUID",
+        help="Query value for SP identifiers (uuid-generated)",
+        required=False)
+
+    parser.add_argument(
+        "--id",
+        type=str,
+        nargs=3,
+        metavar=("VENDOR", "NAME", "VERSION"),
+        help="Query values for package identifiers (vendor name version)",
+        required=False)
+
+    parser.add_argument(
+        "--debug",
+        help="increases logging level to debug",
+        required=False,
+        action="store_true")
+
+    args = parser.parse_args()
+
+    log_level = "INFO"
+    ac = AccessClient(log_level)
+
+    if args.debug:
+        log_level = "DEBUG"
+        coloredlogs.install(level=log_level)
+
+    if args.auth:
+        print("args.auth", args.auth)
+        # Ensure that both arguments are given (USERNAME and PASSWORD)
+        if all(i is not None for i in [args.u, args.p]):
+            usr = args.u
+            pwd = args.p
+            response = ac.client_login(usr, pwd)
+            print("Authentication is successful: %s" % response)
+        elif any(i is not None for i in [args.u, args.p]):
+            parser.error(mcolors.FAIL + "Both Username and Password are required!" + mcolors.ENDC)
+            parser.print_help()
+            return
+        else:
+            parser.error(mcolors.FAIL + "Both Username and Password are required!" + mcolors.ENDC)
+            parser.print_help()
+            return
+
+    if args.push:
+        # TODO: Check token expiration
+        package_path = args.push
+        print(package_path)
+        ac.push_package(package_path)
+
+    if args.list:
+        # TODO: Check token expiration
+        print("args.list", args.list)
+        # Ensure that argument given is a valid type (services, functions, packages)
+        if args.list not in ['services', 'functions', 'packages']:
+            parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
+        else:
+            ac.pull_resource(args.list)
+
+    if args.pull:
+        # TODO: Check token expiration
+        print("args.pull", args.pull)
+
+        # Ensure that both arguments are given (RESOURCE_TYPE and ID)
+        res_type = args.pull
+        # identifier = args.pull[1]
+
+        # Ensure that argument given is a valid type (services, functions, packages)
+        if res_type not in ['services', 'functions', 'packages']:
+            parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
+        # else:
+            # ac.pull_resource(res_type, id=identifier)
+
+        # Ensure that any of next arguments are given (UUID or ID)
+        if any(i is not None for i in [args.uuid, args.id]):
+            if args.uuid:
+                ac.pull_resource(res_type, identifier=args.uuid, uuid=True)
+                return
+            else:
+                resource_vendor = args.id[0]
+                resource_name = args.id[1]
+                resource_version = args.id[2]
+                resource_query = 'vendor=%s&name=%s&version=%s' % (resource_vendor, resource_name, resource_version)
+                ac.pull_resource(res_type, identifier=resource_query, uuid=False)
+                return
+        else:
+            parser.error(mcolors.FAIL + "A resource UUID or ID is required!" + mcolors.ENDC)
+            parser.print_help()
+            return
+
+    else:
+        return
+
+
+if __name__ == '__main__':
+    #TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
+    main()
+
+
 
 
 
