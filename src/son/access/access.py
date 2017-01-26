@@ -25,21 +25,31 @@
 # partner consortium (www.sonata-nfv.eu).
 
 """
-usage: son-access [-h]
-                  [--auth URL] [-u USERNAME] [-p PASSWORD]
-                  [--push TOKEN_PATH PACKAGE_PATH]
-                  [--pull TOKEN_PATH PACKAGE_ID]
-                  [--pull TOKEN_PATH DESCRIPTOR_ID]
-                  [--debug]
+usage: son-access [-h] [--auth] [-u USERNAME] [-p PASSWORD]
+                  [--workspace WORKSPACE_PATH] [--push PACKAGE_PATH]
+                  [--list RESOURCE_TYPE] [--pull RESOURCE_TYPE] [--uuid UUID]
+                  [--id VENDOR NAME VERSION] [--debug]
 
-  -h, --help                        show this help message and exit
-  --auth URL                        requests an Access token to authenticate the user,
-                                    it requires platform url to login,
-  -u USERNAME                       username of the user,
-  -p PASSWORD                       password of the user
-  --push TOKEN_PATH PACKAGE_PATH    submits a package to the SP, requires path to the token file and package
-  --pull TOKEN_PATH PACKAGE_ID      requests a package or descriptor to the SP by its identifier,
-                    DESCRIPTOR_ID   requires path to the token file
+Authenticates users to submit and request resources from SONATA Service Platform
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --auth                authenticates a user, requires -u username -p password
+  -u USERNAME           specifies username of a user
+  -p PASSWORD           specifies password of a user
+  --workspace WORKSPACE_PATH
+                        specifies workspace to work on. If not specified will
+                        assume '/root/.son-workspace'
+  --push PACKAGE_PATH   submits a son-package to the SP
+  --list RESOURCE_TYPE  lists resources based on its type (services,
+                        functions, packages, file)
+  --pull RESOURCE_TYPE  requests a resource based on its type (services,
+                        functions, packages, file), requires a query parameter
+                        --uuid or --id
+  --uuid UUID           Query value for SP identifiers (uuid-generated)
+  --id VENDOR NAME VERSION
+                        Query values for package identifiers (vendor name
+                        version)
   --debug               increases logging level to debug
 """
 
@@ -54,6 +64,7 @@ import jwt
 import coloredlogs
 import os
 from os.path import expanduser
+from son.workspace.workspace import Workspace
 from son.access.helpers.helpers import json_response
 from son.access.models.models import User
 from son.access.config.config import GK_ADDRESS, GK_PORT
@@ -86,12 +97,13 @@ class AccessClient:
     GK_URI_REF = "/refresh"
     GK_URI_TKV = "TBD"
 
-    def __init__(self, log_level='INFO'):
+    def __init__(self, workspace, log_level='INFO'):
         """
         Header
         The JWT Header declares that the encoded object is a JSON Web Token (JWT) and the JWT is a JWS that is MACed
         using the HMAC SHA-256 algorithm
         """
+        self.workspace = workspace
         self.log_level = log_level
         coloredlogs.install(level=log_level)
         self.JWT_SECRET = 'secret'
@@ -298,6 +310,15 @@ def main():
         required=False)
 
     parser.add_argument(
+        "--workspace",
+        type=str,
+        metavar="WORKSPACE_PATH",
+        help="specifies workspace to work on. If not specified will "
+             "assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
+        required=False
+    )
+
+    parser.add_argument(
         "--push",
         type=str,
         metavar="PACKAGE_PATH",
@@ -342,8 +363,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Obtain Workspace object
+    if args.workspace:
+        ws_root = args.workspace
+    else:
+        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+    workspace = Workspace.__create_from_descriptor__(ws_root)
+
     log_level = "INFO"
-    ac = AccessClient(log_level)
+    ac = AccessClient(workspace, log_level)
 
     if args.debug:
         log_level = "DEBUG"
