@@ -68,6 +68,7 @@ from son.workspace.workspace import Workspace
 from son.access.helpers.helpers import json_response
 from son.access.models.models import User
 from son.access.config.config import GK_ADDRESS, GK_PORT
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 log = logging.getLogger(__name__)
 
@@ -272,177 +273,197 @@ class AccessClient:
                 print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
 
 
-def main():
-    from argparse import ArgumentParser, RawDescriptionHelpFormatter
-    print(mcolors.OKGREEN + "Running ACCESS\n", mcolors.ENDC)
+class AccessArgParse(object):
 
-    examples = """Example usage:
+    def __init__(self):
+        usage = """son-access [optional] command [<args>]
+        The supported commands are:
+           auth     Authenticate a user
+           list     List available resources (service, functions, packages, ...)
+           push     Submit a son-package
+           pull     Request resources (services, functions, packages, ...)
+        """
+        examples = """Example usage:
+            access auth -u tester -p 1234
+            access push samples/sonata-demo.son
+            access list services
+            access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+            access pull services --id sonata.eu firewall-vnf 1.0
+            """
+        parser = ArgumentParser(
+            description="Authenticates users to submit and request resources "
+                        "from SONATA Service Platform",
+            usage=usage,
+        )
+        parser.add_argument(
+            "-w", "--workspace",
+            type=str,
+            metavar="WORKSPACE_PATH",
+            help="specifies workspace to work on. If not specified will "
+                 "assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
+            required=False
+        )
+        parser.add_argument(
+            "--debug",
+            help="Set logging level to debug",
+            required=False,
+            action="store_true"
+        )
 
-    access --auth -u tester -p 1234
-    access --push samples/sonata-demo.son
-    access --list services
-    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
-    access --pull services --id sonata.eu firewall-vnf 1.0
-    """
+        parser.add_argument(
+            "command",
+            help="Command to run"
+        )
 
-    parser = ArgumentParser(
-        description="Authenticates users to submit and request resources from SONATA Service Platform",
-        formatter_class=RawDescriptionHelpFormatter,
-        epilog=examples)
+        # align command index
+        command_idx = 1
+        for idx in range(1, len(sys.argv)):
+            v = sys.argv[idx]
+            if v == "-w" or v == "--workspace":
+                command_idx += 2
+            elif v == '--debug':
+                command_idx += 1
 
-    parser.add_argument(
-        "--auth",
-        help="authenticates a user, requires -u username -p password",
-        action="store_true")
+        self.subarg_idx = command_idx+1
+        args = parser.parse_args(sys.argv[1: self.subarg_idx])
 
-    parser.add_argument(
-        "-u",
-        type=str,
-        metavar="USERNAME",
-        help="specifies username of a user",
-        required=False)
-
-    parser.add_argument(
-        "-p",
-        type=str,
-        metavar="PASSWORD",
-        help="specifies password of a user",
-        required=False)
-
-    parser.add_argument(
-        "--workspace",
-        type=str,
-        metavar="WORKSPACE_PATH",
-        help="specifies workspace to work on. If not specified will "
-             "assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
-        required=False
-    )
-
-    parser.add_argument(
-        "--push",
-        type=str,
-        metavar="PACKAGE_PATH",
-        help="submits a son-package to the SP",
-        required=False)
-
-    parser.add_argument(
-        "--list",
-        type=str,
-        metavar="RESOURCE_TYPE",
-        help="lists resources based on its type (services, functions, packages, file)",
-        required=False)
-
-    parser.add_argument(
-        "--pull",
-        type=str,
-        metavar="RESOURCE_TYPE",
-        help="requests a resource based on its type (services, functions, packages, file),"
-             " requires a query parameter --uuid or --id",
-        required=False)
-
-    parser.add_argument(
-        "--uuid",
-        type=str,
-        metavar="UUID",
-        help="Query value for SP identifiers (uuid-generated)",
-        required=False)
-
-    parser.add_argument(
-        "--id",
-        type=str,
-        nargs=3,
-        metavar=("VENDOR", "NAME", "VERSION"),
-        help="Query values for package identifiers (vendor name version)",
-        required=False)
-
-    parser.add_argument(
-        "--debug",
-        help="increases logging level to debug",
-        required=False,
-        action="store_true")
-
-    args = parser.parse_args()
-
-    # Obtain Workspace object
-    if args.workspace:
-        ws_root = args.workspace
-    else:
-        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
-    workspace = Workspace.__create_from_descriptor__(ws_root)
-
-    log_level = "INFO"
-    ac = AccessClient(workspace, log_level)
-
-    if args.debug:
-        log_level = "DEBUG"
-        coloredlogs.install(level=log_level)
-
-    if args.auth:
-        print("args.auth", args.auth)
-        # Ensure that both arguments are given (USERNAME and PASSWORD)
-        if all(i is not None for i in [args.u, args.p]):
-            usr = args.u
-            pwd = args.p
-            response = ac.client_login(usr, pwd)
-            print("Authentication is successful: %s" % response)
-        elif any(i is not None for i in [args.u, args.p]):
-            parser.error(mcolors.FAIL + "Both Username and Password are required!" + mcolors.ENDC)
-            parser.print_help()
-            return
+        # handle workspace
+        if args.workspace:
+            ws_root = args.workspace
         else:
-            parser.error(mcolors.FAIL + "Both Username and Password are required!" + mcolors.ENDC)
-            parser.print_help()
+            ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+        self.workspace = Workspace.__create_from_descriptor__(ws_root)
+        if not self.workspace:
+            print("Invalid workspace: ", ws_root)
             return
 
-    if args.push:
+        # handle debug
+        log_level = 'info'
+        if args.debug:
+            log_level = 'debug'
+            coloredlogs.install(level=log_level)
+
+        if not hasattr(self, args.command):
+            print("Invalid command: ", args.command)
+            exit(1)
+
+        self.ac = AccessClient(self.workspace, log_level=log_level)
+
+        # call sub-command
+        getattr(self, args.command)()
+
+    def auth(self):
+        parser = ArgumentParser(
+            prog="son-access [..] auth",
+            description="Authenticate a user"
+        )
+        parser.add_argument(
+            "-u", "--username",
+            type=str,
+            metavar="USERNAME",
+            dest="username",
+            help="Specify username of the user",
+            required=True
+        )
+        parser.add_argument(
+            "-p", "--password",
+            type=str,
+            metavar="PASSWORD",
+            dest="password",
+            help="Specify password of the user",
+            required=True
+        )
+        args = parser.parse_args(sys.argv[self.subarg_idx:])
+
+        rsp = self.ac.client_login(args.username, args.password)
+        print("Authentication is successful: %s" % rsp)
+
+    def list(self):
+        parser = ArgumentParser(
+            prog="son-access [..] list",
+            description="List available resources (services, functions, "
+                        "packages, ...)"
+        )
+        parser.add_argument(
+            "resource_type",
+            help="(services | functions | packages)"
+        )
+
+        args = parser.parse_args(sys.argv[self.subarg_idx:])
+
+        if args.resource_type not in ['services', 'functions', 'packages']:
+            log.error("Invalid resource type: ", args.resource_type)
+            exit(1)
+
+        self.ac.pull_resource(args.resource_type)
+
+    def push(self):
+        parser = ArgumentParser(
+            prog="son-access [..] push",
+            description="Submit a son-package to the SP"
+        )
+        parser.add_argument(
+            "package",
+            type=str,
+            help="Specify package to submit"
+        )
+        args = parser.parse_args(sys.argv[self.subarg_idx:])
+
         # TODO: Check token expiration
-        package_path = args.push
+        package_path = args.package
         print(package_path)
-        ac.push_package(package_path)
+        self.ac.push_package(package_path)
 
-    if args.list:
-        # TODO: Check token expiration
-        print("args.list", args.list)
-        # Ensure that argument given is a valid type (services, functions, packages)
-        if args.list not in ['services', 'functions', 'packages']:
-            parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
-        else:
-            ac.pull_resource(args.list)
+    def pull(self):
+        parser = ArgumentParser(
+            prog="son-access [..] pull",
+            description="Request resources (services, functions, packages, "
+                        "...)",
+        )
+        parser.add_argument(
+            "resource_type",
+            help="(services | functions | packages)"
+        )
 
-    if args.pull:
-        # TODO: Check token expiration
-        print("args.pull", args.pull)
+        mutex_parser = parser.add_mutually_exclusive_group(
+            required=True
+        )
+        mutex_parser.add_argument(
+            "--uuid",
+            type=str,
+            metavar="UUID",
+            dest="uuid",
+            help="Query value for SP identifiers (uuid-generated)",
+            required=False)
 
-        # Ensure that both arguments are given (RESOURCE_TYPE and ID)
-        res_type = args.pull
-        # identifier = args.pull[1]
+        mutex_parser.add_argument(
+            "--id",
+            type=str,
+            nargs=3,
+            metavar=("VENDOR", "NAME", "VERSION"),
+            help="Query values for package identifiers (vendor name version)",
+            required=False)
 
-        # Ensure that argument given is a valid type (services, functions, packages)
-        if res_type not in ['services', 'functions', 'packages']:
-            parser.error(mcolors.FAIL + "Valid resource types are: services, functions, packages" + mcolors.ENDC)
-        # else:
-            # ac.pull_resource(res_type, id=identifier)
+        args = parser.parse_args(sys.argv[self.subarg_idx:])
 
-        # Ensure that any of next arguments are given (UUID or ID)
-        if any(i is not None for i in [args.uuid, args.id]):
-            if args.uuid:
-                ac.pull_resource(res_type, identifier=args.uuid, uuid=True)
-                return
-            else:
-                resource_vendor = args.id[0]
-                resource_name = args.id[1]
-                resource_version = args.id[2]
-                resource_query = 'vendor=%s&name=%s&version=%s' % (resource_vendor, resource_name, resource_version)
-                ac.pull_resource(res_type, identifier=resource_query, uuid=False)
-                return
-        else:
-            parser.error(mcolors.FAIL + "A resource UUID or ID is required!" + mcolors.ENDC)
-            parser.print_help()
-            return
+        if args.resource_type not in ['services', 'functions', 'packages']:
+            log.error("Invalid resource type: ", args.resource_type)
+            exit(1)
 
-    else:
-        return
+        if args.uuid:
+            self.ac.pull_resource(args.resource_type,
+                                  identifier=args.uuid,
+                                  uuid=True)
+        elif args.id:
+            resource_query = 'vendor=%s&name=%s&version=%s' % \
+                             (args.id[0], args.id[1], args.id[2])
+            self.ac.pull_resource(args.resource_type,
+                                  identifier=resource_query,
+                                  uuid=False)
 
+
+def main():
+    AccessArgParse()
 
 if __name__ == '__main__':
     #TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
