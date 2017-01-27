@@ -282,6 +282,7 @@ class AccessArgParse(object):
            list     List available resources (service, functions, packages, ...)
            push     Submit a son-package
            pull     Request resources (services, functions, packages, ...)
+           config   Configure access parameters
         """
         examples = """Example usage:
             access auth -u tester -p 1234
@@ -299,8 +300,17 @@ class AccessArgParse(object):
             "-w", "--workspace",
             type=str,
             metavar="WORKSPACE_PATH",
-            help="specifies workspace to work on. If not specified will "
+            help="Specify workspace to work on. If not specified will "
                  "assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
+            required=False
+        )
+        parser.add_argument(
+            "-p", "--platform",
+            type=str,
+            metavar="PLATFORM_ID",
+            help="Specify the ID of the Service Platform to use from "
+                 "workspace configuration. If not specified will assume the ID"
+                 "in '{}'".format(Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM),
             required=False
         )
         parser.add_argument(
@@ -460,6 +470,116 @@ class AccessArgParse(object):
             self.ac.pull_resource(args.resource_type,
                                   identifier=resource_query,
                                   uuid=False)
+
+    def config(self):
+        parser = ArgumentParser(
+            prog="son-access [..] config",
+            description="Configure access parameters",
+        )
+        mutex_parser = parser.add_mutually_exclusive_group(
+            required=True,
+        )
+        mutex_parser.add_argument(
+            "--platform",
+            help="Specify the Service Platform ID to configure",
+            type=str,
+            required=False,
+            metavar="SP_ID"
+        )
+        mutex_parser.add_argument(
+            "--list",
+            help="List all Service Platform configuration entries",
+            required=False,
+            action="store_true"
+        )
+        parser.add_argument(
+            "--new",
+            help="Create a new access entry to a Service Platform",
+            action="store_true",
+            required=False
+        )
+        parser.add_argument(
+            "--url",
+            help="Configure URL of Service Platform",
+            type=str,
+            required=False,
+            metavar="URL"
+        )
+        parser.add_argument(
+            "-u", "--username",
+            help="Configure username",
+            type=str,
+            required=False,
+            metavar="USERNAME"
+        )
+        parser.add_argument(
+            "-p", "--password",
+            help="Configure password",
+            type=str,
+            required=False,
+            metavar="PASSWORD"
+        )
+        parser.add_argument(
+            "--token",
+            help="Configure token filename",
+            type=str,
+            required=False,
+            metavar="TOKEN_FILE"
+        )
+        parser.add_argument(
+            "--default",
+            help="Set Service Platform as default",
+            required=False,
+            action="store_true",
+        )
+
+        args = parser.parse_args(sys.argv[self.subarg_idx:])
+
+        # list configuration
+        if args.list:
+            entries = ''
+            for sp_id, sp in self.workspace.service_platforms.items():
+                entries += "[%s]: %s\n" % (sp_id, sp)
+
+            log.info("Service Platform entries (default='{0}'):\n{1}"
+                     .format(self.workspace.default_service_platform,
+                             entries))
+            exit(0)
+
+        if not (args.url or args.username or args.password or args.token or
+                args.default):
+            log.error("At least one of the following arguments must be "
+                      "specified: (--url | --username | --password | --token "
+                      "| --default)")
+            exit(1)
+
+        # new SP entry in workspace configuration
+        if args.new:
+            if self.workspace.get_service_platform(args.platform):
+                log.error("Couldn't add entry. Service Platform ID='{}' "
+                          "already exists.".format(args.platform))
+                exit(1)
+            self.workspace.add_service_platform(args.platform)
+
+        # already existent entry
+        else:
+            if not self.workspace.get_service_platform(args.platform):
+                log.error("Couldn't modify entry. Service Platform ID='{}' "
+                          "doesn't exist.".format(args.platform))
+                exit(1)
+
+        # modify entry
+        self.workspace.config_service_platform(args.platform,
+                                               url=args.url,
+                                               username=args.username,
+                                               password=args.password,
+                                               token=args.token,
+                                               default=args.default)
+
+        log.info("Service Platform ID='{0}':\n{1}"
+                 .format(args.platform,
+                         self.workspace.get_service_platform(args.platform)))
+
 
 
 def main():

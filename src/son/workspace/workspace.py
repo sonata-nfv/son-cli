@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 
 class Workspace:
-    WORKSPACE_VERSION = "0.02"
+    WORKSPACE_VERSION = "0.03"
 
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
@@ -54,7 +54,8 @@ class Workspace:
     CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
     CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
     CONFIG_STR_DESCRIPTOR_EXTENSION = "default_descriptor_extension"
-    CONFIG_STR_CATALOGUE_SERVERS = "catalogue_servers"
+    CONFIG_STR_SERVICE_PLATFORMS = "service_platforms"
+    CONFIG_STR_DEF_SERVICE_PLATFORM = "default_service_platform"
     CONFIG_STR_LOGGING_LEVEL = "log_level"
 
     __descriptor_name__ = "workspace.yml"
@@ -68,11 +69,16 @@ class Workspace:
         self.schemas = dict()
         self.default_descriptor_extension = ""
         self.load_default_config()
+
         # Catalogue servers
-        self._catalogue_servers = [{'id': 'son-catalogue',
-                                    'url':
-                                        'http://catalogue.sonata-nfv.eu:4012',
-                                    'publish': 'yes'}]
+        self._service_platforms = dict()
+        self._service_platforms['sp1'] = \
+            {'url': 'http://sp.int3.sonata-nfv.eu:32001',
+             'credentials': {'username': 'sonata',
+                             'password': 's0n@t@',
+                             'token_file': 'token.txt'}
+             }
+        self._default_service_platform = 'sp1'
 
     def load_default_config(self):
         self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
@@ -152,8 +158,11 @@ class Workspace:
                  self.CONFIG_STR_SCHEMAS_REMOTE_MASTER:
                  self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
 
-                 self.CONFIG_STR_CATALOGUE_SERVERS:
-                 self._catalogue_servers,
+                 self.CONFIG_STR_SERVICE_PLATFORMS:
+                 self._service_platforms,
+
+                 self.CONFIG_STR_DEF_SERVICE_PLATFORM:
+                 self._default_service_platform,
 
                  self.CONFIG_STR_LOGGING_LEVEL:
                  self.log_level,
@@ -220,8 +229,11 @@ class Workspace:
         ws.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
             ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
 
-        ws.catalogue_servers = \
-            ws_config[Workspace.CONFIG_STR_CATALOGUE_SERVERS]
+        ws.service_platforms = \
+            ws_config[Workspace.CONFIG_STR_SERVICE_PLATFORMS]
+
+        ws.default_service_platform = \
+            ws_config[Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM]
 
         ws.descriptor_extension = \
             ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
@@ -229,17 +241,60 @@ class Workspace:
         return ws
 
     @property
-    def catalogue_servers(self):
-        return self._catalogue_servers
+    def default_service_platform(self):
+        return self._default_service_platform
 
-    @catalogue_servers.setter
-    def catalogue_servers(self, cat_servers):
-        self._catalogue_servers = cat_servers
+    @default_service_platform.setter
+    def default_service_platform(self, sp_id):
+        self._default_service_platform = sp_id
 
-    def get_catalogue_server(self, cat_id):
-        for cat in self._catalogue_servers:
-            if cat['id'] == cat_id:
-                return cat
+    @property
+    def service_platforms(self):
+        return self._service_platforms
+
+    @service_platforms.setter
+    def service_platforms(self, sps):
+        self._service_platforms = sps
+
+    def get_service_platform(self, sp_id):
+        if sp_id not in self.service_platforms.keys():
+            return
+        return self.service_platforms[sp_id]
+
+    def add_service_platform(self, sp_id):
+        if sp_id in self.service_platforms.keys():
+            return
+        self.service_platforms[sp_id] = {'url': '',
+                                         'credentials': {'username': '',
+                                                         'password': '',
+                                                         'token_file': ''}
+                                         }
+
+    def config_service_platform(self, sp_id, url=None, username=None,
+                                password=None, token=None, default=None):
+
+        if sp_id not in self.service_platforms.keys():
+            return
+
+        sp = self.service_platforms[sp_id]
+
+        if url:
+            sp['url'] = url
+
+        if username:
+            sp['credentials']['username'] = username
+
+        if password:
+            sp['credentials']['password'] = password
+
+        if token:
+            sp['credentials']['token_file'] = token
+
+        if default:
+            self._default_service_platform = sp_id
+
+        # update workspace config descriptor
+        self.create_ws_descriptor()
 
     def __eq__(self, other):
         """
