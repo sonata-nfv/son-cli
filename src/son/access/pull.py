@@ -78,9 +78,7 @@ class Pull(object):
     CAT_URI_SONP_ID = "/son-packages/"      # Get a specific SON-Package by ID
 
     # def __init__(self, base_url, auth=('', '')):
-    def __init__(self, workspace, base_url, auth_token=None):
-        # Assign workspace
-        self.workspace = workspace
+    def __init__(self, base_url, auth_token=None):
         # Assign parameters
         self._base_url = base_url
         # self._auth = auth

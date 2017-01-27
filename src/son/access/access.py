@@ -69,6 +69,8 @@ from son.access.helpers.helpers import json_response
 from son.access.models.models import User
 from son.access.config.config import GK_ADDRESS, GK_PORT
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from son.access.pull import Pull
+from son.access.push import Push
 
 log = logging.getLogger(__name__)
 
@@ -105,6 +107,19 @@ class AccessClient:
         using the HMAC SHA-256 algorithm
         """
         self.workspace = workspace
+
+        # temporary workaround -> in the future, this information will be
+        # retrieved from workspace configuration
+        with open('src/son/access/config/token.txt', 'rb') as token_file:
+            access_token = token_file.read()
+            access_token = access_token[1:-1]
+        self.platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+        # end - temporary workaround
+
+        # Pull and push clients
+        self.pull_client = Pull(self.platform_url, auth_token=access_token)
+        self.push_client = Push(self.platform_url, auth_token=access_token)
+
         self.log_level = log_level
         coloredlogs.install(level=log_level)
         self.JWT_SECRET = 'secret'
@@ -197,10 +212,8 @@ class AccessClient:
         # path = "samples/sonata-demo.son"
 
         # Push son-package to the Service Platform
-        command = "sudo python push.py -U %s" % path
-        print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-        result = os.popen(command).read()
-        print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+        print(self.push_client.upload_package(path))
+
 
     def pull_resource(self, resource_type, identifier=None, uuid=False):
         """
@@ -214,63 +227,50 @@ class AccessClient:
         # mode = "pull"
         # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
 
+        # resources by id
         if identifier and uuid is False:
             if resource_type == 'services':
-                command = "sudo python pull.py --get_service %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+                log.debug("Retrieving service id='{}'".format(identifier))
+                print(self.pull_client.get_ns_by_id(identifier))
 
             elif resource_type == 'functions':
-                command = "sudo python pull.py --get_function %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+                log.debug("Retrieving function id='{}'".format(identifier))
+                print(self.pull_client.get_vnf_by_id(identifier))
 
-            else:
-                command = "sudo python pull.py --get_package %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+            elif resource_type == 'packages':
+                log.debug("Retrieving package id='{}'".format(identifier))
+                print(self.pull_client.get_package_by_id(identifier))
 
+        # resources by uuid
         elif identifier and uuid is True:
             if resource_type == 'services':
-                command = "sudo python pull.py --get_service_uuid %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+                log.debug("Retrieving service uuid='{}'".format(identifier))
+                print(self.pull_client.get_ns_by_uuid(identifier))
 
             elif resource_type == 'functions':
-                command = "sudo python pull.py --get_function_uuid %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+                log.debug("Retrieving function uuid='{}'".format(identifier))
+                print(self.pull_client.get_vnf_by_uuid(identifier))
 
-            else:
-                command = "sudo python pull.py --get_package_uuid %s" % identifier
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+            elif resource_type == 'packages':
+                log.debug("Retrieving package uuid='{}'".format(identifier))
+                print(self.pull_client.get_package_by_uuid(identifier))
 
+        # resources list
         else:
             if resource_type == 'services':
-                command = "sudo python pull.py -S"
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
-
+                log.info("Listing all services from '{}'"
+                         .format(self.platform_url))
+                print(self.pull_client.get_all_nss())
 
             elif resource_type == 'functions':
-                command = "sudo python pull.py -F"
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+                log.info("Listing all functions from '{}'"
+                         .format(self.platform_url))
+                print(self.pull_client.get_all_vnfs())
 
-            else:
-                command = "sudo python pull.py -P"
-                print("Calling: ", mcolors.OKGREEN + command + "\n", mcolors.ENDC)
-                result = os.popen(command).read()
-                print("Response: ", mcolors.OKGREEN + result + "\n", mcolors.ENDC)
+            elif resource_type == 'packages':
+                log.info("Listing all packages from '{}'"
+                         .format(self.platform_url))
+                print(self.pull_client.get_all_packages())
 
 
 class AccessArgParse(object):
