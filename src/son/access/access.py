@@ -80,12 +80,10 @@ class mcolors:
      FAIL = '\033[91m'
      ENDC = '\033[0m'
 
-
      def disable(self):
          self.OKGREEN = ''
          self.FAIL = ''
          self.ENDC = ''
-
 
 class AccessClient:
     ACCESS_VERSION = "0.3"
@@ -100,7 +98,7 @@ class AccessClient:
     GK_URI_REF = "/refresh"
     GK_URI_TKV = "TBD"
 
-    def __init__(self, workspace, log_level='INFO'):
+    def __init__(self, workspace, platform=None, log_level='INFO'):
         """
         Header
         The JWT Header declares that the encoded object is a JSON Web Token (JWT) and the JWT is a JWS that is MACed
@@ -108,17 +106,23 @@ class AccessClient:
         """
         self.workspace = workspace
 
-        # temporary workaround -> in the future, this information will be
-        # retrieved from workspace configuration
-        with open('src/son/access/config/token.txt', 'rb') as token_file:
+        if platform:
+            self.platform = self.workspace.get_service_platform(platform)
+        else:
+            self.platform = self.workspace.get_service_platform(
+                self.workspace.default_service_platform)
+
+        # retrieve token from workspace
+        platform_dir = self.workspace.dirs[workspace.CONFIG_STR_PLATFORMS_DIR]
+        with open(os.path.join(platform_dir,
+                               self.platform['credentials']['token']),
+                  'rb') as token_file:
             access_token = token_file.read()
             access_token = access_token[1:-1]
-        self.platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
-        # end - temporary workaround
 
         # Pull and push clients
-        self.pull_client = Pull(self.platform_url, auth_token=access_token)
-        self.push_client = Push(self.platform_url, auth_token=access_token)
+        self.pull_client = Pull(self.platform['url'], auth_token=access_token)
+        self.push_client = Push(self.platform['url'], auth_token=access_token)
 
         self.log_level = log_level
         coloredlogs.install(level=log_level)
@@ -259,17 +263,17 @@ class AccessClient:
         else:
             if resource_type == 'services':
                 log.info("Listing all services from '{}'"
-                         .format(self.platform_url))
+                         .format(self.platform['url']))
                 print(self.pull_client.get_all_nss())
 
             elif resource_type == 'functions':
                 log.info("Listing all functions from '{}'"
-                         .format(self.platform_url))
+                         .format(self.platform['url']))
                 print(self.pull_client.get_all_vnfs())
 
             elif resource_type == 'packages':
                 log.info("Listing all packages from '{}'"
-                         .format(self.platform_url))
+                         .format(self.platform['url']))
                 print(self.pull_client.get_all_packages())
 
 
@@ -357,7 +361,8 @@ class AccessArgParse(object):
             print("Invalid command: ", args.command)
             exit(1)
 
-        self.ac = AccessClient(self.workspace, log_level=log_level)
+        self.ac = AccessClient(self.workspace, platform=args.platform,
+                               log_level=log_level)
 
         # call sub-command
         getattr(self, args.command)()
