@@ -39,6 +39,8 @@ class Experiment(object):
         # attributes
         self.run_configurations = list()
         self.generated_services = list()
+        self.command_space_list = list()
+        self.resource_space_list = list()
 
     def populate(self):
         """
@@ -49,17 +51,38 @@ class Experiment(object):
         # convert parameter macros from PED file to plain lists
         for rl in self.resource_limitations:
             rewrite_parameter_macros_to_lists(rl)
+        # convert measurment points from PED file to plain lists
+        for mp in self.measurement_points:
+            rewrite_parameter_macros_to_lists(mp)
+        print(self.measurement_points)
+        # aggregate all commands to be used in the experiment to a flat dict for further processing
+        command_dict = self._get_command_space_as_dict()
+        print(command_dict)
+        # explore entire command space by calculating the Cartesian product over the given dict
+        self.command_space_list = compute_cartesian_product(command_dict)
+
+
         # aggregate all parameters to used in the experiment to a flat dict for further processing
-        parameter_dict = self._get_configuration_space_as_dict()
+        resource_dict = self._get_resource_space_as_dict()
         # print(parameter_dict)
         # explore entire parameter space by calculating the Cartesian product over the given dict
-        parameter_space_list = compute_cartesian_product(parameter_dict)
+        self.resource_space_list = compute_cartesian_product(resource_dict)
+
+
         # create a run configuration object for each calculated configuration to test
-        for i in range(0, len(parameter_space_list)):
-            self.run_configurations.append(RunConfiguration(i, parameter_space_list[i]))
+        for i in range(0, len(self.resource_space_list)):
+            self.run_configurations.append(RunConfiguration(i, self.resource_space_list[i]))
         LOG.info("Populated experiment specifications: %r with %d configurations to test." % (self.name, len(self.run_configurations)))
 
-    def _get_configuration_space_as_dict(self):
+    def _get_command_space_as_dict(self):
+        m = dict()
+        for mp in self.measurement_points:
+            vnf_name = mp.get("name")
+            vnf_cmds = mp.get("cmd")
+            m[vnf_name] = vnf_cmds
+        return m
+
+    def _get_resource_space_as_dict(self):
         """
         Create a flat dictionary with configuration lists to be tested for each configuration parameter.
         Output: dict
