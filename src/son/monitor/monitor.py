@@ -104,7 +104,7 @@ parser = argparse.ArgumentParser(description=description,
 # positional  arguments
 parser.add_argument(
     "command",
-    choices=['init', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm'],
+    choices=['init', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm', 'stats'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)

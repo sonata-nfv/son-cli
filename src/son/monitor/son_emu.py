@@ -23,9 +23,9 @@ partner consortium (www.sonata-nfv.eu).
 
 from requests import get, put, delete, Session
 from son.monitor.utils import *
-from son.monitor.prometheus import query_Prometheus
+from son.monitor.prometheus_lib import query_Prometheus
 from son.monitor.grafana_lib import Grafana
-import son.monitor.profiler as profiler
+from  son.monitor.profiler import Emu_Profiler
 from subprocess import Popen
 import os
 import sys
@@ -34,12 +34,14 @@ from shutil import copy, rmtree, copytree
 import paramiko
 import shlex
 import select
-from time import sleep
+from time import sleep, time, perf_counter
 from threading import Thread
 
 from son.monitor.msd import msd as msd_object
 
 import re
+
+import math
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -48,14 +50,23 @@ logging.basicConfig(level=logging.INFO)
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
+import docker
+
+import numpy as np
+from scipy.stats import norm, lognorm, skew, skewtest, normaltest, t, mode
+import scikits.bootstrap as bootstrap
+import scipy
+
+
 """
 This class implements the son-emu commands via its REST api.
 """
 
 class emu():
 
-    def __init__(self, REST_api, ip='localhost', vm=False, user=None, password=None):
+    def __init__(self, REST_api, docker_api='local', ip='localhost', vm=False, user=None, password=None):
         self.url = REST_api
+        self.docker_client = self.get_docker_api(docker_api)
         self.tmp_dir = '/tmp/son-monitor'
         self.docker_dir = '/tmp/son-monitor/docker'
         self.prometheus_dir = '/tmp/son-monitor/prometheus'
@@ -87,10 +98,13 @@ class emu():
         actions = {'start': self.start_containers, 'stop': self.stop_containers}
         return actions[action](**kwargs)
 
-    def nsd(self, action, **kwargs):
-        #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
-        actions = {'start': self.start_nsd, 'stop': self.stop_nsd}
-        return actions[action](**kwargs)
+    def get_docker_api(self, docker_api):
+        if docker_api == 'local':
+            # commect to local docker api
+            return docker.from_env()
+        else:
+            # connect to remote docker pai eg. tcp://127.0.0.1:1234
+            return docker.Client(base_url='docker_api')
 
     def msd(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
@@ -98,18 +112,18 @@ class emu():
         return actions[action](**kwargs)
 
     # parse the msd file and export the metrics from son-emu and show in grafana
-    def start_msd(self, file=None, **kwargs):
+    def start_msd(self, filepath=None, **kwargs):
 
         # also start son-monitor containers
         self.start_containers()
 
         # initialize msd object
-        msd_obj = msd_object(file, self)
+        msd_obj = msd_object(filepath, self)
         msd_obj.start()
 
         # Parse the msd file
-        logging.info('parsing msd: {0}'.format(file))
-        msd = load_yaml(file)
+        #logging.info('parsing msd: {0}'.format(filepath))
+        #msd = load_yaml(filepath)
 
         # initialize a new Grafana dashboard
         #self.grafana = Grafana()
@@ -127,7 +141,7 @@ class emu():
         # execute the SAP commands
         # first make sure everything is stopped
         #self.install_sap_commands(msd, "stop")
-        self.install_sap_commands(msd, "start")
+        #self.install_sap_commands(msd, "start")
 
         return 'msd metrics installed'
 
@@ -192,10 +206,10 @@ class emu():
         if self.docker_based:
             # we are running son-cli in a docker container
             logging.info('son-cli is running inside a docker container')
-            src_path = os.path.join('docker', 'docker-compose-docker.yml')
+            src_path = os.path.join('docker_compose_files', 'docker-compose-docker.yml')
         else:
             # we are running son-cli locally
-            src_path = os.path.join('docker', 'docker-compose-local.yml')
+            src_path = os.path.join('docker_compose_files', 'docker-compose-local.yml')
         srcfile = pkg_resources.resource_filename(__name__, src_path)
         # copy the docker compose file to a working directory
         copy(srcfile, os.path.join(self.docker_dir, 'docker-compose.yml'))
@@ -290,6 +304,25 @@ class emu():
         #process.wait()
         return process
 
+    def docker_exec(self, cmd, vnf_name, action='start'):
+
+        docker_name = 'mn.' + str(vnf_name)
+        container = self.docker_client.get(docker_name)
+        wait = False
+
+        if action == "stop":
+            cmd = " pkill -9 -f '" + cmd + "'"
+            cmd_list = shlex.split(cmd)
+            wait = True
+        else:
+            cmd_list = shlex.split(cmd)
+
+        thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=wait))
+        thread.start()
+        if wait:
+            thread.join()
+
+
     # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):
         # check required arguments
@@ -302,7 +335,7 @@ class emu():
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
 
-        url = construct_url(self.url, 'restapi/monitor/vnf',
+        url = construct_url(self.url, 'restapi/monitor/interface',
                             vnf_name2, vnf_interface, metric)
 
         response = actions[action](url)
@@ -342,14 +375,18 @@ class emu():
         params = create_dict(
             vnf_src_interface=parse_vnf_interface(source),
             vnf_dst_interface=parse_vnf_interface(destination),
-            weight=args.get("weight"),
-            match=args.get("match"),
-            bidirectional=args.get("bidirectional"),
-            priority=args.get("priority"),
-            cookie=args.get("cookie"),
             skip_vlan_tag=True,
-            monitor=args.get("monitor"),
-            monitor_placement=args.get("monitor_placement") )
+        )
+        params.update(args)
+            # weight=args.get("weight"),
+            # match=args.get("match"),
+            # bidirectional=args.get("bidirectional"),
+            # priority=args.get("priority"),
+            # cookie=args.get("cookie"),
+            # skip_vlan_tag=True,
+            # monitor=args.get("monitor"),
+            # monitor_placement=args.get("monitor_placement"),
+            # metric=args.get("metric"))
 
         response = actions[action]("{0}/restapi/monitor/link/{1}/{2}".format(
                     self.url,
@@ -357,7 +394,7 @@ class emu():
                     vnf_dst_name),
                     json=params)
 
-        return response.json()
+        return response.text
 
     # install monitoring of a specific flow on a pre-existing link in the service.
     # the traffic counters of the newly installed monitor flow are exported
@@ -430,7 +467,7 @@ class emu():
             input=args.get("input"),
             output=args.get("output"))
 
-        profiler_emu = profiler.Emu_Profiler(self.url)
+        profiler_emu = Emu_Profiler(self.url)
 
         # deploy the test service chain
         vnf_name = parse_vnf_name(args.get("vnf_name"))
@@ -469,6 +506,12 @@ class emu():
         dc_label = self._find_dc(vnf_name)
         vnf_status = get("{0}/restapi/compute/{1}/{2}".format(self.url, dc_label, vnf_name)).json()
         return vnf_status['docker_network']
+
+    # find parameter the docker status output
+    def _find_vnf_status_parameter(self, vnf_name, param):
+        dc_label = self._find_dc(vnf_name)
+        vnf_status = get("{0}/restapi/compute/{1}/{2}".format(self.url, dc_label, vnf_name)).json()
+        return vnf_status[param]
 
     # start tcpdump for this interface
     def dump(self, action, vnf_name, file, **kwargs):
@@ -525,7 +568,7 @@ class emu():
 
         return 'xterms started for {0}'.format(vnf_names)
 
-    # exec ute a command in a VNF
+    # execute a command in a VNF
     def exec(self, vnf_name, docker_command, action, loop=False):
         sap = {}
         sap['sap_name'] = vnf_name
@@ -542,6 +585,144 @@ class emu():
         #execute commands
         self.install_sap_commands(self, msd, action)
 
+    # get statistics with certain frequency and export in file for further analysis
+    def stats(self, vnf_name, **kwargs):
+        docker_id = self._find_vnf_status_parameter(vnf_name, 'id')
+        proc_file = '/sys/fs/cgroup/cpuacct/docker/{0}/cpuacct.usage'.format(docker_id)
+
+        cpu_count0 = 0
+        time0 = 0
+
+        #out_file = '/home/steven/Documents/out.txt'
+        #output = open(out_file, 'w')
+
+        #milliseconds
+        stat_delta = 10
+        sample_T = 2000
+
+        data = []
+        n = 0
+
+        fp = open(proc_file)
+
+        moment1 = 0
+        moment2 = 0
+        moment3 = 0
+
+
+        while True:
+            #collect samples
+            for n in range(0,round(sample_T/stat_delta)):
+                # first measurement
+                if cpu_count0 <= 0 or time0 <= 0:
+                    #time0 = int(round(time() * 1000))
+                    time0 = perf_counter()
+                    #cpu_count0=int(open(proc_file).readline())
+                    cpu_count0 = int(fp.read().strip())
+                    fp.seek(0)
+                    sleep(stat_delta/1000)
+                    continue
+
+
+                #time1 = int(round(time() * 1000))
+                #perf_counter in seconds
+                time1 = perf_counter()
+
+                # cpu count in nanoseconds
+                #cpu_count1 = int(open(proc_file).readline())
+                cpu_count1 = int(fp.read().strip())
+                fp.seek(0)
+
+                cpu_delta = cpu_count1 - cpu_count0
+                cpu_count0 = cpu_count1
+
+                time_delta = time1 - time0
+                time0 = time1
+
+                #metric = (cpu_delta / (time_delta * 1e6))
+                #work in nanoseconds
+                metric = (cpu_delta / (time_delta * 1e9))
+
+                #logging.info("cpu delta: {0}, time delta: {1}".format(cpu_delta, time_delta))
+                #output.write(str(int(round(cpu_delta)))+'\n')
+                #output.write(str(int(round(cpu_delta*(stat_delta/time_delta)))) + '\n')
+                #output.write(str((cpu_delta / (time_delta*1e6))) + '\n')
+
+                data.append(metric)
+                #n += 1
+
+                #running calculation of sample moments
+                moment1 += metric
+                temp = metric * metric
+                moment2 += temp
+                moment3 += temp * metric
+
+
+                sleep(stat_delta/1000)
+
+
+            # calc skew:
+            M1 = (1 / n) * moment1
+            M2 = ((1 / n) * moment2) - M1**2
+            M3 = ((1 / n) * moment3) - (3 * M1 * ((1 / n) * moment2)) + (2 * M1**3)
+
+            s2 = (math.sqrt(n*(n - 1))/(n - 2)) * (M3 / (M2)**1.5)
+
+            # calc metrics:
+            #s = skew(data)
+            #mean = np.mean((data))
+            #median = np.median((data))
+            #logging.info("skew: {0:.2f}".format(s))
+            logging.info("skew2: {0:.2f}".format(s2))
+            #logging.info("skew2: {0:.2f}".format((mean - median)))
+            #logging.info("mean: {0:.3f}".format(mean))
+            #logging.info("median: {0:.3f}".format(median))
+
+
+            #logging.info("\n\n")
+            N = len(data)
+            #print("num samples: {0}".format(N))
+
+            #mu = mean
+            #me = median
+            #sigma = np.std(data)
+            #interval = norm.interval(0.99, loc=mu, scale=sigma / np.sqrt(N))
+            #R = t.interval(0.99, N - 1, loc=mu, scale=sigma / np.sqrt(N))
+
+            #print("mean: {0}".format(mu))
+            #print("median: {0}".format(me))
+            #print("interval (%): {0}".format(1 - interval / mu))
+            #print("interval: {0}".format(interval))
+            #print("interval T (%): {0}".format(1 - R / mu))
+            #print("interval T: {0}".format(R))
+
+            logging.info("\n")
+
+            # compute 95% confidence intervals around the mean
+            #CIs = bootstrap.ci(data=data, statfunction=scipy.median, n_samples=30000)
+
+            #logging.info("Bootstrapped 95% confidence intervals\nLow:{0}\nHigh:{1}".format(CIs[0], CIs[1]))
+            #logging.info(CIs[0] / median)
+            #logging.info(CIs[1] / median)
+            #logging.info("\n\n")
+
+            #write to file
+            #out_file = '/home/steven/Documents/out.txt'
+            #output = open(out_file, 'w')
+            #for metric in data:
+            #    output.write(str(metric) + '\n')
+            #output.close()
+
+            # reset metrics array
+            data = []
+            time0 = 0
+            cpu_count0 = 0
+
+            moment1 = 0
+            moment2 = 0
+            moment3 = 0
+
+            #sleep(1)
 
 
 

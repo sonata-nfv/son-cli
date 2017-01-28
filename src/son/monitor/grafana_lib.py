@@ -130,7 +130,7 @@ class Grafana():
             new_target['refId'] = chr(ord('A') + target_index)
             dashboard['rows'][row_index]['panels'][panel_index]['targets'].append(new_target)
 
-            query = metric['metric']
+            query = metric['query']
             dashboard['rows'][row_index]['panels'][panel_index]['targets'][target_index]['expr'] = query.replace('"',
                                                                                                                  '\"')
             legend = metric['desc']

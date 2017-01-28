@@ -37,26 +37,72 @@ Performance profiling function available in the SONATA SDK
 import paramiko
 import time
 
-try:
-    from son.monitor import prometheus
-except:
-    import prometheus
+from son.monitor.msd import msd
+from son.monitor.son_emu import emu
+
+from son.monitor.prometheus_lib import query_Prometheus
 
 
 import logging
+LOG = logging.getLogger('Profiler')
+LOG.setLevel(level=logging.DEBUG)
+LOG.addHandler(logging.StreamHandler())
 
-log = logging.getLogger(__name__)
+
+# TODO read from ped file
+SON_EMU_IP = '172.17.0.1'
+SON_EMU_REST_API_PORT = 5001
+SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
 
-def _create_dict(**kwargs):
-    return kwargs
-
-# TODO transfer to rest API of son-emu
+# TODO call from son-profile
 class Emu_Profiler():
 
-    def __init__(self, net_api, compute_api):
-        self.net_api = net_api
-        self.compute_api = compute_api
+    def __init__(self, input_msd_path, output_msd_path, input_commands, timeout=20):
+
+        #class to control son-emu (export/query metrics)
+        self.emu = emu(SON_EMU_API)
+        # list of class Metric
+        input_msd = msd(input_msd_path, emu)
+        self.input_metric_queries = input_msd.get_metrics_list()
+        output_msd = msd(output_msd_path, emu)
+        self.output_metric_queries = output_msd.get_metrics_list()
+        # each list item is a dict with {vnf_name:"cmd_to_execute", ..}
+        self.input_commands = input_commands
+
+        self.timeout = timeout
+
+    def start_experiment(self):
+
+        # query metrics
+
+        start_time = time.time()
+        # start commands
+        for vnf_name, cmd in [cmd_dict for cmd_dict in self.input_commands]:
+            self.emu.docker_exec(vnf_name, cmd)
+
+            # let the load stabilize
+            time.sleep(2)
+
+            while(time.time()-start_time < self.timeout):
+                self.query_metrics(self.input_metric_queries)
+
+                self.query_metrics(self.output_metric_queries)
+
+                time.sleep(1)
+
+            # stop the load
+            self.emu.docker_exec(vnf_name, cmd, action='stop')
+
+
+    def query_metrics(self, metrics):
+        for metric in metrics:
+            query = metric.query
+            value = query_Prometheus(query)
+            metric_name = metric.metric_name
+            metric_unit = metric.unit
+            LOG.info("metric query: {1} {0} {2}".format(value, metric_name, metric_unit))
+
 
     # TODO: deploy this as a Service/VNF Descriptor
     # Service Chain: traffic source -> vnf -> traffic sink
@@ -78,14 +124,14 @@ class Emu_Profiler():
         vnf_src_name = 'psrc'
         vnf_dst_name = compute_name
 
-        params = _create_dict(
+        params = dict(
             vnf_src_interface='output',
             vnf_dst_interface=kwargs.get('input'),
             bidirectional=True)
         # note zerorpc does not support named arguments
         r = self.net_api.network_action_start( vnf_src_name, vnf_dst_name, params)
 
-        params = _create_dict(
+        params = dict(
             vnf_src_interface='output',
             vnf_dst_interface=kwargs.get('input'),
             bidirectional=True,
@@ -97,13 +143,13 @@ class Emu_Profiler():
         vnf_src_name = compute_name
         vnf_dst_name = 'psink'
 
-        params = _create_dict(
+        params = dict(
             vnf_src_interface='output',
             vnf_dst_interface=kwargs.get('input'),
             bidirectional=True)
         r = self.net_api.network_action_start(vnf_src_name, vnf_dst_name, params)
 
-        params = _create_dict(
+        params = dict(
             vnf_src_interface=kwargs.get('output'),
             vnf_dst_interface='input',
             bidirectional=True,
@@ -145,12 +191,12 @@ class Emu_Profiler():
         start_time = time.time()
         query_cpu = '(sum(rate(container_cpu_usage_seconds_total{{id="/docker/{0}"}}[{1}s])))'.format(vnf_uuid, 1)
         while (time.time() - start_time) < 10:
-            data = prometheus.query_Prometheus(query_cpu)
+            data = query_Prometheus(query_cpu)
             # logging.info('rate: {1} data:{0}'.format(data, rate))
             time.sleep(1)
 
         query_cpu2 = '(sum(rate(container_cpu_usage_seconds_total{{id="/docker/{0}"}}[{1}s])))'.format(vnf_uuid, 8)
-        cpu_load = float(prometheus.query_Prometheus(query_cpu2)[1])
+        cpu_load = float(query_Prometheus(query_cpu2)[1])
         output = 'rate: {1}Mbps; cpu_load: {0}%'.format(round(cpu_load * 100, 2), rate)
         output_line = output
         logging.info(output_line)
