@@ -1,0 +1,24 @@
+version: '2'
+
+
+services:
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    # get the prometheus config file
+    volumes:
+     - /tmp/son-monitor/prometheus:/etc/prometheus
+    ports:
+     - "9090:9090"
+    command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - /tmp/son-monitor/grafana:/var/lib/grafana
+    ports:
+      - 3000:3000
+    links:
+      - prometheus
