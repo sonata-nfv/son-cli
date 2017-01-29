@@ -45,7 +45,7 @@ or
 
 import argparse
 
-from son.monitor.son_emu import emu
+from son.monitor.son_emu import Emu
 from son.monitor.son_sp import sp
 
 import pprint
@@ -53,6 +53,13 @@ pp = pprint.PrettyPrinter(indent=4)
 
 import logging
 logging.basicConfig(level=logging.INFO)
+
+import docker
+from subprocess import Popen
+import os
+import pkg_resources
+from shutil import copy, rmtree
+from time import sleep
 
 ## parameters for the emulator VIM
 # TODO: these settings come from the deployed topology in the emulator, read from centralized config file?
@@ -71,21 +78,104 @@ SON_EMU_USER = 'steven' # 'vagrant'
 SONE_EMU_PASSW = 'test' # 'vagrant'
 
 # initalize the vims accessible from the SDK
-emu = emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
+emu = Emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
 
 
-# map the command and vim selections to the correct function
-def _execute_command(args):
-    if args["command"] is not None:
-        VIM_class = eval(args.get('vim'))
-        # call the VIM class method with the same name as the command arg
-        ret = getattr(VIM_class, args["command"][0])(**args)
-        logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
+tmp_dir = '/tmp/son-monitor'
+docker_dir = '/tmp/son-monitor/docker'
+prometheus_dir = '/tmp/son-monitor/prometheus'
+grafana_dir = '/tmp/son-monitor/grafana'
 
-        pp.pprint(ret)
-    else:
-        logging.error("Command not implemented: {0}".format(args.get("command")))
+class sonmonitor():
 
+    def __init__(self):
+
+        for dir in [docker_dir, prometheus_dir, grafana_dir]:
+            if not os.path.exists(dir):
+                # make local working directory
+                os.makedirs(dir)
+
+        # status of son-monitor
+        self.started = False
+
+    def init(self, action, **kwargs):
+        #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
+        actions = {'start': self.start_containers, 'stop': self.stop_containers}
+        return actions[action](**kwargs)
+
+    # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
+    def start_containers(self, **kwargs):
+        # docker-compose up -d
+        cmd = [
+            'docker-compose',
+            '-p sonmonitor',
+            'up',
+            '-d'
+        ]
+
+        docker_cli = docker.from_env()
+        # check if containers are already running
+        c1 = docker_cli.containers.list(filters={'status': 'running', 'name': 'prometheus'})
+        if len(c1) >= 1:
+            logging.info('prometheus is already running')
+        c2 = docker_cli.containers.list(filters={'status': 'running', 'name': 'grafana'})
+        if len(c2) >= 1:
+            logging.info('grafana is already running')
+        if len(c1 + c2) > 0:
+            return 'son-monitor not started'
+
+        docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
+        if docker_based:
+            # we are running son-cli in a docker container
+            logging.info('son-cli is running inside a docker container')
+            src_path = os.path.join('docker_compose_files', 'docker-compose-docker.yml')
+        else:
+            # we are running son-cli locally
+            src_path = os.path.join('docker_compose_files', 'docker-compose-local.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        # copy the docker compose file to a working directory
+        copy(srcfile, os.path.join(docker_dir, 'docker-compose.yml'))
+
+        # copy the prometheus config file for use in the prometheus docker container
+        src_path = os.path.join('prometheus', 'prometheus_sdk.yml')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        copy(srcfile, prometheus_dir)
+
+        # copy grafana directory
+        src_path = os.path.join('grafana', 'grafana.db')
+        srcfile = pkg_resources.resource_filename(__name__, src_path)
+        copy(srcfile, grafana_dir)
+
+        logging.info('Start son-monitor containers: {0}'.format(docker_dir))
+        process = Popen(cmd, cwd=docker_dir)
+        process.wait()
+
+        # Wait a while for containers to be completely started
+        sleep(4)
+        self.started = True
+        return 'son-monitor started'
+
+    # stop the sdk monitoring framework
+    def stop_containers(self, **kwargs):
+        # docker-compose down, remove volumes
+        cmd = [
+            'docker-compose',
+            '-p sonmonitor',
+            'down',
+            '-v'
+        ]
+        logging.info('stop and remove son-monitor containers')
+        process = Popen(cmd, cwd=docker_dir)
+        process.wait()
+        # try to remove tmp directory
+        try:
+            if os.path.exists(tmp_dir):
+                rmtree(tmp_dir)
+        except:
+            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
+
+        self.started = False
+        return 'son-monitor stopped'
 
 ## cli parser
 
@@ -213,8 +303,28 @@ parser.add_argument(
     help="service descriptor file describing monitoring rules or pcap dump file")
 
 
-def main():
+monitor = sonmonitor()
 
+# map the command and vim selections to the correct function
+def _execute_command(args):
+    # commands inside this class:
+    sonmonitor_cmds = {'init':monitor.init}
+    if args["command"][0] in sonmonitor_cmds:
+        cmd = args["command"][0]
+        ret = sonmonitor_cmds[cmd](**args)
+        logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
+
+    elif args["command"] is not None:
+        VIM_class = eval(args.get('vim'))
+        # call the VIM class method with the same name as the command arg
+        ret = getattr(VIM_class, args["command"][0])(**args)
+        logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
+
+        pp.pprint(ret)
+    else:
+        logging.error("Command not implemented: {0}".format(args.get("command")))
+
+def main():
     args = vars(parser.parse_args())
 
     if args is None:
@@ -222,6 +332,7 @@ def main():
         return
 
     _execute_command(args)
+
 
 if __name__ == "__main__":
     main()
