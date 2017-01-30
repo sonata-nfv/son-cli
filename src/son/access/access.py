@@ -588,19 +588,9 @@ class AccessArgParse(object):
                          self.workspace.get_service_platform(args.platform)))
 
 
-
 def main():
     AccessArgParse()
 
 if __name__ == '__main__':
     #TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
     main()
-
-
-
-
-
-
-
-
-
