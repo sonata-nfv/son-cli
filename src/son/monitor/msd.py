@@ -52,7 +52,7 @@ metric2flow_metric = {
 
 class msd():
 
-    def __init__(self, msd_path, vim):
+    def __init__(self, msd_path, vim, title=None):
 
         # Parse the msd file
         LOG.info('parsing msd: {0}'.format(msd_path))
@@ -65,20 +65,24 @@ class msd():
         self.grafana = Grafana()
 
         # get msd file parameters
-        self.dashboard = self.msd_dict.get('dashboard')
+        if title is None:
+            title = self.msd_dict.get('dashboard')
+        self.dashboard = title
         self.version = self.msd_dict.get('version')
 
         # get msd VNF metrics to monitor
-        self.vnf_metrics = self.msd_dict.get('vnf_metrics')
+        self.vnf_metrics = self.msd_dict.get('vnf_metrics', [])
         # get msd NSD links to monitor
-        self.nsd_links = self.msd_dict.get('nsd_links')
+        self.nsd_links = self.msd_dict.get('nsd_links', [])
 
         # cookie integer, unique per monitred flow
         self.cookie_counter = COOKIE_START
 
-    def start(self):
+    def start(self, title=None, overwrite=True):
+        if title is None:
+            title = self.dashboard
         # init the dashboard
-        self.grafana.init_dashboard(title=self.dashboard)
+        self.grafana.init_dashboard(title=title, overwrite=overwrite)
 
         metrics = self.get_metrics()
         self.start_grafana(metrics)
@@ -105,7 +109,10 @@ class msd():
         link_metrics_dict = self.set_nsdlink_metrics('start')
         # merge the 2 dicts
         all_metrics = dict(vnf_metrics_dict, **link_metrics_dict)
-        flat_metric_list = [metric for group_title, metric_list in all_metrics for metric in metric_list]
+        flat_metric_list = []
+        for metric_list in all_metrics.values():
+            flat_metric_list += metric_list
+
         # return list of class Metric
         return flat_metric_list
 
@@ -219,8 +226,8 @@ class msd():
 
         # metrics of cadvisor al already exported by default
         if not '_cadv' in metric_type:
-            self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
-
+            r = self.vim.monitor_interface(action='start', vnf_name=vnf_name + ':' + vnf_interface, metric=flow_metric)
+            LOG.info('start metric ret:{0}'.format(r))
         query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
         # make default description
         desc = vnf_id.get("description")
@@ -239,7 +246,8 @@ class msd():
         flow_metric = metric2flow_metric[metric_type2]
         # metrics of cadvisor al already exported by default
         if not '_cadv' in metric_type:
-            self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+            r = self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+            LOG.info('stop metric ret:{0}'.format(r))
         return
 
     def set_nsdlink_metrics(self, action=None):
@@ -306,7 +314,8 @@ class msd():
             flow_metric = metric2flow_metric[metric_type2]
             # metrics of cadvisor al already exported by default
             if not '_cadv' in metric_type:
-                self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
+                r = self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
+                LOG.info('start link metric ret:{0}'.format(r))
             query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
             unit = network2vnfquery[metric_type2].unit
             name = '{0}@{1}:{2}'.format(metric_type2, vnf_name, vnf_interface)
@@ -320,8 +329,9 @@ class msd():
             destination = nsdlink_id['destination']
             match = nsdlink_id['match']
             # install the flow and export the metric
-            self.vim.flow_total('start', source, destination, flow_metric, self.cookie_counter, match=match,
+            r = self.vim.flow_total('start', source, destination, flow_metric, self.cookie_counter, match=match,
                             bidirectional=False, priority=MONITOR_FLOW_PRIORITY)
+            LOG.info('start link metric ret:{0}'.format(r))
             query = metric2flowquery[metric_type2].query_template.format(self.cookie_counter, vnf_name, vnf_interface)
             unit = network2vnfquery[metric_type2].unit
             name = '{0}@{1}:{2}:{3}'.format(metric_type2, vnf_name, vnf_interface, self.cookie_counter)
@@ -354,7 +364,7 @@ class msd():
             # metrics of cadvisor al already exported by default
             if not '_cadv' in metric_type:
                 r = self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
-                LOG.info(r)
+                LOG.info('stop link metric ret:{0}'.format(r))
 
         # if a match is given, uninstall a flow specific counter
         else:
@@ -365,5 +375,5 @@ class msd():
             # install the flow and export the metric
             r = self.vim.flow_total('stop', source, destination, flow_metric, self.cookie_counter, match=match,
                                 bidirectional=False, priority=MONITOR_FLOW_PRIORITY)
-            LOG.info('return: {0}'.format(r))
+            LOG.info('stop link metric ret:{0}'.format(r))
             self.cookie_counter += 1

@@ -47,11 +47,11 @@ def rewrite_parameter_macros_to_lists(d):
             match = p.search(v)
             if match:
                 macro = match.group(0)
-            list = macro_to_list(macro)
-            new_list = []
-            for value in list:
-                new_list.append(v.replace(macro, str(value)))
-            d[k] = new_list
+                list = macro_to_list(macro)
+                new_list = []
+                for value in list:
+                    new_list.append(v.replace(macro, str(value)))
+                d[k] = new_list
     return d
 
 

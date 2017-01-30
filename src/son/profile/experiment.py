@@ -54,13 +54,12 @@ class Experiment(object):
         # convert measurment points from PED file to plain lists
         for mp in self.measurement_points:
             rewrite_parameter_macros_to_lists(mp)
-        print(self.measurement_points)
+
         # aggregate all commands to be used in the experiment to a flat dict for further processing
         command_dict = self._get_command_space_as_dict()
-        print(command_dict)
         # explore entire command space by calculating the Cartesian product over the given dict
         self.command_space_list = compute_cartesian_product(command_dict)
-
+        #LOG.info("command space:{0}".format(self.command_space_list))
 
         # aggregate all parameters to used in the experiment to a flat dict for further processing
         resource_dict = self._get_resource_space_as_dict()
@@ -79,6 +78,9 @@ class Experiment(object):
         for mp in self.measurement_points:
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("cmd")
+            # make sure the cmds are in a list
+            if not isinstance(vnf_cmds, list):
+                vnf_cmds = [vnf_cmds]
             m[vnf_name] = vnf_cmds
         return m
 

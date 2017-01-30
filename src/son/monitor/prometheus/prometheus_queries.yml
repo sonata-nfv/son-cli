@@ -81,8 +81,8 @@ networkquery:
 
 testvnfquery:
   - metric_name: 'jitter'
-    query_template: 'sonemu_jitter_ms{vnf_name="{0}"}'
+    query_template: 'sonemu_jitter_ms{{vnf_name="{0}"}}'
     unit: 'ms'
   - metric_name: 'packet_loss'
-    query_template: 'sonemu_packet_loss_percent{vnf_name="{0}"}'
+    query_template: 'sonemu_packet_loss_percent{{vnf_name="{0}"}}'
     unit: '%'

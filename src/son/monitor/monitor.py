@@ -172,7 +172,7 @@ class sonmonitor():
             if os.path.exists(tmp_dir):
                 rmtree(tmp_dir)
         except:
-            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
+            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(tmp_dir))
 
         self.started = False
         return 'son-monitor stopped'
