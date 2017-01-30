@@ -113,9 +113,11 @@ class AccessClient:
                 self.workspace.default_service_platform)
 
         # retrieve token from workspace
-        platform_dir = self.workspace.dirs[workspace.CONFIG_STR_PLATFORMS_DIR]
+        platform_dir = os.path.join(self.workspace.ws_root,
+                                    self.workspace.dirs[
+                                        workspace.CONFIG_STR_PLATFORMS_DIR])
         with open(os.path.join(platform_dir,
-                               self.platform['credentials']['token']),
+                               self.platform['credentials']['token_file']),
                   'rb') as token_file:
             access_token = token_file.read()
             access_token = access_token[1:-1]

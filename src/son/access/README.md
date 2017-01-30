@@ -1,4 +1,4 @@
-#son-access
+# son-access
 
 This tool is responsible for authentication of users, submitting and requesting of resources
 stored in the SONATA Service Platform Catalogues.
@@ -10,61 +10,139 @@ Dependencies:
 * [PyJWT](https://pypi.python.org/pypi/PyJWT/1.4.0) >= 1.4.0 (MIT)
 * [Flask](http://flask.pocoo.org/) >= 0.11.1 (BSD)
 
-Configuration:
-A configuration file 'config.py' in 'access/config/' folder contains the required settings:
+## Configuration
+
+The configuration of son-access is kept in the developer workspace under the section 'service_platforms'. It is possible to configure access parameters to multiple Service Platforms using different credentials. This configuration section keeps the following parameters:
 
 ```sh
-GK_ADDRESS = 'URL address to the platform'
+url = 'URL address to the platform'
 ```
-This setting must be a string pointing to the URL address of the resource owner platform, e.g: 'sp.int3.sonata-nfv.eu'.
+This setting must contain the protocol, address and port number of the platform, e.g.: 'sp.int3.sonata-nfv.eu'
 
 ```sh
-GK_PORT = 'Port number address'
+token_file = "token.txt"
 ```
-This setting must be a string pointing to the port number address of the resource owner platform, e.g: '32001'.
+This setting stores the file name of the token. Token files are stored in the workspace folder 'platforms_dir'.
 
+
+## Usage
 ```sh
-TOKEN_PATH = "/config/token.txt"
-```
-This setting is a string pointing to the folder where access token are temporary saved.
-
-```sh
-usage: access.py [-h]
-                 [--auth] [-u USERNAME] [-p PASSWORD]
-                 [--push PACKAGE_PATH] 
-                 [--list RESOURCE_TYPE]
-                 [--pull RESOURCE_TYPE] [--uuid UUID]
-                                        [--id VENDOR NAME VERSION] 
-                 [--debug]
+usage: son-access [optional] command [<args>]
+        The supported commands are:
+           auth     Authenticate a user
+           list     List available resources (service, functions, packages, ...)
+           push     Submit a son-package
+           pull     Request resources (services, functions, packages, ...)
+           config   Configure access parameters
 
 
-Authenticates users to submit and request resources from SONATA Service Platform
+Authenticates users to submit and request resources from SONATA Service
+Platform
+
+positional arguments:
+  command               Command to run
 
 optional arguments:
-  -h, --help                show this help message and exit
-  --auth                    authenticates a user, requires -u username -p password
-  -u USERNAME               specifies username of a user
-  -p PASSWORD               specifies password of a user
-  --push PACKAGE_PATH       submits a son-package to the SP
-  --list RESOURCE_TYPE      lists resources based on its type (services,
-                            functions, packages, file)
-  --pull RESOURCE_TYPE      requests a resource based on its type (services,
-                            functions, packages, file), requires a query parameter
-                            --uuid or --id
-  --uuid UUID               Query value for SP identifiers (uuid-generated)
-  --id VENDOR NAME VERSION  Query values for package identifiers (vendor name
-                            version)
-  --debug                   increases logging level to debug
+  -h, --help            show this help message and exit
+  -w WORKSPACE_PATH, --workspace WORKSPACE_PATH
+                        Specify workspace to work on. If not specified will
+                        assume '/root/.son-workspace'
+  -p PLATFORM_ID, --platform PLATFORM_ID
+                        Specify the ID of the Service Platform to use from
+                        workspace configuration. If not specified will assume
+                        the IDin 'default_service_platform'
+  --debug               Set logging level to debug
+```
 
+The son-access tool supports five different subcommands to deal with authentication, listing of resources, uploading of resources, requesting of resources and configuration of access parameters.
+
+### Authentication - `auth`
+```sh
+usage: son-access [..] auth [-h] -u USERNAME -p PASSWORD
+
+Authenticate a user
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -u USERNAME, --username USERNAME
+                        Specify username of the user
+  -p PASSWORD, --password PASSWORD
+                        Specify password of the user
+```
+
+### List resources - `list`
+```sh
+usage: son-access [..] list [-h] resource_type
+
+List available resources (services, functions, packages, ...)
+
+positional arguments:
+  resource_type  (services | functions | packages)
+
+optional arguments:
+  -h, --help     show this help message and exit
+```
+
+### Submit packages - `push`
+```sh
+usage: son-access [..] push [-h] package
+
+Submit a son-package to the SP
+
+positional arguments:
+  package     Specify package to submit
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+### Request resources - `pull`
+```sh
+usage: son-access [..] pull [-h] (--uuid UUID | --id VENDOR NAME VERSION)
+                            resource_type
+
+Request resources (services, functions, packages, ...)
+
+positional arguments:
+  resource_type         (services | functions | packages)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --uuid UUID           Query value for SP identifiers (uuid-generated)
+  --id VENDOR NAME VERSION
+                        Query values for package identifiers (vendor name
+                        version)
+```
+
+### Configure parameters - `config`
+```sh
+usage: son-access [..] config [-h] (--platform SP_ID | --list) [--new]
+                              [--url URL] [-u USERNAME] [-p PASSWORD]
+                              [--token TOKEN_FILE] [--default]
+
+Configure access parameters
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --platform SP_ID      Specify the Service Platform ID to configure
+  --list                List all Service Platform configuration entries
+  --new                 Create a new access entry to a Service Platform
+  --url URL             Configure URL of Service Platform
+  -u USERNAME, --username USERNAME
+                        Configure username
+  -p PASSWORD, --password PASSWORD
+                        Configure password
+  --token TOKEN_FILE    Configure token filename
+  --default             Set Service Platform as default
 ```
 
 Example on how to authenticate a user, submit a package file and retrieve resources:
 ```sh
-    access --auth -u tester -p 1234
-    access --push samples/sonata-demo.son
-    access --list services
-    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
-    access --pull services --id sonata.eu firewall-vnf 1.0
-
+    son-access auth -u tester -p 1234
+    son-access list services
+    son-access push samples/sonata-demo.son
+    son-access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    son-access pull services --id sonata.eu firewall-vnf 1.0
 ```
+
 
