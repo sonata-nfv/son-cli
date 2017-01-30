@@ -199,8 +199,6 @@ class Pull(object):
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
 
         nsd = yaml.load(cat_obj)
-        self.store_nsd(nsd)
-
         return nsd
 
     def get_ns_by_name(self, ns_name):
@@ -329,27 +327,6 @@ class Pull(object):
     def instance_list(self, url):
         return loads(get_instances(url)).get("service_instantiations_list")
     """
-
-    def store_nsd(self, nsd):
-        store_path = os.path.join(
-            self.workspace.ws_root,
-            self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_NS_DIR],
-            str(time.time())
-        )
-        Pull.write_descriptor(store_path, nsd)
-
-    def store_vnfd(self, vnfd):
-        store_path = os.path.join(
-            self.workspace.ws_root,
-            self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
-            str(time.time())
-        )
-        Pull.write_descriptor(store_path, vnfd)
-
-    @staticmethod
-    def write_descriptor(filename, descriptor):
-        with open(filename, "w") as _file:
-            _file.write(yaml.dump(descriptor, default_flow_style=False))
 
 
 def main():

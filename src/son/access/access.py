@@ -122,9 +122,12 @@ class AccessClient:
             access_token = token_file.read()
             access_token = access_token[1:-1]
 
-        # Pull and push clients
-        self.pull_client = Pull(self.platform['url'], auth_token=access_token)
-        self.push_client = Push(self.platform['url'], auth_token=access_token)
+        # Create a push and pull client for available Service Platforms
+        self.pull = dict()
+        self.push = dict()
+        for platform, p_id in self.workspace.service_platforms.items():
+            self.pull[p_id] = Pull(platform['url'], auth_token=access_token)
+            self.push[p_id] = Push(platform['url'], auth_token=access_token)
 
         self.log_level = log_level
         coloredlogs.install(level=log_level)
@@ -140,6 +143,22 @@ class AccessClient:
         assert validators.url(self.URL),\
             "Failed to init catalogue client. Invalid URL: '{}'"\
             .format(self.URL)
+
+    @property
+    def default_push(self):
+        """
+        Push client for default service platform
+        :return: Push object
+        """
+        return self.push[self.platform_id]
+
+    @property
+    def default_pull(self):
+        """
+        Pull client for default service platform
+        :return: Pull object
+        """
+        return self.pull[self.platform_id]
 
     # DEPRECATED -> Users will only be able to register through SON-GUI
     def client_register(self, username, password):
@@ -235,64 +254,99 @@ class AccessClient:
         # path = "samples/sonata-demo.son"
 
         # Push son-package to the Service Platform
-        print(self.push_client.upload_package(path))
+        print(self.default_push.upload_package(path))
 
-    def pull_resource(self, resource_type, identifier=None, uuid=False):
+    def pull_resource(self, resource_type, identifier=None, uuid=False,
+                      platform_id=None):
         """
         Call pull feature to request a resource from the SP Catalogue
         :param resource_type: a valid resource classifier (services, functions, packages)
         :param identifier: resource identifier which can be of two types:
         name.trio id ('vendor=%s&name=%s&version=%s') or uuid (xxx-xxxx-xxxx...)
         :param uuid: boolean that indicates the identifier is 'uuid-type' if True
+        :param platform_id: specify from which Service Platform should the
+        resource be pulled. If not specified, the default will be used.
         :return: A valid resource (Package, descriptor)
         """
         # mode = "pull"
         # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
 
+        # assign pull client
+        pull = self.default_pull if not platform_id else self.pull[platform_id]
+
         # resources by id
         if identifier and uuid is False:
             if resource_type == 'services':
                 log.debug("Retrieving service id='{}'".format(identifier))
-                print(self.pull_client.get_ns_by_id(identifier))
+                nsd = pull.get_ns_by_id(identifier)
+                self.store_nsd(nsd)
+                print(nsd)
 
             elif resource_type == 'functions':
                 log.debug("Retrieving function id='{}'".format(identifier))
-                print(self.pull_client.get_vnf_by_id(identifier))
+                vnfd = pull.get_vnf_by_id(identifier)
+                self.store_vnfd(vnfd)
+                print(vnfd)
 
             elif resource_type == 'packages':
                 log.debug("Retrieving package id='{}'".format(identifier))
-                print(self.pull_client.get_package_by_id(identifier))
+                print(pull.get_package_by_id(identifier))
 
         # resources by uuid
         elif identifier and uuid is True:
             if resource_type == 'services':
                 log.debug("Retrieving service uuid='{}'".format(identifier))
-                print(self.pull_client.get_ns_by_uuid(identifier))
+                nsd = pull.get_ns_by_uuid(identifier)
+                self.store_nsd(nsd)
+                print(nsd)
 
             elif resource_type == 'functions':
                 log.debug("Retrieving function uuid='{}'".format(identifier))
-                print(self.pull_client.get_vnf_by_uuid(identifier))
+                vnfd = pull.get_vnf_by_uuid(identifier)
+                self.store_vnfd(vnfd)
+                print(vnfd)
 
             elif resource_type == 'packages':
                 log.debug("Retrieving package uuid='{}'".format(identifier))
-                print(self.pull_client.get_package_by_uuid(identifier))
+                print(pull.get_package_by_uuid(identifier))
 
         # resources list
         else:
             if resource_type == 'services':
                 log.info("Listing all services from '{}'"
                          .format(self.platform['url']))
-                print(self.pull_client.get_all_nss())
+                print(pull.get_all_nss())
 
             elif resource_type == 'functions':
                 log.info("Listing all functions from '{}'"
                          .format(self.platform['url']))
-                print(self.pull_client.get_all_vnfs())
+                print(pull.get_all_vnfs())
 
             elif resource_type == 'packages':
                 log.info("Listing all packages from '{}'"
                          .format(self.platform['url']))
-                print(self.pull_client.get_all_packages())
+                print(pull.get_all_packages())
+
+    def store_nsd(self, nsd):
+        store_path = os.path.join(
+            self.workspace.ws_root,
+            self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_NS_DIR],
+            str(time.time())
+        )
+        self.write_descriptor(store_path, nsd)
+
+    def store_vnfd(self, vnfd):
+        store_path = os.path.join(
+            self.workspace.ws_root,
+            self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
+            str(time.time())
+        )
+        self.write_descriptor(store_path, vnfd)
+
+    @staticmethod
+    def write_descriptor(filename, descriptor):
+        with open(filename, "w") as _file:
+            _file.write(yaml.dump(descriptor, default_flow_style=False))
 
 
 class AccessArgParse(object):
