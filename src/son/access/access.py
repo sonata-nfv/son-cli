@@ -25,32 +25,31 @@
 # partner consortium (www.sonata-nfv.eu).
 
 """
-usage: son-access [-h] [--auth] [-u USERNAME] [-p PASSWORD]
-                  [--workspace WORKSPACE_PATH] [--push PACKAGE_PATH]
-                  [--list RESOURCE_TYPE] [--pull RESOURCE_TYPE] [--uuid UUID]
-                  [--id VENDOR NAME VERSION] [--debug]
+usage: son-access [optional] command [<args>]
+        The supported commands are:
+           auth     Authenticate a user
+           list     List available resources (service, functions, packages, ...)
+           push     Submit a son-package
+           pull     Request resources (services, functions, packages, ...)
+           config   Configure access parameters
 
-Authenticates users to submit and request resources from SONATA Service Platform
+
+Authenticates users to submit and request resources from SONATA Service
+Platform
+
+positional arguments:
+  command               Command to run
 
 optional arguments:
   -h, --help            show this help message and exit
-  --auth                authenticates a user, requires -u username -p password
-  -u USERNAME           specifies username of a user
-  -p PASSWORD           specifies password of a user
-  --workspace WORKSPACE_PATH
-                        specifies workspace to work on. If not specified will
+  -w WORKSPACE_PATH, --workspace WORKSPACE_PATH
+                        Specify workspace to work on. If not specified will
                         assume '/root/.son-workspace'
-  --push PACKAGE_PATH   submits a son-package to the SP
-  --list RESOURCE_TYPE  lists resources based on its type (services,
-                        functions, packages, file)
-  --pull RESOURCE_TYPE  requests a resource based on its type (services,
-                        functions, packages, file), requires a query parameter
-                        --uuid or --id
-  --uuid UUID           Query value for SP identifiers (uuid-generated)
-  --id VENDOR NAME VERSION
-                        Query values for package identifiers (vendor name
-                        version)
-  --debug               increases logging level to debug
+  -p PLATFORM_ID, --platform PLATFORM_ID
+                        Specify the ID of the Service Platform to use from
+                        workspace configuration. If not specified will assume
+                        the IDin 'default_service_platform'
+  --debug               Set logging level to debug
 """
 
 import requests
@@ -65,6 +64,7 @@ import coloredlogs
 import os
 from os.path import expanduser
 from son.workspace.workspace import Workspace
+import time
 from son.access.helpers.helpers import json_response
 from son.access.models.models import User
 from son.access.config.config import GK_ADDRESS, GK_PORT
@@ -98,16 +98,16 @@ class AccessClient:
     GK_URI_REF = "/refresh"
     GK_URI_TKV = "TBD"
 
-    def __init__(self, workspace, platform=None, log_level='INFO'):
+    def __init__(self, workspace, platform_id=None, log_level='INFO'):
         """
         Header
         The JWT Header declares that the encoded object is a JSON Web Token (JWT) and the JWT is a JWS that is MACed
         using the HMAC SHA-256 algorithm
         """
         self.workspace = workspace
-
-        if platform:
-            self.platform = self.workspace.get_service_platform(platform)
+        self.platform_id = platform_id
+        if platform_id:
+            self.platform = self.workspace.get_service_platform(platform_id)
         else:
             self.platform = self.workspace.get_service_platform(
                 self.workspace.default_service_platform)
@@ -161,7 +161,7 @@ class AccessClient:
         # TODO: Create userdata file? Check KEYCLOAK register form
         return response
 
-    def client_login(self, username, password):
+    def client_login(self, username=None, password=None):
         """
         Make a POST request with username and password
         :param username: user identifier
@@ -169,7 +169,13 @@ class AccessClient:
         :return: JW Access Token is returned from the GK server
         """
 
-        url = "http://" + self.URL + self.GK_API_VERSION + self.GK_URI_LOG
+        url = self.platform['url'] + self.GK_API_VERSION + self.GK_URI_LOG
+
+        if not username:
+            username = self.platform['credentials']['username']
+
+        if not password:
+            password = self.platform['credentials']['password']
 
         # Construct the POST request
         form_data = {
@@ -178,10 +184,21 @@ class AccessClient:
         }
 
         response = requests.post(url, data=form_data, verify=False)
-        print("Access Token received: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
+        log.debug("Access Token received: '{0}'".format(response.text))
+
+        token_file = self.platform['credentials']['token_file']
+        if not token_file:
+            token_file = 'token.' + str(time.time())
+            self.workspace.config_service_platform(self.platform_id,
+                                                   token=token_file)
+        token_path = os.path.join(
+            self.workspace.ws_root,
+            self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+            token_file)
+
         token = response.text.replace('\n', '')
-        with open("config/token.txt", "wb") as token_file:
-            token_file.write(token)
+        with open(token_path, "wb") as _file:
+            _file.write(token)
 
         return response.text
 
@@ -219,7 +236,6 @@ class AccessClient:
 
         # Push son-package to the Service Platform
         print(self.push_client.upload_package(path))
-
 
     def pull_resource(self, resource_type, identifier=None, uuid=False):
         """
@@ -363,7 +379,7 @@ class AccessArgParse(object):
             print("Invalid command: ", args.command)
             exit(1)
 
-        self.ac = AccessClient(self.workspace, platform=args.platform,
+        self.ac = AccessClient(self.workspace, platform_id=args.platform,
                                log_level=log_level)
 
         # call sub-command
@@ -380,7 +396,7 @@ class AccessArgParse(object):
             metavar="USERNAME",
             dest="username",
             help="Specify username of the user",
-            required=True
+            required=False
         )
         parser.add_argument(
             "-p", "--password",
@@ -388,11 +404,12 @@ class AccessArgParse(object):
             metavar="PASSWORD",
             dest="password",
             help="Specify password of the user",
-            required=True
+            required=False
         )
         args = parser.parse_args(sys.argv[self.subarg_idx:])
 
-        rsp = self.ac.client_login(args.username, args.password)
+        rsp = self.ac.client_login(username=args.username,
+                                   password=args.password)
         print("Authentication is successful: %s" % rsp)
 
     def list(self):
