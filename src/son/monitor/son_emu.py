@@ -24,8 +24,6 @@ partner consortium (www.sonata-nfv.eu).
 from requests import get, put, delete, Session
 from son.monitor.utils import *
 from son.monitor.prometheus_lib import query_Prometheus
-from son.monitor.grafana_lib import Grafana
-from  son.monitor.profiler import Emu_Profiler
 from subprocess import Popen
 import os
 import sys
@@ -62,21 +60,21 @@ import scipy
 This class implements the son-emu commands via its REST api.
 """
 
-class emu():
+class Emu():
 
     def __init__(self, REST_api, docker_api='local', ip='localhost', vm=False, user=None, password=None):
         self.url = REST_api
         self.docker_client = self.get_docker_api(docker_api)
-        self.tmp_dir = '/tmp/son-monitor'
-        self.docker_dir = '/tmp/son-monitor/docker'
-        self.prometheus_dir = '/tmp/son-monitor/prometheus'
-        self.grafana_dir = '/tmp/son-monitor/grafana'
-        for dir in [self.docker_dir, self.prometheus_dir, self.grafana_dir]:
-            if not os.path.exists(dir):
-                # make local working directory
-                os.makedirs(dir)
+        # self.tmp_dir = '/tmp/son-monitor'
+        # self.docker_dir = '/tmp/son-monitor/docker'
+        # self.prometheus_dir = '/tmp/son-monitor/prometheus'
+        # self.grafana_dir = '/tmp/son-monitor/grafana'
+        # for dir in [self.docker_dir, self.prometheus_dir, self.grafana_dir]:
+        #     if not os.path.exists(dir):
+        #         # make local working directory
+        #         os.makedirs(dir)
 
-        self.docker_based = os.getenv('SON_CLI_IN_DOCKER', False)
+
 
         # remote son-emu parameters
         self.son_emu_ip = ip
@@ -93,18 +91,13 @@ class emu():
             "Accept": "application/json; charset=UTF-8"
         }
 
-    def init(self, action, **kwargs):
-        #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
-        actions = {'start': self.start_containers, 'stop': self.stop_containers}
-        return actions[action](**kwargs)
-
     def get_docker_api(self, docker_api):
         if docker_api == 'local':
             # commect to local docker api
             return docker.from_env()
         else:
             # connect to remote docker pai eg. tcp://127.0.0.1:1234
-            return docker.Client(base_url='docker_api')
+            return docker.DockerClient(base_url=docker_api)
 
     def msd(self, action, **kwargs):
         #startup SONATA SDK environment (cAdvisor, Prometheus, PushGateway, son-emu(experimental))
@@ -112,36 +105,12 @@ class emu():
         return actions[action](**kwargs)
 
     # parse the msd file and export the metrics from son-emu and show in grafana
-    def start_msd(self, filepath=None, **kwargs):
-
-        # also start son-monitor containers
-        self.start_containers()
+    def start_msd(self, file=None, **kwargs):
 
         # initialize msd object
-        msd_obj = msd_object(filepath, self)
+        msd_obj = msd_object(file, self)
         msd_obj.start()
 
-        # Parse the msd file
-        #logging.info('parsing msd: {0}'.format(filepath))
-        #msd = load_yaml(filepath)
-
-        # initialize a new Grafana dashboard
-        #self.grafana = Grafana()
-        #dashboard_name = msd['dashboard']
-        #self.grafana.init_dashboard(title=dashboard_name)
-
-        # Install the vnf metrics
-        #self.install_vnf_metrics(msd, dashboard_name)
-
-        # install the link metrics
-        #first make sure everything is stopped
-        #self.install_nsd_links(msd, 'stop', dashboard_name)
-        #self.install_nsd_links(msd, 'start', dashboard_name)
-
-        # execute the SAP commands
-        # first make sure everything is stopped
-        #self.install_sap_commands(msd, "stop")
-        #self.install_sap_commands(msd, "start")
 
         return 'msd metrics installed'
 
@@ -150,24 +119,6 @@ class emu():
         # initialize msd object
         msd_obj = msd_object(file, self)
         msd_obj.stop()
-
-        logging.info('parsing msd: {0}'.format(file))
-        msd = load_yaml(file)
-
-        # clear the dashboard
-        #self.grafana = Grafana()
-        #dashboard_name = msd['dashboard']
-        #self.grafana.del_dashboard(title=dashboard_name)
-
-        # delete all installed flow_metrics
-        #self.install_nsd_links(msd, 'stop', dashboard_name)
-
-        # kill all the SAP commands
-        self.install_sap_commands(msd, "stop")
-
-        sleep(3)
-        # also stop son-monitor containers
-        self.stop_containers()
 
         return 'msd metrics deleted'
 
@@ -193,78 +144,6 @@ class emu():
                 elif sap['method'] == 'son-emu-local':
                     process = self.docker_exec_cmd(cmd, sap_docker_name)
 
-    # start the sdk monitoring framework (cAdvisor, Prometheus, Pushgateway, ...)
-    def start_containers(self, **kwargs):
-        # docker-compose up -d
-        cmd = [
-            'docker-compose',
-            '-p sonmonitor',
-            'up',
-            '-d'
-        ]
-
-        if self.docker_based:
-            # we are running son-cli in a docker container
-            logging.info('son-cli is running inside a docker container')
-            src_path = os.path.join('docker_compose_files', 'docker-compose-docker.yml')
-        else:
-            # we are running son-cli locally
-            src_path = os.path.join('docker_compose_files', 'docker-compose-local.yml')
-        srcfile = pkg_resources.resource_filename(__name__, src_path)
-        # copy the docker compose file to a working directory
-        copy(srcfile, os.path.join(self.docker_dir, 'docker-compose.yml'))
-
-        # copy the prometheus config file for use in the prometheus docker container
-        src_path = os.path.join('prometheus', 'prometheus_sdk.yml')
-        srcfile = pkg_resources.resource_filename(__name__, src_path)
-        copy(srcfile, self.prometheus_dir)
-
-        # copy grafana directory
-        src_path = os.path.join('grafana', 'grafana.db')
-        srcfile = pkg_resources.resource_filename(__name__, src_path)
-        copy(srcfile, self.grafana_dir)
-
-        logging.info('Start son-monitor containers: {0}'.format(self.docker_dir))
-        process = Popen(cmd, cwd=self.docker_dir)
-        process.wait()
-
-        # Wait a while for containers to be completely started
-        sleep(4)
-        return 'son-monitor started'
-
-    # start the sdk monitoring framework
-    def stop_containers(self, **kwargs):
-        '''
-        # hard stopping of containers
-        cmd = [
-            'docker',
-            'rm',
-            '-f',
-            'grafana',
-            'prometheus'
-        ]
-        logging.info('stop and remove son-monitor containers')
-        process = Popen(cmd, cwd=self.docker_dir)
-        process.wait()
-        '''
-        # docker-compose down, remove volumes
-        cmd = [
-            'docker-compose',
-            '-p sonmonitor',
-            'down',
-            '-v'
-        ]
-        logging.info('stop and remove son-monitor containers')
-        process = Popen(cmd, cwd=self.docker_dir)
-        process.wait()
-        #try to remove tmp directory
-        try:
-            if os.path.exists(self.tmp_dir):
-                rmtree(self.tmp_dir)
-        except:
-            logging.info('cannot remove {0} (this is normal if mounted as a volume)'.format(self.tmp_dir))
-
-        return 'son-monitor stopped'
 
     def ssh_cmd(self, cmd, host='localhost', port=22, username=None, password=None):
         ssh = paramiko.SSHClient()
@@ -307,7 +186,7 @@ class emu():
     def docker_exec(self, cmd, vnf_name, action='start'):
 
         docker_name = 'mn.' + str(vnf_name)
-        container = self.docker_client.get(docker_name)
+        container = self.docker_client.containers.get(docker_name)
         wait = False
 
         if action == "stop":
@@ -317,8 +196,9 @@ class emu():
         else:
             cmd_list = shlex.split(cmd)
 
-        thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=wait))
+        thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait)))
         thread.start()
+        logging.info('vnf: {0} \nexecuting command: {1}'.format(vnf_name, cmd))
         if wait:
             thread.join()
 
@@ -339,7 +219,7 @@ class emu():
                             vnf_name2, vnf_interface, metric)
 
         response = actions[action](url)
-        return response.json()
+        return response.text
 
     # export flow traffic counter, of a manually pre-installed flow entry, specified by its cookie
     def flow_mon(self, action, vnf_name, metric, cookie, **kwargs):
@@ -358,7 +238,7 @@ class emu():
 
         response = actions[action](url)
 
-        return response.json()
+        return response.text
 
     # install a flow match entry in the datacenter and export the flow counters
     def flow_entry(self, action, source, destination, **args):
@@ -452,31 +332,6 @@ class emu():
         r = query_Prometheus(query)
         return r
 
-    def profile(self, args):
-
-        return 'not yet fully implemented'
-
-        nw_list = list()
-        if args.get("network") is not None:
-            nw_list = parse_network(args.get("network"))
-
-        params = create_dict(
-            network=nw_list,
-            command=args.get("docker_command"),
-            image=args.get("image"),
-            input=args.get("input"),
-            output=args.get("output"))
-
-        profiler_emu = Emu_Profiler(self.url)
-
-        # deploy the test service chain
-        vnf_name = parse_vnf_name(args.get("vnf_name"))
-        dc_label = args.get("datacenter")
-        profiler_emu.deploy_chain(dc_label, vnf_name, params)
-
-        # generate output table
-        for output in profiler_emu.generate():
-            print(output + '\n')
 
     def _find_dc(self, vnf_name):
         datacenter = None

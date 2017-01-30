@@ -141,8 +141,8 @@ def query_Prometheus(query):
         try:
             ret = ret['data']['result'][0]['value']
         except:
-            ret = None
+            ret = ret
     else:
-        ret = None
+        ret = ret
     #logging.info('return:{0}'.format(ret))
     return ret

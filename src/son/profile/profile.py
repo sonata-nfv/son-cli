@@ -88,9 +88,6 @@ class ProfileManager(object):
                 input_commands = experiment.command_space_list
                 resource_list = experiment.resource_space_list
                 timeout = experiment.time_limit
-                print(input_commands)
-                print(input_msd_path)
-                print(output_msd_path)
                 profiler = Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,

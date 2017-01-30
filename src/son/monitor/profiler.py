@@ -38,7 +38,8 @@ import paramiko
 import time
 
 from son.monitor.msd import msd
-from son.monitor.son_emu import emu
+from son.monitor.son_emu import Emu
+import son.monitor.monitor as sonmonitor
 
 from son.monitor.prometheus_lib import query_Prometheus
 
@@ -51,6 +52,7 @@ LOG.addHandler(logging.StreamHandler())
 
 # TODO read from ped file
 SON_EMU_IP = '172.17.0.1'
+SON_EMU_IP = 'localhost'
 SON_EMU_REST_API_PORT = 5001
 SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
@@ -60,45 +62,73 @@ class Emu_Profiler():
 
     def __init__(self, input_msd_path, output_msd_path, input_commands, timeout=20):
 
+        # Grafana dashboard title
+        self.title = 'son-profile'
         #class to control son-emu (export/query metrics)
-        self.emu = emu(SON_EMU_API)
+        self.emu = Emu(SON_EMU_API)
         # list of class Metric
-        input_msd = msd(input_msd_path, emu)
-        self.input_metric_queries = input_msd.get_metrics_list()
-        output_msd = msd(output_msd_path, emu)
-        self.output_metric_queries = output_msd.get_metrics_list()
+        self.input_msd = msd(input_msd_path, self.emu, title=self.title)
+        self.input_metric_queries = self.input_msd.get_metrics_list()
+        LOG.info('input metrics:{0}'.format(self.input_metric_queries))
+
+        self.output_msd = msd(output_msd_path, self.emu, title=self.title)
+        self.output_metric_queries = self.output_msd.get_metrics_list()
+        LOG.info('output metrics:{0}'.format(self.output_metric_queries))
+
+
         # each list item is a dict with {vnf_name:"cmd_to_execute", ..}
         self.input_commands = input_commands
+        LOG.info('input commands:{0}'.format(self.input_commands))
 
-        self.timeout = timeout
+        self.timeout = int(timeout)
+
+        # check if prometheus is running
+        sonmonitor.monitor.start_containers()
+
+        # export msd's to Grafana
+        self.input_msd.start()
+        self.output_msd.start(overwrite=False)
 
     def start_experiment(self):
 
-        # query metrics
-
-        start_time = time.time()
         # start commands
-        for vnf_name, cmd in [cmd_dict for cmd_dict in self.input_commands]:
-            self.emu.docker_exec(vnf_name, cmd)
+        # one cmd_dict per profile run
+        for cmd_dict in self.input_commands:
+            # start the load
+            for vnf_name, cmd in cmd_dict.items():
+                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+
 
             # let the load stabilize
             time.sleep(2)
 
-            while(time.time()-start_time < self.timeout):
+            # monitor the metrics
+            start_time = time.time()
+            while((time.time()-start_time) < self.timeout):
                 self.query_metrics(self.input_metric_queries)
 
                 self.query_metrics(self.output_metric_queries)
 
                 time.sleep(1)
 
-            # stop the load
-            self.emu.docker_exec(vnf_name, cmd, action='stop')
 
+            # stop the load
+            for vnf_name, cmd in cmd_dict.items():
+                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, action='stop')
+
+    def stop_experiment(self):
+        self.input_msd.stop()
+        self.output_msd.stop()
 
     def query_metrics(self, metrics):
         for metric in metrics:
             query = metric.query
-            value = query_Prometheus(query)
+            try:
+                ret = query_Prometheus(query)
+                value = float(ret[1])
+            except:
+                logging.info('Prometheus query failed: {0} \nquery: {1}'.format(ret, query))
+                continue
             metric_name = metric.metric_name
             metric_unit = metric.unit
             LOG.info("metric query: {1} {0} {2}".format(value, metric_name, metric_unit))
