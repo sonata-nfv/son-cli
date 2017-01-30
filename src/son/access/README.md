@@ -17,7 +17,7 @@ The configuration of son-access is kept in the developer workspace under the sec
 ```sh
 url = 'URL address to the platform'
 ```
-This setting must contain the protocol, address and port number of the platform, e.g.: 'sp.int3.sonata-nfv.eu'
+This setting must contain the protocol, address and port number of the platform, e.g.: 'http://sp.int3.sonata-nfv.eu:30021'
 
 ```sh
 token_file = "token.txt"
