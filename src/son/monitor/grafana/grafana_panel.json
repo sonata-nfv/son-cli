@@ -24,7 +24,7 @@
   },
   "lines": true,
   "linewidth": 2,
-  "nullPointMode": "connected",
+  "nullPointMode": "null",
   "percentage": false,
   "pointradius": 5,
   "points": false,
