@@ -43,6 +43,7 @@ from son.package.md5 import generate_hash
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
 from son.schema.validator import SchemaValidator
+from son.access.access import AccessClient
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +61,10 @@ class Packager(object):
         self._project = project
         self._services = services
         self._functions = functions
+
+        # Create a son-access client
+        self._access = AccessClient(self._workspace,
+                                    log_level=self._workspace.log_level)
 
         # Create a validator
         self._validator = Validator(workspace=workspace)
@@ -491,17 +496,18 @@ class Packager(object):
                 continue
 
             log.debug("VNF id='{}' is not present in workspace catalogue. "
-                      "Contacting SP catalogues...".format(vnf_id))
+                      "Contacting SP Catalogue...".format(vnf_id))
 
             # If not in WS catalogue, get the VNF from the SP Catalogues
             vnfd = None
+            self.retrieve_external_vnf(vnf_id)
             if not vnfd:
-                log.warning("VNF id='{}' is not present in SP Catalogues"
+                log.warning("VNF id='{}' is not present in SP Catalogue"
                             .format(vnf_id))
                 return False
 
             # Create dir to hold the retrieved VNF in workspace catalogue
-            log.debug("VNF id='{}' retrieved from the SP Catalogues. "
+            log.debug("VNF id='{}' retrieved from the SP Catalogue. "
                       "Loading to workspace cache.".format(vnf_id))
 
             os.mkdir(catalogue_path)
@@ -797,6 +803,32 @@ class Packager(object):
                 u_vnfs.append(vnf)
 
         return u_vnfs
+
+    def retrieve_external_vnf(self, descriptor_id):
+        """
+        Retrieve descriptor from the ervice Platform catalogue.
+        It will loop through available Service Plaforms to retrieve the
+        required descriptor
+        :return: descriptor content
+        """
+        # first, contact the default platform
+        vnfd = self._access.pull_resource('functions',
+                                          identifier=descriptor_id,
+                                          uuid=False)
+        if vnfd:
+            return vnfd
+
+        # if not retrieved, loop through remaining platforms
+        for platform, p_id in self._workspace.service_platforms.items():
+            # ignore default platform
+            if p_id == self._workspace.default_service_platform:
+                continue
+            vnfd = self._access.pull_resource('functions',
+                                              identifier=descriptor_id,
+                                              uuid=False,
+                                              platform_id=p_id)
+            if vnfd:
+                return vnfd
 
     def _add_package_resolver(self, name, username='username',
                               password='password'):

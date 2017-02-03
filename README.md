@@ -141,45 +141,6 @@ Example on how to create an workspace and a project:
 
 This example creates the workspace 'ws1' and a project 'p1' associated with it.
 
-### son-publish
-This tool publishes service descriptors, function descriptors to a catalogue. It is possible to publish all the components of a project using the `--project` option, instead of publishing a single component. Before any descriptor is published, a syntax validation is performed against the latest schemas, defined in the son-schema repository (https://github.com/sonata-nfv/son-schema/tree/master/package-descriptor).
-
-```sh
-usage: son-publish [-h] [--workspace WORKSPACE] [--project PROJECT]
-                   [-d COMPONENT] [-c CATALOGUE]
-
-Publish a project or component to the catalogue server
-
-optional arguments:
-  -h, --help            show this help message and exit
-  
-  --workspace WORKSPACE
-                        Specify workspace. Default is located at
-                        '/home/lconceicao/.son-workspace'
-                        
-  --project PROJECT     Specify project to be published
-  
-  -d COMPONENT, --component COMPONENT
-                        Project component to be published.
-                        
-  -c CATALOGUE, --catalogue CATALOGUE
-                        Catalogue ID where to publish. Overrides defaults in
-                        workspace config.
-```
-
-Example on how to publish a single descriptor:
-```sh
-    son-publish --workspace /home/user/workspaces/ws1 --component vnfd-firewall.yml
-```
-
-Example on how to publish all the descriptors of a project:
-```sh
-    son-publish --workspace /home/user/workspace/ws1 --project /home/user/project/prj1
-```
-These examples assume that the catalogue server address is defined at the workspace configuration.
-Otherwise, the catalogue address must be specified explicitly.
-
-
 ### son-package
 Generate a SONATA SDK package.
 
@@ -220,78 +181,94 @@ Example on how to package a project with custom destination and package name:
     son-package --workspace /home/user/workspace/ws1 --project /home/user/project/prj1 --d /home/user/packages -n sonata-demo.son
 ```
 
-
-### son-push
-Upload a SONATA SDK package to the Gatekeeper for instantiation. With this tools it is also possible to list the packages uploaded and deployed at the Platform.
-
-```sh
-usage: son-push [-h] [-P] [-I] [-U UPLOAD_PACKAGE] [-D DEPLOY_PACKAGE_UUID]
-                platform_url
-
-Push packages to the SONATA service platform/emulator or list
-packages/instances available on the SONATA platform/emulator.
-    
-positional arguments:
-  platform_url          url of the gatekeeper/platform/emulator
-
-optional arguments:
-  -h, --help            show this help message and exit
-  
-  -P, --list_packages   List packages uploaded to the platform
-  
-  -I, --list_instances  List deployed packages on the platform
-  
-  -U UPLOAD_PACKAGE, --upload_package UPLOAD_PACKAGE
-                        Filename incl. path of package to be uploaded
-                        
-  -D DEPLOY_PACKAGE_UUID, --deploy_package_uuid DEPLOY_PACKAGE_UUID
-                        UUID of package to be deployed (must be available at
-                        platform)
-
-Example usage:
-    son-push http://127.0.0.1:5000 -U sonata-demo.son
-    son-push http://127.0.0.1:5000 --list-packages
-    son-push http://127.0.0.1:5000 --deploy-package <uuid>
-    son-push http://127.0.0.1:5000 -I
-
-```
-
 ### son-access
 Authenticate the developer to gain access to the Service Platform.
 Once authenticated, it allows the developer to submit packages to the Service Platform
 Catalogues and request resources (packages and/or descriptors) from the Service Platform Catalogues.
-```
-usage: access.py [-h]
-                 [--auth] [-u USERNAME] [-p PASSWORD]
-                 [--push PACKAGE_PATH] 
-                 [--list RESOURCE_TYPE]
-                 [--pull RESOURCE_TYPE] [--uuid UUID]
-                                        [--id VENDOR NAME VERSION] 
-                 [--debug]
+
+```sh
+usage: son-access [optional] command [<args>]
+        The supported commands are:
+           auth     Authenticate a user
+           list     List available resources (service, functions, packages, ...)
+           push     Submit a son-package
+           pull     Request resources (services, functions, packages, ...)
+           config   Configure access parameters
+
+
+Authenticates users to submit and request resources from SONATA Service
+Platform
+
+positional arguments:
+  command               Command to run
 
 optional arguments:
-  -h, --help                show this help message and exit
-  --auth                    authenticates a user, requires -u username -p password
-  -u USERNAME               specifies username of a user
-  -p PASSWORD               specifies password of a user
-  --push PACKAGE_PATH       submits a son-package to the SP
-  --list RESOURCE_TYPE      lists resources based on its type (services,
-                            functions, packages, file)
-  --pull RESOURCE_TYPE      requests a resource based on its type (services,
-                            functions, packages, file), requires a query parameter
-                            --uuid or --id
-  --uuid UUID               Query value for SP identifiers (uuid-generated)
-  --id VENDOR NAME VERSION  Query values for package identifiers (vendor name
-                            version)
-  --debug                   increases logging level to debug
+  -h, --help            show this help message and exit
+  -w WORKSPACE_PATH, --workspace WORKSPACE_PATH
+                        Specify workspace to work on. If not specified will
+                        assume '/root/.son-workspace'
+  -p PLATFORM_ID, --platform PLATFORM_ID
+                        Specify the ID of the Service Platform to use from
+                        workspace configuration. If not specified will assume
+                        the IDin 'default_service_platform'
+  --debug               Set logging level to debug
 
-example usage:
-    access --auth -u tester -p 1234
-    access --push samples/sonata-demo.son
-    access --list services
-    access --pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
-    access --pull services --id sonata.eu firewall-vnf 1.0
 ```
+Example on how to authenticate a user, submit a package file and retrieve resources:
+```sh
+    son-access auth -u tester -p 1234
+    son-access list services
+    son-access push samples/sonata-demo.son
+    son-access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+    son-access pull services --id sonata.eu firewall-vnf 1.0
+```
+
+### son-validate
+
+The son-validate tool can be used to validate the syntax, integrity and topology of SONATA SDK projects, services and functions. It receives the following arguments:
+
+```sh
+usage: son-validate [-h] [-w WORKSPACE_PATH]
+                    (--project PROJECT_PATH | --package PD | --service NSD | --function VNFD)
+                    [--dpath DPATH] [--dext DEXT] [--syntax] [--integrity]
+                    [--topology] [--debug]
+
+Validate a SONATA Service. By default it performs a validation to the syntax, integrity and network topology.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -w WORKSPACE_PATH, --workspace WORKSPACE_PATH
+                        Specify the directory of the SDK workspace for
+                        validating the SDK project. If not specified will
+                        assume the directory: '$HOME/.son-workspace'
+  --project PROJECT_PATH
+                        Validate the service of the specified SDK project. If
+                        not specified will assume the current directory.
+  --package PD          Validate the specified package descriptor.
+  --service NSD         Validate the specified service descriptor. The
+                        directory of descriptors referenced in the service
+                        descriptor should be specified using the argument '--
+                        path'.
+  --function VNFD       Validate the specified function descriptor. If a
+                        directory is specified, it will search for descriptor
+                        files with extension defined in '--dext'
+  --dpath DPATH         Specify a directory to search for descriptors.
+                        Particularly useful when using the '--service'
+                        argument.
+  --dext DEXT           Specify the extension of descriptor files.
+                        Particularly useful when using the '--function'
+                        argument
+  --syntax, -s          Perform a syntax validation.
+  --integrity, -i       Perform an integrity validation.
+  --topology, -t        Perform a network topology validation.
+  --debug               sets verbosity level to debug
+```
+
+Some usage examples are as follows:
+* validate a project: `son-validate --project /home/sonata/projects/project_X --workspace /home/sonata/.son-workspace`
+* validate a service: `son-validate --service ./nsd_file.yml --path ./vnfds/ --dext yml`
+* validate a function: `son-validate --function ./vnfd_file.yml --dext yml`
+* validate multiple functions: `son-validate --function ./vnfds/ --dext yml`
 
 ### son-monitor
 Monitor metrics of a deployed service (from the SONATA SDK emulator or Service Platform).
@@ -403,3 +380,4 @@ The following lead developers are responsible for this repository and have admin
 #### Feedback-Chanel
 * You may use the mailing list [sonata-dev@lists.atosresearch.eu](mailto:sonata-dev@lists.atosresearch.eu)
 * [GitHub issues](https://github.com/sonata-nfv/son-cli/issues)
+

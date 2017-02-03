@@ -51,10 +51,11 @@ docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo \
     -f tools/distribute/debrepo/Dockerfile \
     tools/distribute/debrepo
 
+#echo DOCKER_OPTS=\"--insecure-registry registry.sonata-nfv.eu:5000 -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\" | sudo tee /etc/default/docker
+#sudo service docker restart
+#docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
+
 export DOCKER_HOST="unix:///var/run/docker.sock"
-echo DOCKER_OPTS=\"--insecure-registry registry.sonata-nfv.eu:5000 -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\" | sudo tee /etc/default/docker
-sudo service docker restart
-docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
 docker push registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 # ====== Instantiate remote container for debian repository ======
