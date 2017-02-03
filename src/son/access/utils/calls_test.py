@@ -30,8 +30,8 @@ import sys; print('Python %s on %s' % (sys.version, sys.platform))
 dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.extend([str(dir)])
 
-from pull import Pull
-from push import Push
+from son.access.pull import Pull
+from son.access.push import Push
 # from son.access.config.config import GK_ADDRESS, GK_PORT
 
 def pull_tests():

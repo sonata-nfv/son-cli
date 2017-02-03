@@ -28,9 +28,7 @@ import logging
 import requests
 import yaml
 import sys
-import os
 import validators
-import time
 from son.workspace.workspace import Workspace
 from son.access.config.config import GK_ADDRESS, GK_PORT
 from json import loads
@@ -179,7 +177,6 @@ class Pull(object):
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
 
         nsd = yaml.load(cat_obj)
-        self.store_nsd(nsd)
 
         return nsd
 
@@ -231,7 +228,6 @@ class Pull(object):
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
 
         vnfd = yaml.load(cat_obj)
-        self.store_nsd(vnfd)
 
         return vnfd
 
@@ -254,7 +250,6 @@ class Pull(object):
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
 
         vnfd = yaml.load(cat_obj)
-        self.store_nsd(vnfd)
 
         return vnfd
 
@@ -454,7 +449,7 @@ def main():
     except:
         pass
 
-    pull_client = Pull(workspace, base_url=platform_url, auth_token=access_token)
+    pull_client = Pull(platform_url, auth_token=access_token)
     # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.alive:

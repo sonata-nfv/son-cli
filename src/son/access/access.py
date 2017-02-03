@@ -85,6 +85,7 @@ class mcolors:
          self.FAIL = ''
          self.ENDC = ''
 
+
 class AccessClient:
     ACCESS_VERSION = "0.3"
 
@@ -106,26 +107,32 @@ class AccessClient:
         """
         self.workspace = workspace
         self.platform_id = platform_id
-        if platform_id:
+        if self.platform_id:
             self.platform = self.workspace.get_service_platform(platform_id)
         else:
+            self.platform_id = self.workspace.default_service_platform
             self.platform = self.workspace.get_service_platform(
-                self.workspace.default_service_platform)
+                self.platform_id)
 
         # retrieve token from workspace
         platform_dir = os.path.join(self.workspace.ws_root,
                                     self.workspace.dirs[
                                         workspace.CONFIG_STR_PLATFORMS_DIR])
-        with open(os.path.join(platform_dir,
-                               self.platform['credentials']['token_file']),
-                  'rb') as token_file:
-            access_token = token_file.read()
-            access_token = access_token[1:-1]
+        token_path = os.path.join(platform_dir,
+                                  self.platform['credentials']['token_file'])
+
+        access_token = None
+        if os.path.isfile(token_path):
+            with open(token_path, 'rb') as token_file:
+                access_token = token_file.read()
+                access_token = access_token[1:-1]
 
         # Create a push and pull client for available Service Platforms
         self.pull = dict()
         self.push = dict()
-        for platform, p_id in self.workspace.service_platforms.items():
+        for p_id, platform in self.workspace.service_platforms.items():
+            print("->", p_id)
+            print("-->", platform_id)
             self.pull[p_id] = Pull(platform['url'], auth_token=access_token)
             self.push[p_id] = Push(platform['url'], auth_token=access_token)
 
@@ -158,7 +165,8 @@ class AccessClient:
         Pull client for default service platform
         :return: Pull object
         """
-        return self.pull[self.platform_id]
+        return self.pull[self.platform_id] \
+            if self.platform_id else None
 
     # DEPRECATED -> Users will only be able to register through SON-GUI
     def client_register(self, username, password):
@@ -273,6 +281,9 @@ class AccessClient:
 
         # assign pull client
         pull = self.default_pull if not platform_id else self.pull[platform_id]
+        if not pull:
+            log.error("Service Platform not defined. Aborting")
+            return
 
         # resources by id
         if identifier and uuid is False:
@@ -405,7 +416,8 @@ class AccessArgParse(object):
         command_idx = 1
         for idx in range(1, len(sys.argv)):
             v = sys.argv[idx]
-            if v == "-w" or v == "--workspace":
+            if (v == "-w" or v == "--workspace" or
+               v == '-p' or v == "--platform"):
                 command_idx += 2
             elif v == '--debug':
                 command_idx += 1
