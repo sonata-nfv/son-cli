@@ -29,7 +29,7 @@ import requests
 import logging
 # import yaml
 import sys
-from config.config import GK_ADDRESS, GK_PORT
+from son.access.config.config import GK_ADDRESS, GK_PORT
 # from json import loads
 
 log = logging.getLogger(__name__)
@@ -77,6 +77,7 @@ class Push(object):
 
     # def __init__(self, base_url, auth=('', '')):
     def __init__(self, base_url, auth_token=None):
+
         # Assign parameters
         self._base_url = base_url
         # self._auth = auth   # Bearer token
