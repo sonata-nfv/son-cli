@@ -143,7 +143,7 @@ Example on how to configure a new platform, authenticate a user, submit a packag
     son-access auth -u tester -p 1234
     son-access list services
     son-access push --upload samples/sonata-demo.son
-    son-access -p sp1 push samples/sonata-demo.son
+    son-access -p sp1 push --upload samples/sonata-demo.son
     son-access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
     son-access pull services --id sonata.eu firewall-vnf 1.0
     son-access -p sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
