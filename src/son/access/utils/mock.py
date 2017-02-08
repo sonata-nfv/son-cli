@@ -31,7 +31,6 @@ User Management component that is still under development.
 This enables a REST API that returns a JWT to the son-access
 component when it tries to authenticate a user.
 """
-
 import time
 import traceback
 import os
@@ -45,7 +44,7 @@ logins = {'tester': '1234'}
 
 def token(data):
     encoded = jwt.encode(data, 'secret', algorithm='HS256')
-    return encoded
+    return str(encoded, 'UTF8')
 
 
 def payload(username):
@@ -98,16 +97,25 @@ def internal_error(error):
     return make_response(resp, 500)
 
 
-@app.route('/login', methods=['POST'])
+@app.route('/api/v2/login', methods=['POST'])
 def login():
     username = request.form['username']
     password = request.form['password']
 
-    if logins[str(username)] == password:
-        payload_data = payload(username)
-        access_token = token(payload_data)
+    print('username=', username)
+    print('password=', password)
 
-        resp = jsonify(access_token)
+    if logins[str(username)] == password:
+        print('ACCEPTED')
+        payload_data = payload(username)
+        print('payload_data=', payload_data)
+        access_token = token(payload_data)
+        print('access_token=', access_token)
+        try:
+            resp = jsonify(access_token)
+            print('response=', resp)
+        except Exception as e:
+            print('ERROR=', e)
         resp.headers['Content-Type'] = 'application/json'
         resp.status_code = 200
         return resp
@@ -115,6 +123,17 @@ def login():
     else:
         return make_response(jsonify({'error': 'Invalid username or password'}), 401)
 
+
+@app.route('/api/v2/packages', methods=['POST'])
+def packages():
+    print('Package received')
+    return make_response(jsonify({'OK': 'Package received'}), 200)
+
+
+@app.route('/api/v2/requests', methods=['POST'])
+def requests():
+    print('Instantiation request received')
+    return make_response(jsonify({'OK': 'Instantiation initiated'}), 200)
 
 def main():
     app.run(

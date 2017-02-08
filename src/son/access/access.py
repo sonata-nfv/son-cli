@@ -29,7 +29,7 @@ usage: son-access [optional] command [<args>]
         The supported commands are:
            auth     Authenticate a user
            list     List available resources (service, functions, packages, ...)
-           push     Submit a son-package
+           push     Submit a son-package or request a service instantiation
            pull     Request resources (services, functions, packages, ...)
            config   Configure access parameters
 
@@ -114,18 +114,21 @@ class AccessClient:
             self.platform = self.workspace.get_service_platform(
                 self.platform_id)
 
-        # retrieve token from workspace
-        platform_dir = os.path.join(self.workspace.ws_root,
-                                    self.workspace.dirs[
-                                        workspace.CONFIG_STR_PLATFORMS_DIR])
-        token_path = os.path.join(platform_dir,
-                                  self.platform['credentials']['token_file'])
+        try:
+            # retrieve token from workspace
+            platform_dir = os.path.join(self.workspace.ws_root,
+                                        self.workspace.dirs[
+                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            token_path = os.path.join(platform_dir,
+                                      self.platform['credentials']['token_file'])
 
-        access_token = None
-        if os.path.isfile(token_path):
-            with open(token_path, 'rb') as token_file:
-                access_token = token_file.read()
-                access_token = access_token[1:-1]
+            access_token = None
+            if os.path.isfile(token_path):
+                with open(token_path, 'rb') as token_file:
+                    access_token = token_file.read()
+                    access_token = access_token[1:-1]
+        except:
+            access_token = None
 
         # Create a push and pull client for available Service Platforms
         self.pull = dict()
@@ -141,6 +144,8 @@ class AccessClient:
         self.JWT_SECRET = 'secret'
         self.JWT_ALGORITHM = 'HS256'
         self.JWT_EXP_DELTA_SECONDS = 20
+
+        # TODO: Deprecated?
         try:
             self.URL = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
         except:
@@ -148,7 +153,7 @@ class AccessClient:
 
         # Ensure parameters are valid
         assert validators.url(self.URL),\
-            "Failed to init catalogue client. Invalid URL: '{}'"\
+            "Failed to init access client. Invalid URL: '{}'"\
             .format(self.URL)
 
     @property
@@ -264,6 +269,13 @@ class AccessClient:
         # Push son-package to the Service Platform
         print(self.default_push.upload_package(path))
 
+    def deploy_service(self, service_id):
+        """
+        Call push feature to request a service instantiation to the SP Catalogue
+        :return: HTTP code 20X or 40X
+        """
+        print(self.default_push.instantiate_service(service_id))
+
     def pull_resource(self, resource_type, identifier=None, uuid=False,
                       platform_id=None):
         """
@@ -367,16 +379,17 @@ class AccessArgParse(object):
         The supported commands are:
            auth     Authenticate a user
            list     List available resources (service, functions, packages, ...)
-           push     Submit a son-package
+           push     Submit a son-package or request a service instantiation
            pull     Request resources (services, functions, packages, ...)
            config   Configure access parameters
         """
         examples = """Example usage:
             access auth -u tester -p 1234
-            access push samples/sonata-demo.son
+            access push --upload samples/sonata-demo.son
             access list services
             access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             access pull services --id sonata.eu firewall-vnf 1.0
+            access -p sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             """
         parser = ArgumentParser(
             description="Authenticates users to submit and request resources "
@@ -503,16 +516,36 @@ class AccessArgParse(object):
             description="Submit a son-package to the SP"
         )
         parser.add_argument(
-            "package",
+            "--upload",
             type=str,
-            help="Specify package to submit"
+            help="Specify package path to submit",
+            required=False,
+            metavar="PACKAGE_PATH"
+        )
+        parser.add_argument(
+            "--deploy",
+            type=str,
+            help="Specify service identifier to instantiate",
+            required=False,
+            metavar="SERVICE_ID"
         )
         args = parser.parse_args(sys.argv[self.subarg_idx:])
 
-        # TODO: Check token expiration
-        package_path = args.package
-        print(package_path)
-        self.ac.push_package(package_path)
+        if not (args.upload or args.deploy):
+            log.error("At least one of the following arguments must be "
+                      "specified: (--upload | --deploy)")
+            exit(1)
+
+        if args.upload:
+            # TODO: Check token expiration
+            package_path = args.upload
+            print(package_path)
+            self.ac.push_package(package_path)
+
+        elif args.deploy:
+            service_uuid = args.deploy
+            print(service_uuid)
+            self.ac.deploy_service(service_uuid)
 
     def pull(self):
         parser = ArgumentParser(
@@ -570,7 +603,7 @@ class AccessArgParse(object):
             required=True,
         )
         mutex_parser.add_argument(
-            "--platform",
+            "--platform_id",
             help="Specify the Service Platform ID to configure",
             type=str,
             required=False,
@@ -645,21 +678,21 @@ class AccessArgParse(object):
 
         # new SP entry in workspace configuration
         if args.new:
-            if self.workspace.get_service_platform(args.platform):
+            if self.workspace.get_service_platform(args.platform_id):
                 log.error("Couldn't add entry. Service Platform ID='{}' "
-                          "already exists.".format(args.platform))
+                          "already exists.".format(args.platform_id))
                 exit(1)
-            self.workspace.add_service_platform(args.platform)
+            self.workspace.add_service_platform(args.platform_id)
 
         # already existent entry
         else:
-            if not self.workspace.get_service_platform(args.platform):
+            if not self.workspace.get_service_platform(args.platform_id):
                 log.error("Couldn't modify entry. Service Platform ID='{}' "
-                          "doesn't exist.".format(args.platform))
+                          "doesn't exist.".format(args.platform_id))
                 exit(1)
 
         # modify entry
-        self.workspace.config_service_platform(args.platform,
+        self.workspace.config_service_platform(args.platform_id,
                                                url=args.url,
                                                username=args.username,
                                                password=args.password,
@@ -667,8 +700,8 @@ class AccessArgParse(object):
                                                default=args.default)
 
         log.info("Service Platform ID='{0}':\n{1}"
-                 .format(args.platform,
-                         self.workspace.get_service_platform(args.platform)))
+                 .format(args.platform_id,
+                         self.workspace.get_service_platform(args.platform_id)))
 
 
 def main():

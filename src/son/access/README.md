@@ -31,7 +31,7 @@ usage: son-access [optional] command [<args>]
         The supported commands are:
            auth     Authenticate a user
            list     List available resources (service, functions, packages, ...)
-           push     Submit a son-package
+           push     Submit a son-package or request a service instantiation
            pull     Request resources (services, functions, packages, ...)
            config   Configure access parameters
 
@@ -85,12 +85,13 @@ optional arguments:
 
 ### Submit packages - `push`
 ```sh
-usage: son-access [..] push [-h] package
+usage: son-access [..] push [-h] (--upload PACKAGE_PATH | --deploy SERVICE_ID)
 
-Submit a son-package to the SP
+Submit a son-package to the SP or deploy a service in the SP
 
 positional arguments:
-  package     Specify package to submit
+  --upload PACKAGE_PATH Specify package path to submit
+  --deploy SERVICE_ID   Specify service identifier to instantiate
 
 optional arguments:
   -h, --help  show this help message and exit
@@ -116,7 +117,7 @@ optional arguments:
 
 ### Configure parameters - `config`
 ```sh
-usage: son-access [..] config [-h] (--platform SP_ID | --list) [--new]
+usage: son-access [..] config [-h] (--platform_id SP_ID | --list) [--new]
                               [--url URL] [-u USERNAME] [-p PASSWORD]
                               [--token TOKEN_FILE] [--default]
 
@@ -124,7 +125,7 @@ Configure access parameters
 
 optional arguments:
   -h, --help            show this help message and exit
-  --platform SP_ID      Specify the Service Platform ID to configure
+  --platform_id SP_ID   Specify the Service Platform ID to configure
   --list                List all Service Platform configuration entries
   --new                 Create a new access entry to a Service Platform
   --url URL             Configure URL of Service Platform
@@ -136,13 +137,16 @@ optional arguments:
   --default             Set Service Platform as default
 ```
 
-Example on how to authenticate a user, submit a package file and retrieve resources:
+Example on how to configure a new platform, authenticate a user, submit a package file and retrieve resources:
 ```sh
+    son-access config --platform_id sp1 --new --url http://127.0.0.1:5001 --default
     son-access auth -u tester -p 1234
     son-access list services
-    son-access push samples/sonata-demo.son
+    son-access push --upload samples/sonata-demo.son
+    son-access -p sp1 push samples/sonata-demo.son
     son-access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
     son-access pull services --id sonata.eu firewall-vnf 1.0
+    son-access -p sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
 ```
 
 
