@@ -8,7 +8,6 @@
       apt: pkg={{item}} state=installed
       with_items:
         - python3.4
-        - python3.pip
         - python3-pycparser
         - build-essential
         - python3-dev
