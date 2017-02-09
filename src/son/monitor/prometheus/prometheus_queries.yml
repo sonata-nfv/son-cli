@@ -28,17 +28,20 @@ flowquery:
 
 computequery:
   - metric_name: 'cpu'
-    query_template: 'sum(rate(container_cpu_usage_seconds_total{{name="mn.{0}"}}[3s]))*100'
+    query_template: 'sum(rate(container_cpu_usage_seconds_total{{name="mn.{0}"}}[5s]))*100'
     unit: '%'
   - metric_name: 'mem'
-    query_template: 'container_memory_usage_bytes{{name="mn.{0}"}}'
-    unit: 'bytes'
+    query_template: 'container_memory_usage_bytes{{name="mn.{0}"}}/1000000'
+    unit: 'MB'
   - metric_name: 'host_cpu'
-    query_template: 'sum(rate(container_cpu_usage_seconds_total{{id="/"}}[3s]))*100'
+    query_template: 'sum(rate(container_cpu_usage_seconds_total{{id="/"}}[5s]))*100'
     unit: '%'
   - metric_name: 'skew_cpu'
     query_template: 'skewness{{vnf_name="{0}",vnf_metric="cpu"}}'
     unit: ''
+  - metric_name: 'num_cores'
+    query_template: 'machine_cpu_cores'
+    unit: 'core(s)'
 
 networkquery:
   - metric_name: 'tx_packet_rate'
