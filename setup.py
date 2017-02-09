@@ -59,7 +59,7 @@ setup(
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
-                          'Flask'],
+                          'Flask', 'docker==2.0.2'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
