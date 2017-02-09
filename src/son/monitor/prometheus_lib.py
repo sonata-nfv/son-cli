@@ -28,9 +28,14 @@ Prometheus API helper functions
 
 import requests
 import logging
+logging.getLogger("requests").setLevel(logging.WARNING)
+
 import pkg_resources
 import os
 from son.profile.helper import read_yaml
+
+from scipy.stats import t
+import numpy as np
 
 # set this to localhost for now
 # this is correct for son-emu started outside of a container or as a container with net=host
@@ -54,8 +59,44 @@ class Metric(object):
         self.query = None
         self.desc = None
         self.unit = None
+
+        self.reset()
+
         # populate object from definition dict (eg. from YAML)
         self.__dict__.update(definition)
+
+    def addValue(self, value):
+        self.last_value = value
+        self.list_values.append(value)
+        # update running average
+        self.sum += value
+        self.len += 1
+        self.average = self.sum/self.len
+        # update CI
+        if self.len > 5 :
+            mu = self.average
+            sigma = np.std(self.list_values)
+            N = self.len
+            if sigma > 0:
+                R = t.interval(0.95, N - 1, loc=mu, scale=sigma / np.sqrt(N))
+                self.CI = R
+
+    def reset(self):
+        # reset the measured values
+        # last added value
+        self.last_value = float('nan')
+        # list of all values
+        self.list_values = []
+        # running sum of all values
+        self.sum = 0
+        # how many gathered values
+        self.len = 0
+        # running average
+        self.average = float('nan')
+        # confidence interval
+        self.CI = (float('nan'), float('nan'))
+
+
 
 class MetricTemplate(object):
 

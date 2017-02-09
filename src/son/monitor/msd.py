@@ -46,7 +46,7 @@ metric2flow_metric = {
     "tx_byte_count": "tx_bytes",
     "rx_packet_rate": "rx_packets",
     "tx_packet_rate": "tx_packets",
-    "rx_byte_rate": "tx_bytes",
+    "rx_byte_rate": "rx_bytes",
     "tx_byte_rate": "tx_bytes"
 }
 

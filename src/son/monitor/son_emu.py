@@ -42,7 +42,9 @@ import re
 import math
 
 import logging
-logging.basicConfig(level=logging.INFO)
+LOG = logging.getLogger('son_emu_lib')
+LOG.setLevel(level=logging.INFO)
+LOG.propagate = False
 #logging.getLogger("requests").setLevel(logging.WARNING)
 
 import pprint
@@ -65,15 +67,6 @@ class Emu():
     def __init__(self, REST_api, docker_api='local', ip='localhost', vm=False, user=None, password=None):
         self.url = REST_api
         self.docker_client = self.get_docker_api(docker_api)
-        # self.tmp_dir = '/tmp/son-monitor'
-        # self.docker_dir = '/tmp/son-monitor/docker'
-        # self.prometheus_dir = '/tmp/son-monitor/prometheus'
-        # self.grafana_dir = '/tmp/son-monitor/grafana'
-        # for dir in [self.docker_dir, self.prometheus_dir, self.grafana_dir]:
-        #     if not os.path.exists(dir):
-        #         # make local working directory
-        #         os.makedirs(dir)
-
 
 
         # remote son-emu parameters
@@ -150,7 +143,7 @@ class Emu():
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         # ssh.connect(mgmt_ip, username='steven', password='test')
         ssh.connect(host, port=port, username=username, password=password)
-        logging.info("executing command: {0}".format(cmd))
+        LOG.info("executing command: {0}".format(cmd))
         stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
 
         # Wait for the command to terminate
@@ -161,7 +154,7 @@ class Emu():
                 rl, wl, xl = select.select([stdout.channel], [], [], 0.0)
                 if len(rl) > 0:
                     # Print data from stdout
-                    logging.info(stdout.channel.recv(1024).decode("utf-8"))
+                    LOG.info(stdout.channel.recv(1024).decode("utf-8"))
                     timer = 0
             else:
                 timer += 1
@@ -178,7 +171,7 @@ class Emu():
             docker_name
         ]
         cmd = cmd + cmd_list
-        logging.info("executing command: {0}".format(cmd))
+        LOG.info("executing command: {0}".format(cmd))
         process = Popen(cmd)
         #process.wait()
         return process
@@ -190,7 +183,8 @@ class Emu():
         wait = False
 
         if action == "stop":
-            cmd = " pkill -9 -f '" + cmd + "'"
+            # send SIGTERM (not SIGKILL -9)
+            cmd = " pkill -15 -f '" + cmd + "'"
             cmd_list = shlex.split(cmd)
             wait = True
         else:
@@ -198,7 +192,7 @@ class Emu():
 
         thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait)))
         thread.start()
-        logging.info('vnf: {0} \nexecuting command: {1}'.format(vnf_name, cmd))
+        LOG.info('vnf: {0} \nexecuting command: {1}'.format(vnf_name, cmd))
         if wait:
             thread.join()
 
@@ -212,13 +206,15 @@ class Emu():
         if actions.get(action) is None:
             return "Action argument not valid"
 
-        vnf_name2 = parse_vnf_name(vnf_name)
-        vnf_interface = parse_vnf_interface(vnf_name)
+        params = create_dict(
+            vnf_name=parse_vnf_name(vnf_name),
+            vnf_interface=parse_vnf_interface(vnf_name),
+            metric=metric,
+        )
 
-        url = construct_url(self.url, 'restapi/monitor/interface',
-                            vnf_name2, vnf_interface, metric)
+        url = "{0}/restapi/monitor/interface".format(self.url)
+        response = actions[action](url, params=params)
 
-        response = actions[action](url)
         return response.text
 
     # export flow traffic counter, of a manually pre-installed flow entry, specified by its cookie
@@ -230,13 +226,15 @@ class Emu():
         if actions.get(action) is None:
             return "Action argument not valid"
 
-        vnf_name2 = parse_vnf_name(vnf_name)
-        vnf_interface = parse_vnf_interface(vnf_name)
+        params = create_dict(
+            vnf_name=parse_vnf_name(vnf_name),
+            vnf_interface=parse_vnf_interface(vnf_name),
+            metric=metric,
+            cookie=cookie,
+        )
 
-        url = construct_url(self.url, 'restapi/monitor/flow',
-                            vnf_name2, vnf_interface, metric, cookie)
-
-        response = actions[action](url)
+        url = "{0}/restapi/monitor/flow".format(self.url)
+        response = actions[action](url,params=params)
 
         return response.text
 
@@ -249,30 +247,17 @@ class Emu():
         if actions.get(action) is None:
             return "Action argument not valid"
 
-        vnf_src_name = parse_vnf_name(source)
-        vnf_dst_name = parse_vnf_name(destination)
-
         params = create_dict(
             vnf_src_interface=parse_vnf_interface(source),
             vnf_dst_interface=parse_vnf_interface(destination),
+            vnf_src_name=parse_vnf_name(source),
+            vnf_dst_name=parse_vnf_name(destination),
             skip_vlan_tag=True,
         )
         params.update(args)
-            # weight=args.get("weight"),
-            # match=args.get("match"),
-            # bidirectional=args.get("bidirectional"),
-            # priority=args.get("priority"),
-            # cookie=args.get("cookie"),
-            # skip_vlan_tag=True,
-            # monitor=args.get("monitor"),
-            # monitor_placement=args.get("monitor_placement"),
-            # metric=args.get("metric"))
 
-        response = actions[action]("{0}/restapi/monitor/link/{1}/{2}".format(
-                    self.url,
-                    vnf_src_name,
-                    vnf_dst_name),
-                    json=params)
+        response = actions[action]("{0}/restapi/monitor/link".format(self.url),
+                    params=params)
 
         return response.text
 
@@ -286,8 +271,7 @@ class Emu():
         if actions.get(action) is None:
             return "Action argument not valid"
 
-        vnf_src_name = parse_vnf_name(source)
-        vnf_dst_name = parse_vnf_name(destination)
+
 
         monitor_placement = None
         if 'rx' in metric:
@@ -297,6 +281,8 @@ class Emu():
 
 
         params = create_dict(
+            vnf_src_name=parse_vnf_name(source),
+            vnf_dst_name = parse_vnf_name(destination),
             vnf_src_interface=parse_vnf_interface(source),
             vnf_dst_interface=parse_vnf_interface(destination),
             weight=kwargs.get("weight"),
@@ -381,10 +367,10 @@ class Emu():
             vnf_interface = parse_vnf_interface(vnf_name)
             dc_portname = self._find_dc_interface(vnf_name2, vnf_interface)
             log_string = "dump {0} at {1}".format(vnf_name, dc_portname)
-            logging.info(log_string)
+            LOG.info(log_string)
 
             process = self._tcpdump(dc_portname, file=file, title=log_string)
-            logging.info("Close tcpdump window to stop capturing or do son-monitor dump stop")
+            LOG.info("Close tcpdump window to stop capturing or do son-monitor dump stop")
 
             return 'tcpdump started'
 
@@ -402,7 +388,7 @@ class Emu():
         else:
             #start tcpdump in xterm
             xterm_cmd = "xterm -xrm 'XTerm.vt100.allowTitleOps: false' -T {0} -hold -e {1}".format("'"+title+"'", tcpdump_cmd)
-            #logging.info(xterm_cmd)
+            #LOG.info(xterm_cmd)
             return Popen(shlex.split(xterm_cmd))
 
     # start an xterm for the specfified vnfs
@@ -448,151 +434,13 @@ class Emu():
         if actions.get(action) is None:
             return "Action argument not valid"
 
-        url = construct_url(self.url, 'restapi/monitor/skewness',
-                            vnf_name, resource_name)
+        params = create_dict(
+            vnf_name=vnf_name,
+            resource_name=resource_name,
+        )
 
-        response = actions[action](url)
+        response = actions[action]("{0}/restapi/monitor/skewness".format(self.url),
+                                   params=params)
 
         return response.text
-
-    # get statistics with certain frequency and export in file for further analysis
-    def stats(self, vnf_name, **kwargs):
-        docker_id = self._find_vnf_status_parameter(vnf_name, 'id')
-        proc_file = '/sys/fs/cgroup/cpuacct/docker/{0}/cpuacct.usage'.format(docker_id)
-
-        cpu_count0 = 0
-        time0 = 0
-
-        #out_file = '/home/steven/Documents/out.txt'
-        #output = open(out_file, 'w')
-
-        #milliseconds
-        stat_delta = 10
-        sample_T = 2000
-
-        data = []
-        n = 0
-
-        fp = open(proc_file)
-
-        moment1 = 0
-        moment2 = 0
-        moment3 = 0
-
-
-        while True:
-            #collect samples
-            for n in range(0,round(sample_T/stat_delta)):
-                # first measurement
-                if cpu_count0 <= 0 or time0 <= 0:
-                    #time0 = int(round(time() * 1000))
-                    time0 = perf_counter()
-                    #cpu_count0=int(open(proc_file).readline())
-                    cpu_count0 = int(fp.read().strip())
-                    fp.seek(0)
-                    sleep(stat_delta/1000)
-                    continue
-
-
-                #time1 = int(round(time() * 1000))
-                #perf_counter in seconds
-                time1 = perf_counter()
-
-                # cpu count in nanoseconds
-                #cpu_count1 = int(open(proc_file).readline())
-                cpu_count1 = int(fp.read().strip())
-                fp.seek(0)
-
-                cpu_delta = cpu_count1 - cpu_count0
-                cpu_count0 = cpu_count1
-
-                time_delta = time1 - time0
-                time0 = time1
-
-                #metric = (cpu_delta / (time_delta * 1e6))
-                #work in nanoseconds
-                metric = (cpu_delta / (time_delta * 1e9))
-
-                #logging.info("cpu delta: {0}, time delta: {1}".format(cpu_delta, time_delta))
-                #output.write(str(int(round(cpu_delta)))+'\n')
-                #output.write(str(int(round(cpu_delta*(stat_delta/time_delta)))) + '\n')
-                #output.write(str((cpu_delta / (time_delta*1e6))) + '\n')
-
-                data.append(metric)
-                #n += 1
-
-                #running calculation of sample moments
-                moment1 += metric
-                temp = metric * metric
-                moment2 += temp
-                moment3 += temp * metric
-
-
-                sleep(stat_delta/1000)
-
-
-            # calc skew:
-            M1 = (1 / n) * moment1
-            M2 = ((1 / n) * moment2) - M1**2
-            M3 = ((1 / n) * moment3) - (3 * M1 * ((1 / n) * moment2)) + (2 * M1**3)
-
-            s2 = (math.sqrt(n*(n - 1))/(n - 2)) * (M3 / (M2)**1.5)
-
-            # calc metrics:
-            #s = skew(data)
-            #mean = np.mean((data))
-            #median = np.median((data))
-            #logging.info("skew: {0:.2f}".format(s))
-            logging.info("skew2: {0:.2f}".format(s2))
-            #logging.info("skew2: {0:.2f}".format((mean - median)))
-            #logging.info("mean: {0:.3f}".format(mean))
-            #logging.info("median: {0:.3f}".format(median))
-
-
-            #logging.info("\n\n")
-            N = len(data)
-            #print("num samples: {0}".format(N))
-
-            #mu = mean
-            #me = median
-            #sigma = np.std(data)
-            #interval = norm.interval(0.99, loc=mu, scale=sigma / np.sqrt(N))
-            #R = t.interval(0.99, N - 1, loc=mu, scale=sigma / np.sqrt(N))
-
-            #print("mean: {0}".format(mu))
-            #print("median: {0}".format(me))
-            #print("interval (%): {0}".format(1 - interval / mu))
-            #print("interval: {0}".format(interval))
-            #print("interval T (%): {0}".format(1 - R / mu))
-            #print("interval T: {0}".format(R))
-
-            logging.info("\n")
-
-            # compute 95% confidence intervals around the mean
-            #CIs = bootstrap.ci(data=data, statfunction=scipy.median, n_samples=30000)
-
-            #logging.info("Bootstrapped 95% confidence intervals\nLow:{0}\nHigh:{1}".format(CIs[0], CIs[1]))
-            #logging.info(CIs[0] / median)
-            #logging.info(CIs[1] / median)
-            #logging.info("\n\n")
-
-            #write to file
-            #out_file = '/home/steven/Documents/out.txt'
-            #output = open(out_file, 'w')
-            #for metric in data:
-            #    output.write(str(metric) + '\n')
-            #output.close()
-
-            # reset metrics array
-            data = []
-            time0 = 0
-            cpu_count0 = 0
-
-            moment1 = 0
-            moment2 = 0
-            moment3 = 0
-
-            #sleep(1)
-
-
 

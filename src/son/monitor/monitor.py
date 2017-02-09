@@ -80,7 +80,7 @@ SONE_EMU_PASSW = 'test' # 'vagrant'
 # initalize the vims accessible from the SDK
 emu = Emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
 
-
+# tmp directories that will be mounted in the Prometheus and Grafana Docker containers by son-emu
 tmp_dir = '/tmp/son-monitor'
 docker_dir = '/tmp/son-monitor/docker'
 prometheus_dir = '/tmp/son-monitor/prometheus'
@@ -151,8 +151,19 @@ class sonmonitor():
         process.wait()
 
         # Wait a while for containers to be completely started
-        sleep(4)
-        self.started = True
+        self.started = False
+        wait_time = 0
+        while not self.started:
+            list1 = emu.docker_client.containers.list(filters={'status':'running', 'name':'prometheus'})
+            list2 = emu.docker_client.containers.list(filters={'status': 'running', 'name': 'grafana'})
+            if len(list1+list2) >= 2:
+                self.started = True
+            if wait_time > 5:
+                return 'son-monitor not started'
+            sleep(1)
+            wait_time += 1
+
+
         return 'son-monitor started'
 
     # stop the sdk monitoring framework
@@ -194,7 +205,7 @@ parser = argparse.ArgumentParser(description=description,
 # positional  arguments
 parser.add_argument(
     "command",
-    choices=['init', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm', 'stats'],
+    choices=['init', 'query', 'interface', 'flow_mon', 'flow_entry', 'flow_total', 'msd', 'dump', 'xterm'],
     nargs=1,
     help="""Monitoring feature to be executed:
          interface: export interface metric (tx/rx bytes/packets)
