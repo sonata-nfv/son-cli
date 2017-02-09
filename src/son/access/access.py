@@ -134,8 +134,6 @@ class AccessClient:
         self.pull = dict()
         self.push = dict()
         for p_id, platform in self.workspace.service_platforms.items():
-            print("->", p_id)
-            print("-->", platform_id)
             self.pull[p_id] = Pull(platform['url'], auth_token=access_token)
             self.push[p_id] = Push(platform['url'], auth_token=access_token)
 
