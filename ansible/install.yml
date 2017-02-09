@@ -13,6 +13,7 @@
         - python3-dev
         - python3-pip
         - libyaml-dev
+        - curl
 
     - name: ensure docker repo key
       shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
