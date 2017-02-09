@@ -81,17 +81,23 @@ class ProfileManager(object):
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
 
         # execute profiling run on pre-deployed service
+        # only service experiments are executed
         if not self.args.no_execution :
             for experiment in self.service_experiments:
                 input_msd_path = experiment.input_metrics
                 output_msd_path = experiment.output_metrics
                 input_commands = experiment.command_space_list
+                configuration_commands = experiment.configuration_space_dict
                 resource_list = experiment.resource_space_list
                 timeout = experiment.time_limit
                 profiler = Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,
-                                        timeout=timeout)
+                                        configuration_commands=configuration_commands,
+                                        overload_vnf_list = experiment.overload_vnf_list,
+                                        timeout=timeout,
+                                        title=self.ped['name'],
+                                        no_display=self.args.no_display)
                 profiler.start_experiment()
 
         # generate service packages
@@ -298,6 +304,14 @@ def parse_args(manual_args=None):
         required=False,
         default=False,
         dest="no_execution",
+        action="store_true")
+
+    parser.add_argument(
+        "--no-display",
+        help="Disable realtime output of profiling results",
+        required=False,
+        default=False,
+        dest="no_display",
         action="store_true")
 
     if manual_args is not None:

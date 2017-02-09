@@ -41,6 +41,8 @@ class Experiment(object):
         self.generated_services = list()
         self.command_space_list = list()
         self.resource_space_list = list()
+        self.configuration_space_dict = dict()
+        self.overload_vnf_list = list()
 
     def populate(self):
         """
@@ -54,6 +56,15 @@ class Experiment(object):
         # convert measurment points from PED file to plain lists
         for mp in self.measurement_points:
             rewrite_parameter_macros_to_lists(mp)
+
+        # check for vnfs that need overload detection
+        if hasattr(self, 'overload_detection') :
+            for vnf_name in self.overload_detection:
+                self.overload_vnf_list.append(vnf_name)
+
+        # get the configuration that needs to be executed in the vnf before the test run.
+        self.configuration_space_dict = self._get_configuration_space_as_dict()
+        #LOG.info("configuration space:{0}".format(self.command_space_list))
 
         # aggregate all commands to be used in the experiment to a flat dict for further processing
         command_dict = self._get_command_space_as_dict()
@@ -73,11 +84,42 @@ class Experiment(object):
             self.run_configurations.append(RunConfiguration(i, self.resource_space_list[i]))
         LOG.info("Populated experiment specifications: %r with %d configurations to test." % (self.name, len(self.run_configurations)))
 
+    def _get_configuration_space_as_dict(self):
+        """
+        Create a dict that lists all commands that need to be executed per VNF
+        :return: dict
+        {"vnf_name1": [cmd1, cmd2, ...],
+         "vnf_nameN": [cmd, ...],
+        }
+        """
+        m = dict()
+        for mp in self.measurement_points:
+            vnf_name = mp.get("name")
+            vnf_cmds = mp.get("configuration")
+            # check if not empty
+            if not vnf_cmds:
+                return m
+            # make sure the cmds are in a list
+            if not isinstance(vnf_cmds, list):
+                vnf_cmds = [vnf_cmds]
+            m[vnf_name] = vnf_cmds
+        return m
+
     def _get_command_space_as_dict(self):
+        """
+        Create a dict that lists all commands that need to be executed per VNF
+        :return: dict
+        {"vnf_name1": [cmd1, cmd2, ...],
+         "vnf_nameN": [cmd, ...],
+        }
+        """
         m = dict()
         for mp in self.measurement_points:
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("cmd")
+            # check if not empty
+            if not vnf_cmds:
+                return m
             # make sure the cmds are in a list
             if not isinstance(vnf_cmds, list):
                 vnf_cmds = [vnf_cmds]
