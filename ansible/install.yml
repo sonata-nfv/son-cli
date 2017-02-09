@@ -35,3 +35,9 @@
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
+
+    - name: install numpy
+      pip: name=numpy state=latest
+
+    - name: install scipy
+      pip: name=scipy state=latest
