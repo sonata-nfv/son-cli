@@ -29,11 +29,11 @@ import requests
 import yaml
 import sys
 import validators
-from config.config import GK_ADDRESS, GK_PORT
+from son.workspace.workspace import Workspace
+from son.access.config.config import GK_ADDRESS, GK_PORT
 from json import loads
 
 log = logging.getLogger(__name__)
-
 
 class mcolors:
      OKGREEN = '\033[92m'
@@ -169,13 +169,16 @@ class Pull(object):
         :return: yaml object containing NS
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_uuid)
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_uuid))
             return
 
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
-        return yaml.load(cat_obj)
+
+        nsd = yaml.load(cat_obj)
+
+        return nsd
 
     def get_ns_by_id(self, ns_id):
         # TODO: Enable name.trio identifier
@@ -185,13 +188,15 @@ class Pull(object):
         :return: yaml object containing NS
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_NS, ns_id)
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_id))
             return
 
         log.debug("Obtained NS schema:\n{}".format(cat_obj))
-        return yaml.load(cat_obj)
+
+        nsd = yaml.load(cat_obj)
+        return nsd
 
     def get_ns_by_name(self, ns_name):
         """
@@ -216,12 +221,15 @@ class Pull(object):
         if not cat_obj:
             return
 
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple VNFs using ID '{}'".format(vnf_uuid))
             return
 
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
-        return yaml.load(cat_obj)
+
+        vnfd = yaml.load(cat_obj)
+
+        return vnfd
 
     def get_vnf_by_id(self, vnf_id):
         # TODO: Enable name.trio identifier
@@ -235,12 +243,15 @@ class Pull(object):
         if not cat_obj:
             return
 
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple VNFs using ID '{}'".format(vnf_id))
             return
 
         log.debug("Obtained VNF schema:\n{}".format(cat_obj))
-        return yaml.load(cat_obj)
+
+        vnfd = yaml.load(cat_obj)
+
+        return vnfd
 
     def get_vnf_by_name(self, vnf_name):
         """
@@ -261,7 +272,7 @@ class Pull(object):
         :return: yaml object containing PD
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_PD_ID, package_uuid)
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
                       "using the ID '{}'".format(package_uuid))
             return
@@ -277,7 +288,7 @@ class Pull(object):
         :return: yaml object containing PD
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_PD, package_id)
-        if not isinstance(cat_obj, unicode) and len(cat_obj) > 1:
+        if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple packages "
                       "using the ID '{}'".format(package_id))
             return
@@ -330,6 +341,15 @@ def main():
         description=description,
         formatter_class=RawDescriptionHelpFormatter,
         epilog=examples)
+
+    parser.add_argument(
+        "--workspace",
+        type=str,
+        metavar="WORKSPACE_PATH",
+        help="specifies workspace to work on. If not specified will "
+             "assume '{}'".format(Workspace.DEFAULT_WORKSPACE_DIR),
+        required=False
+    )
 
     parser.add_argument(
         "--url",
@@ -406,6 +426,13 @@ def main():
 
     args = parser.parse_args()
 
+    # Obtain Workspace object
+    if args.workspace:
+        ws_root = args.workspace
+    else:
+        ws_root = Workspace.DEFAULT_WORKSPACE_DIR
+    workspace = Workspace.__create_from_descriptor__(ws_root)
+
     if args.url:
         platform_url = str(args.url)
     else:
@@ -422,7 +449,7 @@ def main():
     except:
         pass
 
-    pull_client = Pull(base_url=platform_url, auth_token=access_token)
+    pull_client = Pull(platform_url, auth_token=access_token)
     # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.alive:

@@ -24,6 +24,7 @@
 # acknowledge the contributions of their colleagues of the SONATA
 # partner consortium (www.sonata-nfv.eu).
 
+
 class User:
 
     def __init__(self, id, email, password, is_admin):

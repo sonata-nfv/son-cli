@@ -1,7 +1,6 @@
-﻿#!/bin/bash
-set -e
+﻿set -e
 
-if [[ $# != 4 ]]; then
+if [ "$#" -ne 4 ]; then
 	echo "Usage: `basename "$0"` <REPO_NAME> <COMPONENT> <DISTRIBUTION> <DEB_PACKAGE_DIR>"
 	exit 1
 fi
@@ -22,6 +21,7 @@ aptly repo add $APTLY_REPO_NAME $DEB_PACKAGE_DIR
 
 aptly repo show $APTLY_REPO_NAME
 
+echo "t0"
 if [ ! -z "$GPG_PASSPHRASE" ]
 then
     passphrase="$GPG_PASSPHRASE"
@@ -30,11 +30,13 @@ then
     passphrase=$(<$GPG_PASSPHRASE_FILE)
 fi
 
+echo "t1"
 aptly publish repo \
     -architectures="$APTLY_ARCHITECTURES" \
     -passphrase="$passphrase" \
     $APTLY_REPO_NAME
 
+echo "t2"
 if [ ! -z "$KEYSERVER" ] && [ ! -z "$URI" ]
 then
     release_sig_path=$(find ~/.aptly/public/dists -name Release.gpg | head -1)

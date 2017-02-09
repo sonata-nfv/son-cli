@@ -29,7 +29,7 @@ import requests
 import logging
 # import yaml
 import sys
-from config.config import GK_ADDRESS, GK_PORT
+from son.access.config.config import GK_ADDRESS, GK_PORT
 # from json import loads
 
 log = logging.getLogger(__name__)
@@ -74,9 +74,11 @@ class Push(object):
     CAT_URI_PD = "/packages?"               # Package submitting endpoint
     # CAT_URI_PD_ID = "/packages/"            #
     # CAT_URI_PD_NAME = "/packages?name="     #
+    GK_URI_INST = "/requests?"
 
     # def __init__(self, base_url, auth=('', '')):
     def __init__(self, base_url, auth_token=None):
+
         # Assign parameters
         self._base_url = base_url
         # self._auth = auth   # Bearer token
@@ -203,12 +205,30 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
+        try:
+            with open(package_file_name, 'rb') as pkg_file:
+                payload = {'package': pkg_file}
+                r = requests.post(url, files=payload)
+                if r.status_code == 201:
+                    msg = "Upload succeeded"
+                elif r.status_code == 409:
+                    msg = "Package already exists"
+                else:
+                    msg = "Upload error"
+                return "%s (%d): %r" % (msg, r.status_code, r.text)
+
+        except Exception as e:
+            return "Service package upload failed. " + str(e)
+
+        # DEPRECATED --> SP Gatekepeer API does not support data with this POST flow
+        """
         file_name = package_file_name.split('/')
         headers = self._headers
         headers['Content-Type'] = 'application/zip'
         headers['Content-Disposition'] = 'attachment; filename=' + str(file_name[-1])
         print("HEADERS", headers)
         print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
+
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 r = requests.post(url, headers=headers, files={'package': pkg_file})
@@ -222,15 +242,12 @@ class Push(object):
 
         except Exception as e:
             return "Service package upload failed. " + str(e)
+        """
 
-    '''
-    def instantiate_package(platform_url, service_uuid=""):
+    # TODO: Enable instantiation
+    def instantiate_service(self, service_uuid=""):
         """
         Instantiate service on SONATA service platform
-
-        :param platform_url: url of the SONATA service
-                             platform/gatekeeper or emulator
-                             to upload package to
 
         :param service_uuid: uuid of the service package
                              (requires it to be available
@@ -238,25 +255,25 @@ class Push(object):
 
         :returns: text response message of the server
         """
-        # TODO: to be removed (default choice) after testing
+        # TODO: TO BE IMPLEMENTED
         try:
-            if len(service_uuid) == 0:
-                service_uuid = package_list(platform_url)[0]
-            if service_uuid == "last":
-                service_uuid = package_list(platform_url)[0]
+            # if len(service_uuid) == 0:
+            #     service_uuid = package_list(platform_url)[0]
+            # if service_uuid == "last":
+            #     service_uuid = package_list(platform_url)[0]
 
-            if service_uuid not in package_list(platform_url):
-                return "Given service uuid does not exist on the platform."
+            # if service_uuid not in package_list(platform_url):
+            #     return "Given service uuid does not exist on the platform."
 
-            url = platform_url+"/instantiations"
+            url = self._base_url + self.GK_API_VERSION + self.GK_URI_INST
+
+            # url = platform_url+"/instantiations"
 
             r = requests.post(url, json={"service_uuid": service_uuid})
-
             return r.text
 
         except Exception as e:
-            return "Service could not be instantiated. " + e
-    '''
+            return "Service could not be instantiated. " + str(e)
 
 
 def main():
@@ -282,8 +299,8 @@ def main():
         help="Filename incl. path of package to be uploaded")
 
     parser.add_argument(
-        "-D", "--deploy_package_uuid",
-        help="UUID of package to be deployed (must be available at platform)")
+        "-D", "--deploy_service_uuid",
+        help="UUID of service to be instantiated (must be available at platform)")
 
     args = parser.parse_args()
 
@@ -307,8 +324,9 @@ def main():
         print(mcolors.OKGREEN + "PUSH - Uploading Package...\n", mcolors.ENDC)
         print(push_client.upload_package(args.upload_package))
 
-    # if args.deploy_package_uuid:
-    #    print(push_client.instantiate_package(args.platform_url, args.deploy_package_uuid))
+    if args.deploy_service_uuid:
+        print(mcolors.OKGREEN + "PUSH - Instantiating Service...\n", mcolors.ENDC)
+        print(push_client.instantiate_service(args.service_uuid))
 
 if __name__ == '__main__':
     main()
