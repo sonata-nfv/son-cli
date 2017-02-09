@@ -205,12 +205,30 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
+        try:
+            with open(package_file_name, 'rb') as pkg_file:
+                payload = {'package': pkg_file}
+                r = requests.post(url, files=payload)
+                if r.status_code == 201:
+                    msg = "Upload succeeded"
+                elif r.status_code == 409:
+                    msg = "Package already exists"
+                else:
+                    msg = "Upload error"
+                return "%s (%d): %r" % (msg, r.status_code, r.text)
+
+        except Exception as e:
+            return "Service package upload failed. " + str(e)
+
+        # DEPRECATED --> SP Gatekepeer API does not support data with this POST flow
+        """
         file_name = package_file_name.split('/')
         headers = self._headers
         headers['Content-Type'] = 'application/zip'
         headers['Content-Disposition'] = 'attachment; filename=' + str(file_name[-1])
         print("HEADERS", headers)
         print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
+
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 r = requests.post(url, headers=headers, files={'package': pkg_file})
@@ -224,6 +242,7 @@ class Push(object):
 
         except Exception as e:
             return "Service package upload failed. " + str(e)
+        """
 
     # TODO: Enable instantiation
     def instantiate_service(self, service_uuid=""):
