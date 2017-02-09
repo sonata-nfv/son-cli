@@ -426,6 +426,8 @@ class Overload_Monitor():
         for vnf_name in self.vnf_list:
             son_emu.update_skewness_monitor(vnf_name=vnf_name, resource_name='cpu', action='start')
 
+        # wait some time until first metrics are gathered
+        time.sleep(2)
         self.monitor = threading.Thread(target=self.query_metrics)
         self.monitor.start()
 
