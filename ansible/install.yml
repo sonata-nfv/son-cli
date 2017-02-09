@@ -7,9 +7,6 @@
     - name: install son-cli dependencies
       apt: pkg={{item}} state=installed
       with_items:
-        - software-properties-common
-        - apt-transport-https
-        - ca-certificates wget
         - python3.4
         - python3.pip
         - python3-pycparser
