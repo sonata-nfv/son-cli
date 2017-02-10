@@ -55,6 +55,8 @@ The son-cli tools have the following dependencies:
 * [docker-compose](https://docs.docker.com/compose/) >= 1.6.0 (Apache 2.0)
 * [PyJWT](https://pypi.python.org/pypi/PyJWT/1.4.0) >= 1.4.0 (MIT)
 * [Flask](http://flask.pocoo.org/) >= 0.11.1 (BSD)
+* [numpy](https://pypi.python.org/pypi/numpy)  >= 1.11.3 (BSD)
+* [scipy](https://pypi.python.org/pypi/scipy) >= 0.18.1 (BSD)
 
 
 ## Contributing
