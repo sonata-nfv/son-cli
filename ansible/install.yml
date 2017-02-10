@@ -15,7 +15,7 @@
         - libyaml-dev
         - curl
         - gfortran
-        - libopenblas-dev
+        - libblas-dev
         - liblapack-dev
 
     - name: ensure docker repo key
