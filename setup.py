@@ -53,7 +53,7 @@ setup(
         include_package_data=True,
         package_data= {
             'son': ['schema/tests/son-schema/*', 'workspace/samples/*',
-                    'monitor/docker/*', 'monitor/grafana/*',
+                    'monitor/docker_compose_files/*', 'monitor/grafana/*',
                     'monitor/prometheus/*', 'monitor/*.exp']
         },
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
