@@ -37,7 +37,7 @@
         - chmod +x /usr/local/bin/docker-compose
 
     - name: install numpy
-      pip: name=numpy state=latest
+      pip: name=numpy state=latest executable=pip3
 
     - name: install scipy
-      pip: name=scipy state=latest
+      pip: name=scipy state=latest executable=pip3
