@@ -36,6 +36,7 @@ from tabulate import tabulate
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.sonpkg import extract_son_package, SonataServicePackage
 from son.profile.helper import read_yaml
+from son.monitor.profiler import Emu_Profiler
 
 LOG = logging.getLogger(__name__)
 
@@ -76,17 +77,40 @@ class ProfileManager(object):
         # try to load PED file
         self.ped = self._load_ped_file(self.args.config)
         self._validate_ped_file(self.ped)
-        # unzip *.son package to be profiled and load its contents
-        extract_son_package(self.ped, self.son_pkg_input_dir)
-        self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
-        # generate experiment services (modified NSDs, VNFDs for each experiment run)
-        self.generated_services = self.generate_experiment_services()
-        # package experiment services
-        self.package_experiment_services()
-        # print generation statistics
-        self.print_generation_and_packaging_statistics()
+
+        # execute profiling run on pre-deployed service
+        # only service experiments are executed
+        if not self.args.no_execution :
+            for experiment in self.service_experiments:
+                input_msd_path = experiment.input_metrics
+                output_msd_path = experiment.output_metrics
+                input_commands = experiment.command_space_list
+                configuration_commands = experiment.configuration_space_dict
+                resource_list = experiment.resource_space_list
+                timeout = experiment.time_limit
+                profiler = Emu_Profiler(input_msd_path=input_msd_path,
+                                        output_msd_path=output_msd_path,
+                                        input_commands=input_commands,
+                                        configuration_commands=configuration_commands,
+                                        overload_vnf_list = experiment.overload_vnf_list,
+                                        timeout=timeout,
+                                        title=self.ped['name'],
+                                        no_display=self.args.no_display)
+                profiler.start_experiment()
+
+        # generate service packages
+        if not self.args.no_generation :
+            # unzip *.son package to be profiled and load its contents
+            extract_son_package(self.ped, self.son_pkg_input_dir)
+            self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
+            # generate experiment services (modified NSDs, VNFDs for each experiment run)
+            self.generated_services = self.generate_experiment_services()
+            # package experiment services
+            self.package_experiment_services()
+            # print generation statistics
+            self.print_generation_and_packaging_statistics()
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -280,6 +304,14 @@ def parse_args(manual_args=None):
         required=False,
         default=False,
         dest="no_execution",
+        action="store_true")
+
+    parser.add_argument(
+        "--no-display",
+        help="Disable realtime output of profiling results",
+        required=False,
+        default=False,
+        dest="no_display",
         action="store_true")
 
     if manual_args is not None:

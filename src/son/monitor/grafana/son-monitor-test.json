@@ -9,9 +9,26 @@
   "hideControls": false,
   "sharedCrosshair": false,
   "rows": [
+    {
+      "height": "250px",
+      "panels": [
+        {
+          "targets": [
+            {
+              "expr": "container_cpu_usage_seconds_total{name=\"mn.ubuntu_vnf1\"}"
+            }
+          ],
+          "type": "graph"
+
+        }
+      ],
+      "title": "Row",
+      "collapse": false,
+      "editable": true
+    }
   ],
   "time": {
-    "from": "now-15m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {

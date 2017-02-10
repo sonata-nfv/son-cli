@@ -1,6 +1,6 @@
 {
   "expr": "metric_query",
-  "intervalFactor": 1,
+  "intervalFactor": 2,
   "refId": "A",
   "step": 2,
   "legendFormat": "graph_legend"

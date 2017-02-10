@@ -39,6 +39,10 @@ class Experiment(object):
         # attributes
         self.run_configurations = list()
         self.generated_services = list()
+        self.command_space_list = list()
+        self.resource_space_list = list()
+        self.configuration_space_dict = dict()
+        self.overload_vnf_list = list()
 
     def populate(self):
         """
@@ -49,17 +53,80 @@ class Experiment(object):
         # convert parameter macros from PED file to plain lists
         for rl in self.resource_limitations:
             rewrite_parameter_macros_to_lists(rl)
+        # convert measurment points from PED file to plain lists
+        for mp in self.measurement_points:
+            rewrite_parameter_macros_to_lists(mp)
+
+        # check for vnfs that need overload detection
+        if hasattr(self, 'overload_detection') :
+            for vnf_name in self.overload_detection:
+                self.overload_vnf_list.append(vnf_name)
+
+        # get the configuration that needs to be executed in the vnf before the test run.
+        self.configuration_space_dict = self._get_configuration_space_as_dict()
+        #LOG.info("configuration space:{0}".format(self.command_space_list))
+
+        # aggregate all commands to be used in the experiment to a flat dict for further processing
+        command_dict = self._get_command_space_as_dict()
+        # explore entire command space by calculating the Cartesian product over the given dict
+        self.command_space_list = compute_cartesian_product(command_dict)
+        #LOG.info("command space:{0}".format(self.command_space_list))
+
         # aggregate all parameters to used in the experiment to a flat dict for further processing
-        parameter_dict = self._get_configuration_space_as_dict()
+        resource_dict = self._get_resource_space_as_dict()
         # print(parameter_dict)
         # explore entire parameter space by calculating the Cartesian product over the given dict
-        parameter_space_list = compute_cartesian_product(parameter_dict)
+        self.resource_space_list = compute_cartesian_product(resource_dict)
+
+
         # create a run configuration object for each calculated configuration to test
-        for i in range(0, len(parameter_space_list)):
-            self.run_configurations.append(RunConfiguration(i, parameter_space_list[i]))
+        for i in range(0, len(self.resource_space_list)):
+            self.run_configurations.append(RunConfiguration(i, self.resource_space_list[i]))
         LOG.info("Populated experiment specifications: %r with %d configurations to test." % (self.name, len(self.run_configurations)))
 
     def _get_configuration_space_as_dict(self):
+        """
+        Create a dict that lists all commands that need to be executed per VNF
+        :return: dict
+        {"vnf_name1": [cmd1, cmd2, ...],
+         "vnf_nameN": [cmd, ...],
+        }
+        """
+        m = dict()
+        for mp in self.measurement_points:
+            vnf_name = mp.get("name")
+            vnf_cmds = mp.get("configuration")
+            # check if not empty
+            if not vnf_cmds:
+                return m
+            # make sure the cmds are in a list
+            if not isinstance(vnf_cmds, list):
+                vnf_cmds = [vnf_cmds]
+            m[vnf_name] = vnf_cmds
+        return m
+
+    def _get_command_space_as_dict(self):
+        """
+        Create a dict that lists all commands that need to be executed per VNF
+        :return: dict
+        {"vnf_name1": [cmd1, cmd2, ...],
+         "vnf_nameN": [cmd, ...],
+        }
+        """
+        m = dict()
+        for mp in self.measurement_points:
+            vnf_name = mp.get("name")
+            vnf_cmds = mp.get("cmd")
+            # check if not empty
+            if not vnf_cmds:
+                return m
+            # make sure the cmds are in a list
+            if not isinstance(vnf_cmds, list):
+                vnf_cmds = [vnf_cmds]
+            m[vnf_name] = vnf_cmds
+        return m
+
+    def _get_resource_space_as_dict(self):
         """
         Create a flat dictionary with configuration lists to be tested for each configuration parameter.
         Output: dict

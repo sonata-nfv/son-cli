@@ -4,20 +4,22 @@
     - name: updates apt
       apt: update_cache=yes
 
-    - name: install python 3.4
+    - name: install son-cli dependencies
       apt: pkg={{item}} state=installed
       with_items:
         - python3.4
+        - python3-pycparser
+        - build-essential
+        - python3-dev
+        - python3-pip
         - libyaml-dev
+        - curl
 
-    - name: install pip 3.x
-      apt: pkg=python3-pip state=installed
+    - name: ensure docker repo key
+      shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
 
-    - shell: uname -s
-      register: var1
-
-    - shell: uname -m
-      register: var2
+    - name: install docker
+      shell: curl -fsSL https://get.docker.com/ | sh
 
     - name: install son-monitor dependecies
       apt: pkg={{item}} state=installed
@@ -25,11 +27,23 @@
         - libffi-dev
         - libssl-dev
         - tcpdump
+        - gfortran
+        - libopenblas-dev
+        - liblapack-dev
 
     - name: download docker-compose
-      get_url: url=https://github.com/docker/compose/releases/download/1.6.2/docker-compose-{{ var1.stdout }}-{{ var2.stdout }} dest=/usr/local/bin/docker-compose
+      shell: curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 
     - name: install docker-compose
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
+
+    - name: install numpy
+      pip: name=numpy state=latest executable=pip3
+
+    - name: install scipy
+      pip: name=scipy state=latest executable=pip3
+
+    - name: install docker python api
+      pip: name=docker version=2.0.2 executable=pip3

@@ -64,14 +64,14 @@ class Grafana():
         return url_pattern.format(**params)
 
     # post an empty json dashboard template file to grafana
-    def init_dashboard(self, title=None):
+    def init_dashboard(self, title=None, overwrite=True):
         url = self.construct_api_url('dashboards/db')
         src_path = os.path.join('grafana', 'son-monitor-empty.json')
         srcfile = pkg_resources.resource_filename(__name__, src_path)
         dashboard = json.load(open(srcfile))
         if title is not None:
             dashboard["title"] = title
-        ret = self.session.post(url, json={'dashboard': dashboard, 'overwrite': True})
+        ret = self.session.post(url, json={'dashboard': dashboard, 'overwrite': overwrite})
         sleep(2)
         logging.info('init dahsboard: {0}'.format(ret))
 
@@ -88,7 +88,9 @@ class Grafana():
         """
         url = self.construct_api_url('dashboards/db/{0}'.format(dashboard_name))
         ret = self.session.get(url)
+        #logging.info('Grafana add panel resonse: {0}'.format(ret.json()))
         dashboard = ret.json()
+
         dashboard = dashboard['dashboard']
 
         # add a new row
@@ -130,7 +132,7 @@ class Grafana():
             new_target['refId'] = chr(ord('A') + target_index)
             dashboard['rows'][row_index]['panels'][panel_index]['targets'].append(new_target)
 
-            query = metric['metric']
+            query = metric['query']
             dashboard['rows'][row_index]['panels'][panel_index]['targets'][target_index]['expr'] = query.replace('"',
                                                                                                                  '\"')
             legend = metric['desc']
