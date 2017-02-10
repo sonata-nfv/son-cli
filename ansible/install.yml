@@ -14,6 +14,9 @@
         - python3-pip
         - libyaml-dev
         - curl
+        - gfortran
+        - libopenblas-dev
+        - liblapack-dev
 
     - name: ensure docker repo key
       shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
@@ -41,3 +44,6 @@
 
     - name: install scipy
       pip: name=scipy state=latest executable=pip3
+
+    - name: install docker python api
+      pip: name=docker version=2.0.2 executable=pip3
