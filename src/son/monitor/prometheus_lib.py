@@ -36,6 +36,7 @@ from son.profile.helper import read_yaml
 
 from scipy.stats import t
 import numpy as np
+from math import isnan
 
 # set this to localhost for now
 # this is correct for son-emu started outside of a container or as a container with net=host
@@ -67,11 +68,14 @@ class Metric(object):
 
     def addValue(self, value):
         self.last_value = value
-        self.list_values.append(value)
+
         # update running average
-        self.sum += value
-        self.len += 1
-        self.average = self.sum/self.len
+        if not isnan(value):
+            self.list_values.append(value)
+            self.sum += value
+            self.len += 1
+            self.average = self.sum/self.len
+
         # update CI
         if self.len > 5 :
             mu = self.average

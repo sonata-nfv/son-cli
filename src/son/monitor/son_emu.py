@@ -44,7 +44,7 @@ import math
 import logging
 LOG = logging.getLogger('son_emu_lib')
 LOG.setLevel(level=logging.INFO)
-LOG.propagate = False
+#LOG.propagate = True
 #logging.getLogger("requests").setLevel(logging.WARNING)
 
 import pprint
@@ -186,7 +186,7 @@ class Emu():
 
         thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait)))
         thread.start()
-        LOG.info('vnf: {0} \nexecuting command: {1}'.format(vnf_name, cmd))
+        LOG.info('vnf: {0} executing command: {1}'.format(vnf_name, cmd))
         if wait:
             thread.join()
 
@@ -436,5 +436,16 @@ class Emu():
         response = actions[action]("{0}/restapi/monitor/skewness".format(self.url),
                                    params=params)
 
+        return response.text
+
+    def update_vnf_resources(self, vnf_name, resource_dict):
+
+        dc = self._find_dc(vnf_name)
+        #LOG.info('dc name: {0} vnf: {1}, res: {2}'.format(dc, vnf_name, resource_dict))
+        response = self.session.put("{url}/restapi/compute/resources/{dc}/{name}".format(
+                                    url=self.url,
+                                    dc=self._find_dc(vnf_name),
+                                    name=vnf_name),
+                                   params=resource_dict)
         return response.text
 

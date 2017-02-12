@@ -97,7 +97,8 @@ class ProfileManager(object):
                                         overload_vnf_list = experiment.overload_vnf_list,
                                         timeout=timeout,
                                         title=self.ped['name'],
-                                        no_display=self.args.no_display)
+                                        no_display=self.args.no_display,
+                                        resource_configuration=resource_list)
                 profiler.start_experiment()
 
         # generate service packages

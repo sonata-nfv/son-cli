@@ -56,9 +56,9 @@ import logging
 LOG = logging.getLogger('Profiler')
 LOG.setLevel(level=logging.DEBUG)
 #LOG.addHandler(logging.StreamHandler())
-LOG.propagate = False
+LOG.propagate = True
 #logging.getLogger().removeHandler(logging.StreamHandler())
-
+from itertools import groupby
 
 # TODO read from ped file
 SON_EMU_IP = '172.17.0.1'
@@ -67,7 +67,7 @@ SON_EMU_REST_API_PORT = 5001
 SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
 
-# TODO call from son-profile
+# call from son-profile
 class Emu_Profiler():
 
     def __init__(self, input_msd_path, output_msd_path, input_commands, configuration_commands, **kwargs):
@@ -76,7 +76,8 @@ class Emu_Profiler():
         defaults = {
             'title':'son-profile',
             'timeout':20,
-            'overload_vnf_list':[]
+            'overload_vnf_list':[],
+            'resource_configuration':kwargs.get('resource_configuration', [{}])
         }
         defaults.update(kwargs)
         self.title = defaults.get('title')
@@ -96,12 +97,17 @@ class Emu_Profiler():
         self.input_commands = input_commands
         LOG.info('input commands:{0}'.format(self.input_commands))
 
-        # the configuration commands that need to be executed before the load starts
+        # the configuration commands that needs to be executed before the load starts
         self.configuration_commands = configuration_commands
         LOG.info("configuration commands:{0}".format(self.configuration_commands))
 
+        # the resource configuration that needs to be allocated before the load starts
+        self.resource_configuration = defaults.get('resource_configuration')
+        LOG.info("resource  configuration:{0}".format(self.resource_configuration))
 
         self.timeout = int(defaults.get('timeout'))
+        if self.timeout < 11:
+            LOG.warning("timeout should be > 10 to allow overload detection")
 
         # check if prometheus is running
         sonmonitor.monitor.start_containers()
@@ -152,6 +158,9 @@ class Emu_Profiler():
             # Add a delay to allow settings to settle...
             time.sleep(1)
             curses.wrapper(self.display_loop)
+        else:
+            # wait for profiling thread to end
+            self.profiling_thread.join()
 
 
         # stop overload detection
@@ -166,41 +175,46 @@ class Emu_Profiler():
 
         # one cmd_dict per profile run
         for cmd_dict in self.input_commands:
-            # reset metrics
-            for metric in self.input_metrics+self.output_metrics:
-                metric.reset()
+            # configure all resource settings for every input command
+            for resource_dict in self.resource_configuration:
 
-            # start the load
-            for vnf_name, cmd in cmd_dict.items():
-                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+                # reset metrics
+                for metric in self.input_metrics + self.output_metrics:
+                    metric.reset()
 
-            # let the load stabilize
-            time.sleep(2)
-            # reset the overload monitor
-            self.overload_monitor.reset()
+                self.set_resources(resource_dict)
 
-            # monitor the metrics
-            start_time = time.time()
+                # start the load
+                for vnf_name, cmd in cmd_dict.items():
+                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
 
-            while((time.time()-start_time) < self.timeout):
-                # add the new metric values to the list
-                input_metrics = self.query_metrics(self.input_metrics)
-                output_metrics = self.query_metrics(self.output_metrics)
-                time.sleep(1)
-                if self.overload.is_set():
-                    LOG.info('overload detected')
+                # let the load stabilize
+                time.sleep(2)
+                # reset the overload monitor
+                self.overload_monitor.reset()
 
-            # stop the load
-            for vnf_name, cmd in cmd_dict.items():
-                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, action='stop')
+                # monitor the metrics
+                start_time = time.time()
 
-            # add the result of this profiling run to the results list
-            profiling_result = dict(
-                input_metrics=copy.deepcopy(input_metrics),
-                output_metrics=copy.deepcopy(output_metrics)
-            )
-            self.profiling_results.append(profiling_result)
-            self.run_number += 1
+                while((time.time()-start_time) < self.timeout):
+                    # add the new metric values to the list
+                    input_metrics = self.query_metrics(self.input_metrics)
+                    output_metrics = self.query_metrics(self.output_metrics)
+                    time.sleep(1)
+                    if self.overload.is_set():
+                        LOG.info('overload detected')
+
+                # stop the load
+                for vnf_name, cmd in cmd_dict.items():
+                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, action='stop')
+
+                # add the result of this profiling run to the results list
+                profiling_result = dict(
+                    input_metrics=copy.deepcopy(input_metrics),
+                    output_metrics=copy.deepcopy(output_metrics)
+                )
+                self.profiling_results.append(profiling_result)
+                self.run_number += 1
 
 
     def display_loop(self, stdscr):
@@ -230,18 +244,28 @@ class Emu_Profiler():
         # win.leaveok(True)
 
         # LOG.removeHandler(logging.StreamHandler())
+        LOG.propagate = False
+        logging.getLogger('son_emu_lib').propagate=False
         LOG.addHandler(CursesHandler(logwin))
 
         stdscr.clear()
 
-        resultwin.addstr(0, 0, "------------ input metrics ------------")
+        resultwin.addstr(0, 0, "------------ resource allocation ------------")
         i = 1
+        for resource, value in self.resource_configuration[self.run_number].items():
+            resultwin.addstr(i, 0, "{0}".format(resource))
+            i += 1
+
+        i += 2
+        resultwin.addstr(i, 0, "------------ input metrics ------------")
+        i += 1
         for metric in self.input_metrics:
             resultwin.addstr(i, 0, "{0} ({1})".format(metric.metric_name, metric.unit))
             i += 1
 
-        resultwin.addstr(len(self.input_metrics) + i, 0 , "------------ output metrics ------------")
-        i = len(self.input_metrics) + i + 1
+        i += 2
+        resultwin.addstr(i, 0 , "------------ output metrics ------------")
+        i += 1
         for metric in self.output_metrics:
             resultwin.addstr(i, 0, "{0} ({1})".format(metric.metric_name, metric.unit))
             i += 1
@@ -250,12 +274,20 @@ class Emu_Profiler():
         resultwin.refresh(0, 0, 0, 0, height, maxx-1)
 
         while self.profiling_thread.isAlive():
+
             i = 1
+            resource_configs = len(self.resource_configuration)
+            for resource, value in self.resource_configuration[(self.run_number-1)%resource_configs].items():
+                resultwin.addstr(i, 40*self.run_number, "{0}".format(value))
+                i += 1
+
+            # start from length of resource parameters
+            i += 3
             for metric in self.input_metrics:
                 resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
                 i += 1
 
-            i = len(self.input_metrics) + i + 1
+            i += 3
             for metric in self.output_metrics:
                 resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
                 i += 1
@@ -264,12 +296,13 @@ class Emu_Profiler():
             result_number = 1
             for result in self.profiling_results:
 
-                i = 1
+                # start from length of resource parameters
+                i = len(self.resource_configuration[0]) + 4
                 for metric in result['input_metrics']:
                     resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
                     i += 1
 
-                i = len(self.input_metrics) + i + 1
+                i += 3
                 for metric in result['output_metrics']:
                     resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
                     i += 1
@@ -284,13 +317,14 @@ class Emu_Profiler():
         result_number = 1
         for result in self.profiling_results:
 
-            i = 1
+            # start from length of resource parameters
+            i = len(self.resource_configuration[0]) + 4
             for metric in result['input_metrics']:
                 resultwin.addstr(i, 40 * result_number,
                               "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
                 i += 1
 
-            i = len(self.input_metrics) + i + 1
+            i += 3
             for metric in result['output_metrics']:
                 resultwin.addstr(i, 40 * result_number,
                               "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
@@ -307,6 +341,8 @@ class Emu_Profiler():
         #stdscr.refresh()
         resultwin.getkey()
         LOG.removeHandler(CursesHandler(logwin))
+        LOG.propagate = True
+        logging.getLogger('son_emu_lib').propagate = True
         # curses.endwin()
         # LOG.addHandler(logging.StreamHandler())
         # wait until curses is finished
@@ -331,6 +367,40 @@ class Emu_Profiler():
             #metric_unit = metric.unit
             #LOG.info("metric query: {1} {0} {2}".format(metric.value, metric_name, metric_unit))
         return metrics
+
+    def set_resources(self, resource_dict):
+        """
+        Allocate the specified resources
+        :param resource_dict:
+        {"function1:parameter1" : 0.1,
+         "functionN:parameterN" : 0.2,
+        }
+        :return:
+        """
+
+        if len(resource_dict) == 0:
+            return
+
+
+        # group resources per vnf
+        def get_vnfname(key):
+            return key.split(':')[0]
+
+        resource_dict_grouped = {}
+        for vnf_name, param_list in groupby(resource_dict, get_vnfname):
+            if not resource_dict_grouped.get(vnf_name) :
+                resource_dict_grouped[vnf_name] = []
+            resource_dict_grouped[vnf_name] += list(param_list)
+
+        # execute resource allocation of all parameters per vnf
+        for vnf_name in resource_dict_grouped:
+            new_dict = {}
+            for param in resource_dict_grouped[vnf_name]:
+                if ':' not in param: continue
+                new_dict[param.split(':')[1]] = resource_dict[param]
+            if len(new_dict) > 0:
+                LOG.debug('vnf {1} set resources: {0}'.format(new_dict, vnf_name))
+                self.emu.update_vnf_resources(vnf_name, new_dict)
 
 
 class Overload_Monitor():
