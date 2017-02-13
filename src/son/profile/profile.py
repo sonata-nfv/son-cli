@@ -98,7 +98,8 @@ class ProfileManager(object):
                                         timeout=timeout,
                                         title=self.ped['name'],
                                         no_display=self.args.no_display,
-                                        resource_configuration=resource_list)
+                                        resource_configuration=resource_list,
+                                        vnforder_list=experiment.vnforder_list)
                 profiler.start_experiment()
 
         # generate service packages

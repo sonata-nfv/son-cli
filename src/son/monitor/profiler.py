@@ -50,11 +50,12 @@ import threading
 from collections import deque
 import numpy as np
 from scipy.stats import norm, t
-
+from collections import OrderedDict
+import operator
 
 import logging
 LOG = logging.getLogger('Profiler')
-LOG.setLevel(level=logging.DEBUG)
+LOG.setLevel(level=logging.INFO)
 #LOG.addHandler(logging.StreamHandler())
 LOG.propagate = True
 #logging.getLogger().removeHandler(logging.StreamHandler())
@@ -77,7 +78,9 @@ class Emu_Profiler():
             'title':'son-profile',
             'timeout':20,
             'overload_vnf_list':[],
-            'resource_configuration':kwargs.get('resource_configuration', [{}])
+            'resource_configuration':kwargs.get('resource_configuration', [{}]),
+            'vnforder_list':kwargs.get('vnforder_list', {})
+
         }
         defaults.update(kwargs)
         self.title = defaults.get('title')
@@ -100,6 +103,9 @@ class Emu_Profiler():
         # the configuration commands that needs to be executed before the load starts
         self.configuration_commands = configuration_commands
         LOG.info("configuration commands:{0}".format(self.configuration_commands))
+        # the order in which the vnf_commands need to be executed
+        self.vnforder_list = defaults.get('vnforder_list')
+        LOG.info("vnf order:{0}".format(self.vnforder_list))
 
         # the resource configuration that needs to be allocated before the load starts
         self.resource_configuration = defaults.get('resource_configuration')
@@ -150,8 +156,8 @@ class Emu_Profiler():
             rows, columns = os.popen('stty size', 'r').read().split()
             # Set the Terminal window size larger than its default
             # to make sure the profiling results are fitting
-            if int(rows) < 40 or int(columns) < 120:
-                sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=40, cols=120))
+            if int(rows) < 40 or int(columns) < 130:
+                sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=40, cols=130))
             # print something to reset terminal
             print("")
             n = os.system("clear")
@@ -185,11 +191,14 @@ class Emu_Profiler():
                 self.set_resources(resource_dict)
 
                 # start the load
-                for vnf_name, cmd in cmd_dict.items():
+                for vnf_name in self.vnforder_list:
+                    cmd = cmd_dict[vnf_name]
                     self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+                #for vnf_name, cmd in cmd_dict:
+                #    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, ensure=True)
 
                 # let the load stabilize
-                time.sleep(2)
+                time.sleep(1)
                 # reset the overload monitor
                 self.overload_monitor.reset()
 

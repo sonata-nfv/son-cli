@@ -177,19 +177,27 @@ class Emu():
         wait = False
 
         if action == "stop":
+            # remove quotes from command
+            # remove whole process tree
             # send SIGTERM (not SIGKILL -9)
-            cmd = " pkill -15 -f '" + cmd + "'"
-            cmd_list = shlex.split(cmd)
+            cmd_new = cmd.replace('"', '')
+            cmd_new = "pkill -15 -f '" + cmd_new + "'"
+            #cmd = "kill -TERM -- -$(pgrep -f '{cmd}')".format(cmd=cmd.replace('"',''))
+            cmd_list = shlex.split(cmd_new)
             wait = True
         else:
             cmd_list = shlex.split(cmd)
 
-        thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait)))
-        thread.start()
-        LOG.info('vnf: {0} executing command: {1}'.format(vnf_name, cmd))
-        if wait:
-            thread.join()
+        self.thread = Thread(target=container.exec_run,
+                        kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait), stdout=False, stderr=False))
+        self.thread.start()
 
+        LOG.info('vnf: {0} executing command: {1}'.format(vnf_name, cmd_list))
+        if wait:
+            self.thread.join()
+        else:
+            # allow some time to start the cmd
+            sleep(1)
 
     # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):

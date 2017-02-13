@@ -158,7 +158,7 @@ class sonmonitor():
             list2 = emu.docker_client.containers.list(filters={'status': 'running', 'name': 'grafana'})
             if len(list1+list2) >= 2:
                 self.started = True
-                sleep(1)
+                sleep(3)
             if wait_time > 5:
                 return 'son-monitor not started'
             sleep(1)
