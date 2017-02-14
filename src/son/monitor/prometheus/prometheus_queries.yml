@@ -89,3 +89,7 @@ testvnfquery:
   - metric_name: 'packet_loss'
     query_template: 'sonemu_packet_loss_percent{{vnf_name="{0}"}}'
     unit: '%'
+  - metric_name: 'throughput'
+    query_template: 'sonemu_bandwith_Mbitspersec{{vnf_name="{0}"}}'
+    unit: 'Mbits/sec'
+
