@@ -411,23 +411,6 @@ class Emu():
 
         return 'xterms started for {0}'.format(vnf_names)
 
-    # # execute a command in a VNF
-    # def exec(self, vnf_name, docker_command, action, loop=False):
-    #     sap = {}
-    #     sap['sap_name'] = vnf_name
-    #     sap['method'] = 'son-emu-VM-ssh'
-    #     sap['wait'] = True
-    #     sap['commands'] = []
-    #     p = re.compile("{(.*)}M")
-    #     m = p.search(docker_command)
-    #     arg_list = m.group(1).split(',')
-    #
-    #     #construct commands
-    #
-    #     msd = {'saps':[sap]}
-    #     #execute commands
-    #     self.install_sap_commands(self, msd, action)
-
     def update_skewness_monitor(self, vnf_name, resource_name, action):
 
         actions = {'start': self.session.put, 'stop': self.session.delete}

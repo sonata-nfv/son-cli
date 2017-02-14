@@ -192,13 +192,21 @@ class sonmonitor():
 ## cli parser
 
 description = """
-    Install monitor features on or get monitor data from the SONATA platform/emulator.
+    Install monitor features or get monitor data from the SONATA platform/emulator.
     """
-examples = """Example usage:
+examples = """General usage:
+    son-monitor init
+    son-monitor msd -f msd_example.yml
+    son-monitor init stop
+    son-monitor xterm -n vnf1 vnf2
 
+Specialized usage:
     son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
     son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
     """
+
+#   son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
+#   son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 
 parser = argparse.ArgumentParser(description=description,
                         formatter_class=argparse.RawTextHelpFormatter,
