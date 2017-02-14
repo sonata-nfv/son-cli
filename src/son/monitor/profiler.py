@@ -50,8 +50,7 @@ import threading
 from collections import deque
 import numpy as np
 from scipy.stats import norm, t
-from collections import OrderedDict
-import operator
+from son.profile.helper import write_yaml
 
 import logging
 LOG = logging.getLogger('Profiler')
@@ -172,6 +171,9 @@ class Emu_Profiler():
         # stop overload detection
         self.overload_monitor.stop(self.emu)
 
+        # write results to file
+        self.write_results_to_file("test_results.yml")
+
 
     def profling_loop(self):
 
@@ -219,6 +221,7 @@ class Emu_Profiler():
 
                 # add the result of this profiling run to the results list
                 profiling_result = dict(
+                    resource_alloc=copy.deepcopy(resource_dict),
                     input_metrics=copy.deepcopy(input_metrics),
                     output_metrics=copy.deepcopy(output_metrics)
                 )
@@ -261,7 +264,7 @@ class Emu_Profiler():
 
         resultwin.addstr(0, 0, "------------ resource allocation ------------")
         i = 1
-        for resource, value in self.resource_configuration[self.run_number].items():
+        for resource, value in self.resource_configuration[self.run_number-1].items():
             resultwin.addstr(i, 0, "{0}".format(resource))
             i += 1
 
@@ -357,6 +360,9 @@ class Emu_Profiler():
         # wait until curses is finished
         # while not curses.isendwin():
         #    time.sleep(0.5)
+
+    def write_results_to_file(self, file_name):
+        write_yaml(file_name, self.profiling_results)
 
     def stop_experiment(self):
         self.input_msd.stop()
