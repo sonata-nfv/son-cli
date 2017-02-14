@@ -17,18 +17,17 @@ usage: son-monitor [-h] [--vnf_names [VNF_NAMES [VNF_NAMES ...]]] [--vim VIM]
                    [--image IMAGE] [--dcmd DOCKER_COMMAND] [--net NETWORK]
                    [--query QUERY] [--input INPUT] [--output OUTPUT]
                    [--source SOURCE] [--destination DESTINATION]
-                   [--weight WEIGHT] [--match MATCH] [--bidirectional]
-                   [--priority PRIORITY] [--metric METRIC] [--cookie COOKIE]
+                   [--weight WEIGHT] [--match MATCH] [--priority PRIORITY]
+                   [--bidirectional] [--metric METRIC] [--cookie COOKIE]
                    [--file FILE]
-                   
-                   {init,profile,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
+                   {init,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
                    [{start,stop}]
 
-    Install monitor features on or get monitor data from the SONATA platform/emulator.
+    Install monitor features or get monitor data from the SONATA platform/emulator.
     
 
 positional arguments:
-  {init,profile,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
+  {init,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
                         Monitoring feature to be executed:
                                  interface: export interface metric (tx/rx bytes/packets)
                                  flow_entry : (un)set the flow entry
@@ -36,9 +35,8 @@ positional arguments:
                                  flow_total : flow_entry + flow_mon
                                  init : start/stop the monitoring framework
                                  msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
-                                 profile : performance profiling (tba)
                                  dump: start tcpdump for specified interface (save as .pcap)
-                                 xterm: start an xterminal for specific vnf(s)
+                                 xterm: start an x-terminal for specific vnf(s)
                                  
   {start,stop}          Action for interface, flow_mon, flow_entry, flow_total:
                                   start: install the flowentry and/or export the metric
@@ -46,11 +44,9 @@ positional arguments:
                                   Action for init:
                                   start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
                                   stop: stop the monitoring framework
-                                  Action for nsd:
-                                  start: start the monitoring metrics from the nsd
-                                  stop: start the monitoring metrics from the nsd
-                                  Action for xterm:
-                                  vnf names to start an xterm for
+                                  Action for msd:
+                                  start: start exporting the monitoring metrics from the msd
+                                  stop: stop exporting the monitoring metrics from the msd
                                   
 
 optional arguments:
@@ -80,15 +76,25 @@ optional arguments:
   --weight WEIGHT, -w WEIGHT
                         weight edge attribute to calculate the path
   --match MATCH, -ma MATCH
-                        string holding extra matches for the flow entries
-  --bidirectional, -b   add/remove the flow entries from src to dst and back
+                        string to specify how to match the monitored flow
   --priority PRIORITY, -p PRIORITY
-                        priority of the installed flowrule
+                        priority of the flow match entry, installed to get counter metrics for the monitored flow.
+  --bidirectional, -b   add/remove the flow entries from src to dst and back
   --metric METRIC, -me METRIC
                         tx_bytes, rx_bytes, tx_packets, rx_packets
   --cookie COOKIE, -c COOKIE
-                        flow cookie to monitor
-  --file FILE, -f FILE  service descriptor file describing monitoring rules
+                        integer value to identify this flow monitor rule
+  --file FILE, -f FILE  service descriptor file describing monitoring rules or pcap dump file
+
+General usage:
+    son-monitor init
+    son-monitor msd -f msd_example.yml
+    son-monitor init stop
+    son-monitor xterm -n vnf1 vnf2
+
+Specialized usage:
+    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
+    son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 
 ```
 
