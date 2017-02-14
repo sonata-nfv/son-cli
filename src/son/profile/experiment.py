@@ -28,6 +28,9 @@ import logging
 from son.profile.macro import rewrite_parameter_macros_to_lists
 from son.profile.helper import compute_cartesian_product
 from son.profile.sonpkg import SonataServicePackage
+import operator
+from collections import OrderedDict
+
 LOG = logging.getLogger(__name__)
 
 
@@ -40,6 +43,7 @@ class Experiment(object):
         self.run_configurations = list()
         self.generated_services = list()
         self.command_space_list = list()
+        self.vnforder_list = list()
         self.resource_space_list = list()
         self.configuration_space_dict = dict()
         self.overload_vnf_list = list()
@@ -67,7 +71,7 @@ class Experiment(object):
         #LOG.info("configuration space:{0}".format(self.command_space_list))
 
         # aggregate all commands to be used in the experiment to a flat dict for further processing
-        command_dict = self._get_command_space_as_dict()
+        command_dict, self.vnforder_list = self._get_command_space_as_dict()
         # explore entire command space by calculating the Cartesian product over the given dict
         self.command_space_list = compute_cartesian_product(command_dict)
         #LOG.info("command space:{0}".format(self.command_space_list))
@@ -113,18 +117,30 @@ class Experiment(object):
          "vnf_nameN": [cmd, ...],
         }
         """
-        m = dict()
+        cmds = dict()
+        vnf_name2order = dict()
+        vnforder_list = []
         for mp in self.measurement_points:
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("cmd")
+            cmd_order = mp.get("cmd_order")
             # check if not empty
             if not vnf_cmds:
-                return m
+                return (cmds, vnforder_list)
             # make sure the cmds are in a list
             if not isinstance(vnf_cmds, list):
                 vnf_cmds = [vnf_cmds]
-            m[vnf_name] = vnf_cmds
-        return m
+            cmds[vnf_name] = vnf_cmds
+
+            if cmd_order:
+                vnf_name2order[vnf_name] = int(cmd_order)
+            else:
+                vnf_name2order[vnf_name] = 0
+            # create ordered list of vnf_names, so the commands are always executed in a defined order
+            vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
+            vnforder_list = [vnf_name for vnf_name, order in vnforder_dict.items()]
+
+        return (cmds, vnforder_list)
 
     def _get_resource_space_as_dict(self):
         """

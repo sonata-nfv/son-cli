@@ -148,7 +148,7 @@ class msd():
         compute_metrics = ['cpu', 'mem', 'host_cpu']
 
         testvnf_metric_dict = {'start': self.start_testvnf_metric}
-        testvnf_metrics = ['packet_loss', 'jitter']
+        testvnf_metrics = ['packet_loss', 'jitter', 'throughput']
 
         network_metric_dict = {'start': self.start_network_metric, 'stop': self.stop_network_metric}
         network_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',

@@ -92,7 +92,12 @@ def loop_macro_to_list(m):
     r = list()
     m = m.strip("${}")
     m = re.split('to|step', m)
-    m = [float(i) for i in m]
+    # detect if the values should be float or int
+    cls = float
+    if not '.' in str(m):
+        cls = int
+
+    m = [cls(i) for i in m]
     step = DEFAULT_STEP
     if len(m) > 2:
         step = m[2]
@@ -110,7 +115,11 @@ def list_macro_to_list(m):
     """
     m = m.strip("${}")
     m = re.split(',', m)
-    m = [float(i) for i in m]
+    # detect if the values should be float or int
+    cls = float
+    if not '.' in str(m):
+        cls = int
+    m = [cls(i) for i in m]
     return m
 
 

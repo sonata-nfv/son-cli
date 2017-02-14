@@ -44,7 +44,7 @@ import math
 import logging
 LOG = logging.getLogger('son_emu_lib')
 LOG.setLevel(level=logging.INFO)
-LOG.propagate = False
+#LOG.propagate = True
 #logging.getLogger("requests").setLevel(logging.WARNING)
 
 import pprint
@@ -177,19 +177,27 @@ class Emu():
         wait = False
 
         if action == "stop":
+            # remove quotes from command
+            # remove whole process tree
             # send SIGTERM (not SIGKILL -9)
-            cmd = " pkill -15 -f '" + cmd + "'"
-            cmd_list = shlex.split(cmd)
+            cmd_new = cmd.replace('"', '')
+            cmd_new = "pkill -15 -f '" + cmd_new + "'"
+            #cmd = "kill -TERM -- -$(pgrep -f '{cmd}')".format(cmd=cmd.replace('"',''))
+            cmd_list = shlex.split(cmd_new)
             wait = True
         else:
             cmd_list = shlex.split(cmd)
 
-        thread = Thread(target=container.exec_run, kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait)))
-        thread.start()
-        LOG.info('vnf: {0} \nexecuting command: {1}'.format(vnf_name, cmd))
-        if wait:
-            thread.join()
+        self.thread = Thread(target=container.exec_run,
+                        kwargs=dict(cmd=cmd_list, tty=True, detach=(not wait), stdout=False, stderr=False))
+        self.thread.start()
 
+        LOG.info('vnf: {0} executing command: {1}'.format(vnf_name, cmd_list))
+        if wait:
+            self.thread.join()
+        else:
+            # allow some time to start the cmd
+            sleep(1)
 
     # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):
@@ -403,23 +411,6 @@ class Emu():
 
         return 'xterms started for {0}'.format(vnf_names)
 
-    # # execute a command in a VNF
-    # def exec(self, vnf_name, docker_command, action, loop=False):
-    #     sap = {}
-    #     sap['sap_name'] = vnf_name
-    #     sap['method'] = 'son-emu-VM-ssh'
-    #     sap['wait'] = True
-    #     sap['commands'] = []
-    #     p = re.compile("{(.*)}M")
-    #     m = p.search(docker_command)
-    #     arg_list = m.group(1).split(',')
-    #
-    #     #construct commands
-    #
-    #     msd = {'saps':[sap]}
-    #     #execute commands
-    #     self.install_sap_commands(self, msd, action)
-
     def update_skewness_monitor(self, vnf_name, resource_name, action):
 
         actions = {'start': self.session.put, 'stop': self.session.delete}
@@ -436,5 +427,16 @@ class Emu():
         response = actions[action]("{0}/restapi/monitor/skewness".format(self.url),
                                    params=params)
 
+        return response.text
+
+    def update_vnf_resources(self, vnf_name, resource_dict):
+
+        dc = self._find_dc(vnf_name)
+        #LOG.info('dc name: {0} vnf: {1}, res: {2}'.format(dc, vnf_name, resource_dict))
+        response = self.session.put("{url}/restapi/compute/resources/{dc}/{name}".format(
+                                    url=self.url,
+                                    dc=self._find_dc(vnf_name),
+                                    name=vnf_name),
+                                   params=resource_dict)
         return response.text
 

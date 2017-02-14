@@ -15,12 +15,6 @@
         - libyaml-dev
         - curl
 
-    - name: ensure docker repo key
-      shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
-
-    - name: install docker
-      shell: curl -fsSL https://get.docker.com/ | sh
-
     - name: install son-monitor dependecies
       apt: pkg={{item}} state=installed
       with_items:
@@ -31,19 +25,25 @@
         - libopenblas-dev
         - liblapack-dev
 
-    - name: download docker-compose
+    - name: ensure docker repo key (son-monitor dependency)
+      shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
+
+    - name: install docker (son-monitor dependency)
+      shell: curl -fsSL https://get.docker.com/ | sh
+
+    - name: download docker-compose (son-monitor dependency)
       shell: curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 
-    - name: install docker-compose
+    - name: install docker-compose (son-monitor dependency)
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
 
-    - name: install numpy
+    - name: install numpy (son-monitor dependency)
       pip: name=numpy state=latest executable=pip3
 
-    - name: install scipy
+    - name: install scipy (son-monitor dependency)
       pip: name=scipy state=latest executable=pip3
 
-    - name: install docker python api
+    - name: install docker python api (son-monitor dependency)
       pip: name=docker version=2.0.2 executable=pip3
