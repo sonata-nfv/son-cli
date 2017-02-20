@@ -169,6 +169,10 @@ class Pull(object):
         :return: yaml object containing NS
         """
         cat_obj = self.__get_cat_object__(self.CAT_URI_NS_ID, ns_uuid)
+        if cat_obj is None:
+            log.error("Network service with UUID "
+                      "\"{}\" is not found".format(ns_uuid))
+            return
         if not isinstance(cat_obj, str) and len(cat_obj) > 1:
             log.error("Obtained multiple network "
                       "services using the ID '{}'".format(ns_uuid))
