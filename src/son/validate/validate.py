@@ -419,9 +419,9 @@ class Validator(object):
             manif_md5 = package.md5(strip_root(f))
             if manif_md5 and gen_md5 != manif_md5:
                 log.warning("MD5 hash of file '{0}' is not equal to the "
-                          "defined in package descriptor:\nGen MD5:\t{1}\n"
-                          "MANIF MD5:\t{2}"
-                          .format(f, gen_md5, manif_md5))
+                            "defined in package descriptor:\nGen MD5:\t{1}\n"
+                            "MANIF MD5:\t{2}"
+                            .format(f, gen_md5, manif_md5))
 
         # configure dpath for function referencing
         self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
@@ -545,6 +545,11 @@ class Validator(object):
         service.build_topology_graph(deep=False, interfaces=True,
                                      link_type='e-line')
 
+        if not service.graph:
+            log.error("Couldn't build topology graph of service '{0}'"
+                      .format(service.id))
+            return
+
         log.debug("Built topology graph of service '{0}': {1}"
                   .format(service.id, service.graph.edges()))
 
@@ -557,16 +562,23 @@ class Validator(object):
 
         # load forwarding paths
         if not service.load_forwarding_paths():
-            log.error("Couldn't load service forwarding paths")
-            return
+            log.warning("Couldn't load service forwarding paths. "
+                        "Ignoring validation.")
+            return True
 
         # analyse forwarding paths
         for fpid, fw_path in service.fw_paths.items():
+
+            # check if number of connection points is odd
+            if len(fw_path) % 2 != 0:
+                log.warning("The forwarding path id='{0}' has an odd number "
+                            "of connection points".format(fpid))
+
             trace = service.trace_path(fw_path)
             if 'BREAK' in trace:
-                log.warning("The forwarding path id='{0}' is invalid for the "
-                            "specified topology. {1} breakpoints were "
-                            "found in the path: {2}"
+                log.error("The forwarding path id='{0}' is invalid for the "
+                            "specified topology. {1} breakpoint(s) "
+                            "found the path: {2}"
                             .format(fpid, trace.count('BREAK'), trace))
                 # skip further analysis on this path
                 continue
@@ -712,6 +724,18 @@ class Validator(object):
         return backtrace
 
 
+def print_result(validator):
+
+    if validator.error_count:
+        log.error("Validation failed with {0} error(s) and {1} warning(s)"
+                  .format(validator.error_count, validator.warning_count))
+    elif validator.warning_count:
+        log.warning("Validation completed with {0} warning(s)"
+                    .format(validator.warning_count))
+    else:
+        log.info("Validation succeeded")
+
+
 def main():
     coloredlogs.install(level='info')
 
@@ -842,18 +866,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_package(args.package_file):
-            log.critical("Package validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of package '{0}' has succeeded."
-                     .format(args.package_file))
-        else:
-            log.warning("Validation of package '{0}' returned {1} warning(s)"
-                        .format(args.package_file,
-                                validator.warning_count))
-
-        print(validator.error_count)
+        validator.validate_package(args.package_file)
+        print_result(validator)
 
     elif args.project_path:
 
@@ -881,16 +895,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_project(project):
-            log.critical("Project validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of project '{0}' has succeeded."
-                     .format(project.project_root))
-        else:
-            log.warning("Validation of project '{0}' returned {1} warning(s)"
-                        .format(project.project_root,
-                                validator.warning_count))
+        validator.validate_project(project)
+        print_result(validator)
 
     elif args.nsd:
         validator = Validator()
@@ -900,15 +906,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_service(args.nsd):
-            log.critical("Project validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of service '{0}' has succeeded."
-                     .format(args.nsd))
-        else:
-            log.warning("Validation of service '{0}' returned {1} warning(s)"
-                        .format(args.nsd, validator.warning_count))
+        validator.validate_service(args.nsd)
+        print_result(validator)
 
     elif args.vnfd:
         validator = Validator()
@@ -918,19 +917,11 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_function(args.vnfd):
-            log.critical("Function validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of function '{0}' has succeeded."
-                     .format(args.vnfd))
-        else:
-            log.warning("Validation of function '{0}' returned {1} warning(s)"
-                        .format(args.vnfd, validator.warning_count))
-    else:
-        log.error("Provided arguments are invalid.")
-        exit(1)
+        validator.validate_function(args.vnfd)
+        print_result(validator)
 
-    log.info("Done.")
+    else:
+        log.error("Invalid arguments.")
+        exit(1)
 
     exit(0)

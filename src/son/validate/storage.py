@@ -182,7 +182,7 @@ class Node:
             log.error("The interface id='{0}' is already stored in node "
                       "id='{1}'".format(interface, self.id))
             return
-        log.debug("Node id='{0}': adding interface '{1}'"
+        log.debug("Node id='{0}': adding connection point '{1}'"
                   .format(self.id, interface))
         self._interfaces.append(interface)
 
@@ -418,8 +418,8 @@ class Descriptor(Node):
                         Link(u_iface, v_iface, ltype='e-lan')
 
         else:
-            log.error("Invalid link type='{0}' in link id='{1}' of "
-                      "descriptor id='{2}'".format(ltype, lid, self.id))
+            log.error("Virtual link id='{0}' is of an invalid type='{1}"
+                      .format(lid, ltype))
             return
 
         return True
@@ -437,6 +437,7 @@ class Descriptor(Node):
                           link['connection_points_reference'])
 
         return True
+
 
 
 class Package(Descriptor):
@@ -576,7 +577,7 @@ class Service(Descriptor):
             return
 
         log.debug("Service '{0}': associating function id='{1}' with vnf_id="
-                  "'{2}".format(self.id, function.id, vnf_id))
+                  "'{2}'".format(self.id, function.id, vnf_id))
 
         self._functions[function.id] = function
         self._vnf_id_map[vnf_id] = function.id
@@ -619,6 +620,10 @@ class Service(Descriptor):
 
         # build topology graph
         links = self.filter_links(link_type=link_type)
+        if not links:
+            log.warning("No virtual links of type '{0}' were found"
+                        .format('all' if link_type is None else link_type))
+
         for lid, link in links.items():
 
             if deep or interfaces:
@@ -661,7 +666,7 @@ class Service(Descriptor):
         service content.
         """
         if 'forwarding_graphs' not in self.content:
-            log.error("No forwarding graphs available in service id='{0}'"
+            log.debug("No forwarding graphs available in service id='{0}'"
                       .format(self.id))
             return
 
