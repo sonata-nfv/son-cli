@@ -190,33 +190,29 @@ class Node:
 
 
 class Link:
-    def __init__(self, u, v, ltype='e-line'):
+    def __init__(self, link_id, iface_u, iface_v):
         """
         Initialize a link object.
         A link defines a connection between two interfaces.
-        :param u: interface u
-        :param v: interface v
-        :param ltype: type of link: 'e-line', 'e-tree' for direct links and
-        'e-lan' to indicate a link is part of a bridge
+        :param link_id: link id
+        :param iface_u: interface u
+        :param iface_v: interface v
         """
-        self._type = ltype
-        self._iface_pair = [u, v]
+        self._id = link_id
+        self._iface_pair = [iface_u, iface_v]
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
-        return "<{}: {} -- {}>".format(self.type, self.iface_u, self.iface_v)
+        return "{} -- {}".format(self.id, self.iface_u, self.iface_v)
 
     @property
-    def type(self):
-        """
-        :return: Link type
-        """
-        return self._type
+    def id(self):
+        return self._id
 
     @property
-    def iface_pair(self):
+    def interfaces(self):
         """
         The two interfaces composing the link in a list format [u, v]
         :return: interface list
@@ -240,6 +236,33 @@ class Link:
         return self._iface_pair[1]
 
 
+class Bridge:
+    def __init__(self, bridge_id, interfaces):
+        """
+        Initialize a bridge object.
+        A bridge contains a list of N associated interfaces.
+        """
+        assert bridge_id
+        assert interfaces
+
+        self._id = bridge_id
+        self._interfaces = interfaces
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return "{}".format(self.interfaces)
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def interfaces(self):
+        return self._interfaces
+
+
 class Descriptor(Node):
     def __init__(self, descriptor_file):
         """
@@ -258,6 +281,7 @@ class Descriptor(Node):
         super().__init__(self.id)
         self._graph = None
         self._links = {}
+        self._bridges = {}
 
     @property
     def id(self):
@@ -312,55 +336,74 @@ class Descriptor(Node):
         return self._links
 
     @property
-    def p2p_links(self):
+    def bridges(self):
         """
-        Provides the direct links associated with the descriptor.
-        :return: 'e-line' (direct) links
+        Provides the bridges associated with the descriptor.
+        :return: dictionary of bridge objects
         """
-        return {lid: self._links[lid] for lid, link in self._links.items()
-                if link.type == 'e-line'}
+        return self._bridges
 
     @property
-    def bridge_links(self):
+    def link_interfaces(self):
         """
-        Provides the bridge links associated with the descriptor.
-        :return: 'e-lan' (bridge) links
+        Provides the interfaces that are associated with links.
+        Interfaces that are exclusively associated with bridges are removed.
         """
-        return {lid: self._links[lid] for lid, link in self._links.items()
-                if link.type == 'e-lan'}
+        f_ifaces = self.interfaces.copy()
 
-    def filter_links(self, link_type=None):
-        """
-        Provides the links associated with the descriptor, filtered by the
-        provided link type.
-        :param link_type: 'e-line' (direct) or 'e-lan' (bridge)
-        :return: filtered links
-        """
-        if not link_type:
-            return self.links
+        for iface in self.interfaces:
 
-        if link_type.lower() == 'e-line' or link_type.lower() == 'e-tree':
-            return self.p2p_links
+            for lid, link in self.links.items():
+                if iface in link.interfaces:
+                    break    # in links, continue to next iface
 
-        if link_type == 'e-lan':
-            return self.bridge_links
+            for bid, bridge in self.bridges.items():
+                if iface in bridge.interfaces:
+                    index = f_ifaces.index(iface)
+                    f_ifaces.pop(index)
+                    break    # exclude this interface, continue to the next
 
-    def filter_interfaces(self, link_type):
+        return f_ifaces
+
+    @property
+    def bridge_interfaces(self):
         """
-        Provides the interfaces, associated with the descriptor/node,
-        filtered by the link-type that they are associated with.
-        :param link_type: 'e-line' (direct) or 'e-lan' (bridge)
-        :return: filtered interfaces
+        Provides the interfaces that are associated with bridges.
+        Interfaces that are exclusively associated with links are removed.
         """
-        finterfaces = []
-        for interface in self.interfaces:
-            eligible = False
-            for lid, link in self.filter_links(link_type=link_type).items():
-                if interface in link.iface_pair:
-                    eligible = True
-            if eligible:
-                finterfaces.append(interface)
-        return finterfaces
+        f_ifaces = self.interfaces.copy()
+
+        for iface in self.interfaces:
+
+            for bid, bridge in self.bridges.items():
+                if iface in bridge.interfaces:
+                    break   # in bridges, continue to next iface
+
+            for lid, link in self.links.items():
+                if iface in link.interfaces:
+                    index = f_ifaces.index(iface)
+                    f_ifaces.pop(index)
+                    break   # exclude iface, continue to next
+
+        return f_ifaces
+
+    #
+    # def filter_interfaces(self, link_type):
+    #     """
+    #     Provides the interfaces, associated with the descriptor/node,
+    #     filtered by the link-type that they are associated with.
+    #     :param link_type: 'e-line' (direct) or 'e-lan' (bridge)
+    #     :return: filtered interfaces
+    #     """
+    #     finterfaces = []
+    #     for interface in self.interfaces:
+    #         eligible = False
+    #         for lid, link in self.filter_links(link_type=link_type).items():
+    #             if interface in link.iface_pair:
+    #                 eligible = True
+    #         if eligible:
+    #             finterfaces.append(interface)
+    #     return finterfaces
 
     @property
     def graph(self):
@@ -389,53 +432,51 @@ class Descriptor(Node):
                 return
         return True
 
-    def add_link(self, lid, ltype, interfaces):
+    def add_bridge(self, bid, interfaces):
+        """
+        Add bridge to the descriptor.
+
+        :param bid:
+        :param interfaces:
+        :return:
+        """
+        assert bid
+        assert len(interfaces) > 0
+        assert bid not in self.bridges.keys()
+
+        self._bridges[bid] = Bridge(bid, interfaces)
+
+    def add_link(self, lid, interfaces):
         """
         Add link to the descriptor.
-        Associate a connection, between interfaces, of the provided type.
-        If provided link type is direct, a list of two interfaces elements
-        must be provided. If the link is a bridge, there is no limit on the
-        number of interfaces.
+        Associate a connection, between two interfaces.
         :param lid: link id
-        :param ltype: link type  'e-line' (direct) or 'e-lan' (bridge)
-        :param interfaces: interface list
+        :param interfaces: interface pair list
         """
-        if lid in self.links.keys():
-            log.error("The link id='{0} is already stored in descriptor "
-                      "id='{1}'".format(lid, self.id))
-            return
+        assert lid
+        assert len(interfaces) == 2
+        assert lid not in self.links.keys()
 
-        if ltype.lower() == 'e-line':  # TODO or link_type.lower()=='e-tree':
-            self.links[lid] = Link(interfaces[0], interfaces[1])
+        self._links[lid] = Link(lid, interfaces[0], interfaces[1])
 
-        elif ltype.lower() == 'e-lan':
-            for u_iface in interfaces:
-                interfaces_inc = interfaces.copy()
-                interfaces_inc.pop(interfaces_inc.index(u_iface))
-
-                for v_iface in interfaces_inc:
-                    self._links[lid + ':' + u_iface + '-' + v_iface] = \
-                        Link(u_iface, v_iface, ltype='e-lan')
-
-        else:
-            log.error("Virtual link id='{0}' is of an invalid type='{1}"
-                      .format(lid, ltype))
-            return
-
-        return True
-
-    def load_links(self):
+    def load_virtual_links(self):
         """
-        Load links of the descriptor, based on the 'virtual_links' section
-        of its content.
+        Load 'virtual_links' section of the descriptor.
+        - 'e-line' virtual links will be stored in Link objects
+        - 'e-lan' virtual links will be stored in Bridge objects
         """
         if 'virtual_links' not in self.content:
             return
 
         for link in self.content['virtual_links']:
-            self.add_link(link['id'], link['connectivity_type'],
-                          link['connection_points_reference'])
+            ltype = link['connectivity_type'].lower()
+            if ltype == 'e-line':
+                self.add_link(link['id'],
+                              link['connection_points_reference'])
 
+            elif ltype == 'e-lan':
+                self.add_bridge(link['id'],
+                                link['connection_points_reference'])
         return True
 
     def find_unused_interfaces(self):
@@ -444,13 +485,11 @@ class Descriptor(Node):
         'virtual_links'. Should only be invoked after links are loaded.
         :return:
         """
-        unused_ifaces = self.interfaces.copy()
+        unused_ifaces = []
         for iface in self.interfaces:
-            for lid, link in self.links.items():
-                if link.iface_u == iface or link.iface_v == iface:
-                    idx = unused_ifaces.index(iface)
-                    unused_ifaces.pop(idx)
-                    break  # continue on next interface
+            if iface not in self.link_interfaces and \
+                    iface not in self.bridge_interfaces:
+                unused_ifaces.append(iface)
 
         return unused_ifaces
 
@@ -484,7 +523,6 @@ class Package(Descriptor):
             if item['content-type'] == \
                     'application/sonata.service_descriptor':
                 service_list.append(item['name'])
-        print(service_list)
         return service_list
 
     @property
@@ -598,7 +636,7 @@ class Service(Descriptor):
         self._vnf_id_map[vnf_id] = function.id
 
     def build_topology_graph(self, deep=False, interfaces=False,
-                             link_type=None):
+                             bridges=False):
         """
         Build the network topology graph of the service.
         :param deep: indicates the granularity of the graph
@@ -606,14 +644,15 @@ class Service(Descriptor):
                      False - graph will only include the service topology graph
         :param interfaces: indicates whether should nodes include interface
                            names
-        :param link_type: filter by link type. 'e-line' (direct) or
-                          'e-lan' (bridge)
+        :param bridges: indicates whether bridges should be included in
+                        the graph
         """
 
         self._graph = nx.Graph()
 
         # assign nodes from service interfaces
-        self._graph.add_nodes_from(self.filter_interfaces(link_type))
+        if not bridges:
+            self._graph.add_nodes_from(self.link_interfaces)
 
         prefixes = []
         # assign sub-graphs of functions
@@ -633,13 +672,11 @@ class Service(Descriptor):
             else:
                 prefixes.append(prefix)
 
-        # build topology graph
-        links = self.filter_links(link_type=link_type)
-        if not links:
-            log.warning("No virtual links of type '{0}' were found"
-                        .format('all' if link_type is None else link_type))
+        # build links topology graph
+        if not self.links:
+            log.warning("No links were found")
 
-        for lid, link in links.items():
+        for lid, link in self.links .items():
 
             if deep or interfaces:
                 iface_u = link.iface_u
@@ -660,7 +697,7 @@ class Service(Descriptor):
                     iface_v = link.iface_v
 
             self._graph.add_edge(iface_u, iface_v,
-                                 attr_dict={'label': lid})
+                                 attr_dict={'label': link.id})
 
         # if show interfaces, link interfaces within each function
         if interfaces:
@@ -699,9 +736,9 @@ class Service(Descriptor):
                         return
                     if pos in path_dict:
                         log.warning("Duplicate referenced position '{0}' "
-                                  "in forwarding path id='{1}'. Ignoring "
-                                  "connection point: '{2}'"
-                                  .format(pos, fpath['fp_id'], path_dict[pos]))
+                                    "in forwarding path id='{1}'. Ignoring "
+                                    "connection point: '{2}'"
+                                    .format(pos, fpath['fp_id'], path_dict[pos]))
                     path_dict[pos] = iface
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
@@ -817,16 +854,16 @@ class Function(Descriptor):
 
         return True
 
-    def build_topology_graph(self, link_type=None):
+    def build_topology_graph(self, bridges=False):
         """
         Build the network topology graph of the function.
-        :param link_type: filter by link type. 'e-line' (direct) or
-                          'e-lan' (bridge)
+        :param bridges: indicates if bridges should be included in the graph
         """
         self._graph = nx.Graph()
 
         # assign nodes from function interfaces
-        self._graph.add_nodes_from(self.filter_interfaces(link_type))
+        if not bridges:
+            self._graph.add_nodes_from(self.link_interfaces)
 
         # assign nodes from units interfaces
         for uid, unit in self.units.items():
@@ -834,8 +871,7 @@ class Function(Descriptor):
                                  attr_dict={'interfaces': unit.interfaces})
 
         # build topology graph
-        links = self.filter_links(link_type=link_type)
-        for lid, link in links.items():
+        for lid, link in self.links.items():
 
             # unit interfaces are not considered as nodes, just the unit itself
             iface_u = link.iface_u.split(':')
@@ -852,7 +888,34 @@ class Function(Descriptor):
                 iface_v = link.iface_v
 
             self._graph.add_edge(iface_u, iface_v,
-                                 attr_dict={'label': lid})
+                                 attr_dict={'label': link.id})
+
+
+    # def find_undeclared_interfaces(self):
+    #     """
+    #     Provides a list of interfaces that are referenced in 'virtual_links'
+    #     but not declared in the function and respective units
+    #     'connection_points' sections.
+    #     :return: list of undeclared interfaces
+    #     """
+    #
+    #     for iface in self.link_interfaces:
+    #         if iface
+    #
+    #     undeclared_ifaces = []
+    #     for link in self.links:
+    #
+    #         if iface not in self.link_interfaces and \
+    #                 iface not in self.bridge_interfaces:
+    #
+    #         for iface in link.interfaces:
+    #             if iface not in self.interfaces:
+    #                 log.error("Undeclared connection point '{0}' in "
+    #                           "virtual link id='{1}'"
+    #                           .format(iface, lid))
+    #                 if iface not in undeclared_ifaces:
+    #                     undeclared_ifaces.append(iface)
+    #     return undeclared_ifaces
 
 
 class Unit(Node):

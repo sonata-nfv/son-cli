@@ -451,13 +451,13 @@ class Validator(object):
 
         # load service interfaces
         if not service.load_interfaces():
-            log.error("Couldn't load the interfaces of service id='{0}'"
+            log.error("Couldn't load the connection points of service id='{0}'"
                       .format(service.id))
             return
 
         # load service links
-        if not service.load_links():
-            log.error("Couldn't load the links of service id='{0}'"
+        if not service.load_virtual_links():
+            log.error("Couldn't load virtual links of service id='{0}'"
                       .format(service.id))
             return
 
@@ -469,7 +469,7 @@ class Validator(object):
 
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
-            for iface in link.iface_pair:
+            for iface in link.interfaces:
                 if iface not in service.interfaces:
                     iface_tokens = iface.split(':')
                     if len(iface_tokens) != 2:
@@ -523,14 +523,26 @@ class Validator(object):
             return
 
         # load function links
-        if not function.load_links():
+        if not function.load_virtual_links():
             log.error("Couldn't load the links of function id='{0}'"
                       .format(function.id))
             return
 
+        # check for undeclared interfaces
+        # undeclared_ifaces = function.find_undeclared_interfaces()
+        # if undeclared_ifaces:
+        #     log.error("Function has undeclared connection points")
+        #     return
+
+        # check for unused interfaces
+        unused_ifaces = function.find_unused_interfaces()
+        if unused_ifaces:
+            log.warning("Function has unused connection points: {0}"
+                        .format(unused_ifaces))
+
         # verify integrity between unit interfaces and units
         for lid, link in function.links.items():
-            for iface in link.iface_pair:
+            for iface in link.interfaces:
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
                     if iface_tokens[0] not in function.units.keys():
@@ -549,7 +561,7 @@ class Validator(object):
 
         # build service topology graph
         service.build_topology_graph(deep=False, interfaces=True,
-                                     link_type='e-line')
+                                     bridges=False)
 
         if not service.graph:
             log.error("Couldn't build topology graph of service '{0}'"
@@ -574,8 +586,7 @@ class Validator(object):
 
         # analyse forwarding paths
         for fpid, fw_path in service.fw_paths.items():
-
-            log.debug("Verifying forwarding path id='{0}'".format(fpid))
+            log.debug("Building forwarding path id='{0}'".format(fpid))
 
             # check if number of connection points is odd
             if len(fw_path) % 2 != 0:
@@ -617,7 +628,7 @@ class Validator(object):
                  .format(function.id))
 
         # build function topology graph
-        function.build_topology_graph(link_type='e-line')
+        function.build_topology_graph(bridges=False)
 
         log.debug("Built topology graph of function '{0}': {1}"
                   .format(function.id, function.graph.edges()))
