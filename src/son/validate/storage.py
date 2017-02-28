@@ -697,8 +697,12 @@ class Service(Descriptor):
                                   "'{1}' is not defined"
                                   .format(iface, fpath['fp_id']))
                         return
+                    if pos in path_dict:
+                        log.warning("Duplicate referenced position '{0}' "
+                                  "in forwarding path id='{1}'. Ignoring "
+                                  "connection point: '{2}'"
+                                  .format(pos, fpath['fp_id'], path_dict[pos]))
                     path_dict[pos] = iface
-
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
                 self._fw_paths[fpath['fp_id']] = list(d.values())

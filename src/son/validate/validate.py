@@ -575,6 +575,8 @@ class Validator(object):
         # analyse forwarding paths
         for fpid, fw_path in service.fw_paths.items():
 
+            log.debug("Verifying forwarding path id='{0}'".format(fpid))
+
             # check if number of connection points is odd
             if len(fw_path) % 2 != 0:
                 log.warning("The forwarding path id='{0}' has an odd number "
@@ -583,11 +585,13 @@ class Validator(object):
             trace = service.trace_path(fw_path)
             if 'BREAK' in trace:
                 log.error("The forwarding path id='{0}' is invalid for the "
-                            "specified topology. {1} breakpoint(s) "
-                            "found the path: {2}"
-                            .format(fpid, trace.count('BREAK'), trace))
+                          "specified topology. {1} breakpoint(s) "
+                          "found the path: {2}"
+                          .format(fpid, trace.count('BREAK'), trace))
                 # skip further analysis on this path
                 continue
+
+            log.debug("Forwarding path id='{0}': {1}".format(fpid, trace))
 
             # path is valid in specified topology, let's check for cycles
             fpg = nx.Graph()
