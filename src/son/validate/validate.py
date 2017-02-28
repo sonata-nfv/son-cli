@@ -461,6 +461,12 @@ class Validator(object):
                       .format(service.id))
             return
 
+        # check for unused interfaces
+        unused_ifaces = service.find_unused_interfaces()
+        if unused_ifaces:
+            log.warning("Service has unused connection points: {0}"
+                        .format(unused_ifaces))
+
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
             for iface in link.iface_pair:

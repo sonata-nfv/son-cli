@@ -77,5 +77,3 @@ forwarding_graphs:
             position: 3
           - connection_point_ref: "output"
             position: 4
-
-

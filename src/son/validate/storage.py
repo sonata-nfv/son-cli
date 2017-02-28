@@ -438,6 +438,21 @@ class Descriptor(Node):
 
         return True
 
+    def find_unused_interfaces(self):
+        """
+        Provides a list of interfaces that are not referenced by
+        'virtual_links'. Should only be invoked after links are loaded.
+        :return:
+        """
+        unused_ifaces = self.interfaces.copy()
+        for iface in self.interfaces:
+            for lid, link in self.links.items():
+                if link.iface_u == iface or link.iface_v == iface:
+                    idx = unused_ifaces.index(iface)
+                    unused_ifaces.pop(idx)
+                    break  # continue on next interface
+
+        return unused_ifaces
 
 
 class Package(Descriptor):
