@@ -449,6 +449,11 @@ class Validator(object):
             log.error("Failed to read service function descriptors")
             return
 
+        # validate service function descriptors (VNFDs)
+        for fid, function in service.functions.items():
+            if not self.validate_function(function.filename):
+                return
+
         # load service interfaces
         if not service.load_interfaces():
             log.error("Couldn't load the connection points of service id='{0}'"
@@ -459,6 +464,12 @@ class Validator(object):
         if not service.load_virtual_links():
             log.error("Couldn't load virtual links of service id='{0}'"
                       .format(service.id))
+            return
+
+        undeclared = service.find_undeclared_interfaces()
+        if undeclared:
+            log.error("Virtual links section has undeclared connection "
+                      "points: {0}".format(undeclared))
             return
 
         # check for unused interfaces
@@ -486,10 +497,7 @@ class Validator(object):
                                   .format(vnf_id, iface, lid))
                         return
 
-        # validate service function descriptors (VNFDs)
-        for fid, function in service.functions.items():
-            if not self.validate_function(function.filename):
-                return
+
 
         return True
 
@@ -526,6 +534,12 @@ class Validator(object):
         if not function.load_virtual_links():
             log.error("Couldn't load the links of function id='{0}'"
                       .format(function.id))
+            return
+
+        undeclared = function.find_undeclared_interfaces()
+        if undeclared:
+            log.error("Virtual links section has undeclared connection "
+                      "points: {0}".format(undeclared))
             return
 
         # check for undeclared interfaces
@@ -567,6 +581,9 @@ class Validator(object):
             log.error("Couldn't build topology graph of service '{0}'"
                       .format(service.id))
             return
+
+        # TODO: find a more coherent method to do this
+        nx.write_graphml(service.graph, "{0}.graphml".format(service.id))
 
         log.debug("Built topology graph of service '{0}': {1}"
                   .format(service.id, service.graph.edges()))
@@ -612,8 +629,7 @@ class Validator(object):
                 log.warning("Found cycles forwarding path id={0}: {1}"
                             .format(fpid, cycles))
 
-        # TODO: find a more coherent method to do this
-        nx.write_graphml(service.graph, "{0}.graphml".format(service.id))
+
         return True
 
     def _validate_function_topology(self, function):

@@ -343,49 +343,66 @@ class Descriptor(Node):
         """
         return self._bridges
 
+    # @property
+    # def link_interfaces(self):
+    #     """
+    #     Provides the interfaces that are associated with links.
+    #     Interfaces that are exclusively associated with bridges are removed.
+    #     """
+    #     f_ifaces = self.interfaces.copy()
+    #
+    #     for iface in self.interfaces:
+    #
+    #         for lid, link in self.links.items():
+    #             if iface in link.interfaces:
+    #                 break    # in links, continue to next iface
+    #
+    #         for bid, bridge in self.bridges.items():
+    #             if iface in bridge.interfaces:
+    #                 index = f_ifaces.index(iface)
+    #                 f_ifaces.pop(index)
+    #                 break    # exclude this interface, continue to the next
+    #
+    #     return f_ifaces
+
     @property
     def link_interfaces(self):
-        """
-        Provides the interfaces that are associated with links.
-        Interfaces that are exclusively associated with bridges are removed.
-        """
-        f_ifaces = self.interfaces.copy()
 
-        for iface in self.interfaces:
+        link_interfaces = []
+        for lid, link in self.links.items():
+            link_interfaces += link.interfaces
 
-            for lid, link in self.links.items():
-                if iface in link.interfaces:
-                    break    # in links, continue to next iface
-
-            for bid, bridge in self.bridges.items():
-                if iface in bridge.interfaces:
-                    index = f_ifaces.index(iface)
-                    f_ifaces.pop(index)
-                    break    # exclude this interface, continue to the next
-
-        return f_ifaces
+        return link_interfaces
 
     @property
     def bridge_interfaces(self):
-        """
-        Provides the interfaces that are associated with bridges.
-        Interfaces that are exclusively associated with links are removed.
-        """
-        f_ifaces = self.interfaces.copy()
+        bridge_interfaces = []
+        for bid, bridge in self.bridges.items():
+            bridge_interfaces += bridge.interfaces
+        return bridge_interfaces
 
-        for iface in self.interfaces:
 
-            for bid, bridge in self.bridges.items():
-                if iface in bridge.interfaces:
-                    break   # in bridges, continue to next iface
-
-            for lid, link in self.links.items():
-                if iface in link.interfaces:
-                    index = f_ifaces.index(iface)
-                    f_ifaces.pop(index)
-                    break   # exclude iface, continue to next
-
-        return f_ifaces
+    # @property
+    # def bridge_interfaces(self):
+    #     """
+    #     Provides the interfaces that are associated with bridges.
+    #     Interfaces that are exclusively associated with links are removed.
+    #     """
+    #     f_ifaces = self.interfaces.copy()
+    #
+    #     for iface in self.interfaces:
+    #
+    #         for bid, bridge in self.bridges.items():
+    #             if iface in bridge.interfaces:
+    #                 break   # in bridges, continue to next iface
+    #
+    #         for lid, link in self.links.items():
+    #             if iface in link.interfaces:
+    #                 index = f_ifaces.index(iface)
+    #                 f_ifaces.pop(index)
+    #                 break   # exclude iface, continue to next
+    #
+    #     return f_ifaces
 
     #
     # def filter_interfaces(self, link_type):
@@ -459,6 +476,8 @@ class Descriptor(Node):
 
         self._links[lid] = Link(lid, interfaces[0], interfaces[1])
 
+
+
     def load_virtual_links(self):
         """
         Load 'virtual_links' section of the descriptor.
@@ -478,6 +497,7 @@ class Descriptor(Node):
                 self.add_bridge(link['id'],
                                 link['connection_points_reference'])
         return True
+
 
     def find_unused_interfaces(self):
         """
@@ -588,6 +608,17 @@ class Service(Descriptor):
         :return: forwarding paths dict
         """
         return self._fw_paths
+
+    @property
+    def all_function_interfaces(self):
+        """
+        Provides a list of interfaces from all functions of this service.
+        """
+        all_interfaces = []
+        for fid, function in self.functions.items():
+            for iface in function.interfaces:
+                all_interfaces.append(self.vnf_id(function) + ':' + iface)
+        return all_interfaces
 
     def mapped_function(self, vnf_id):
         """
@@ -785,6 +816,30 @@ class Service(Descriptor):
         trace.append(path[-1])
         return trace
 
+    def find_undeclared_interfaces(self, interfaces=None):
+        """
+        Provides a list of interfaces that are referenced in 'virtual_links'
+        section but not declared in 'connection_points' of the Service and its
+        Functions.
+        """
+        if interfaces:
+            target_ifaces = interfaces
+        else:
+            target_ifaces = self.link_interfaces + self.bridge_interfaces
+
+        function_ifaces = self.all_function_interfaces
+        all_interfaces = self.interfaces.copy()
+        all_interfaces += function_ifaces
+
+        undeclared = []
+        for iface in target_ifaces:
+            if iface not in all_interfaces:
+                undeclared.append(iface)
+
+        return undeclared
+
+
+
 
 class Function(Descriptor):
 
@@ -889,6 +944,26 @@ class Function(Descriptor):
 
             self._graph.add_edge(iface_u, iface_v,
                                  attr_dict={'label': link.id})
+
+    def find_undeclared_interfaces(self, interfaces=None):
+        """
+        Provides a list of interfaces that are referenced in 'virtual_links'
+        section but not declared in 'connection_points' of the Service and its
+        Functions.
+        """
+        if interfaces:
+            target_ifaces = interfaces
+        else:
+            target_ifaces = self.link_interfaces + self.bridge_interfaces
+
+        all_interfaces = self.interfaces.copy()
+
+        undeclared = []
+        for iface in target_ifaces:
+            if iface not in all_interfaces:
+                undeclared.append(iface)
+
+        return undeclared
 
 
     # def find_undeclared_interfaces(self):
