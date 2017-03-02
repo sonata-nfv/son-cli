@@ -58,6 +58,8 @@ connection_points:
     type: "interface"
   - id: "ns:output"
     type: "interface"
+  - id: "unused_iface"  ## modified here
+    type: "interface"
 
 ##
 ## The virtual links that interconnect
@@ -123,13 +125,13 @@ forwarding_graphs:
           - connection_point_ref: "ns:input"
             position: 1
           - connection_point_ref: "vnf_iperf:input"
-            position: 5  # modified here
+            position: 2
           - connection_point_ref: "vnf_iperf:output"
             position: 3
           - connection_point_ref: "vnf_firewall:input"
             position: 4
           - connection_point_ref: "vnf_firewall:output"
-            position: 2  # modified here
+            position: 5
           - connection_point_ref: "vnf_tcpdump:input"
             position: 6
           - connection_point_ref: "vnf_tcpdump:output"

@@ -588,9 +588,9 @@ class Validator(object):
 
         # load forwarding paths
         if not service.load_forwarding_paths():
-            log.warning("Couldn't load service forwarding paths. "
-                        "Ignoring validation.")
-            return True
+            log.error("Couldn't load service forwarding paths. "
+                      "Aborting validation.")
+            return
 
         # analyse forwarding paths
         for fpid, fw_path in service.fw_paths.items():
