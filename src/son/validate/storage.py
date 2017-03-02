@@ -286,8 +286,6 @@ class Descriptor(Node):
         self._links = {}
         self._bridges = {}
 
-
-
     @property
     def id(self):
         """
@@ -350,28 +348,6 @@ class Descriptor(Node):
         """
         return self._bridges
 
-    # @property
-    # def link_interfaces(self):
-    #     """
-    #     Provides the interfaces that are associated with links.
-    #     Interfaces that are exclusively associated with bridges are removed.
-    #     """
-    #     f_ifaces = self.interfaces.copy()
-    #
-    #     for iface in self.interfaces:
-    #
-    #         for lid, link in self.links.items():
-    #             if iface in link.interfaces:
-    #                 break    # in links, continue to next iface
-    #
-    #         for bid, bridge in self.bridges.items():
-    #             if iface in bridge.interfaces:
-    #                 index = f_ifaces.index(iface)
-    #                 f_ifaces.pop(index)
-    #                 break    # exclude this interface, continue to the next
-    #
-    #     return f_ifaces
-
     @property
     def link_interfaces(self):
 
@@ -387,47 +363,6 @@ class Descriptor(Node):
         for bid, bridge in self.bridges.items():
             bridge_interfaces += bridge.interfaces
         return bridge_interfaces
-
-
-    # @property
-    # def bridge_interfaces(self):
-    #     """
-    #     Provides the interfaces that are associated with bridges.
-    #     Interfaces that are exclusively associated with links are removed.
-    #     """
-    #     f_ifaces = self.interfaces.copy()
-    #
-    #     for iface in self.interfaces:
-    #
-    #         for bid, bridge in self.bridges.items():
-    #             if iface in bridge.interfaces:
-    #                 break   # in bridges, continue to next iface
-    #
-    #         for lid, link in self.links.items():
-    #             if iface in link.interfaces:
-    #                 index = f_ifaces.index(iface)
-    #                 f_ifaces.pop(index)
-    #                 break   # exclude iface, continue to next
-    #
-    #     return f_ifaces
-
-    #
-    # def filter_interfaces(self, link_type):
-    #     """
-    #     Provides the interfaces, associated with the descriptor/node,
-    #     filtered by the link-type that they are associated with.
-    #     :param link_type: 'e-line' (direct) or 'e-lan' (bridge)
-    #     :return: filtered interfaces
-    #     """
-    #     finterfaces = []
-    #     for interface in self.interfaces:
-    #         eligible = False
-    #         for lid, link in self.filter_links(link_type=link_type).items():
-    #             if interface in link.iface_pair:
-    #                 eligible = True
-    #         if eligible:
-    #             finterfaces.append(interface)
-    #     return finterfaces
 
     @property
     def graph(self):
@@ -673,24 +608,28 @@ class Service(Descriptor):
         self._functions[function.id] = function
         self._vnf_id_map[vnf_id] = function.id
 
-    def build_topology_graph(self, deep=False, interfaces=False,
-                             bridges=False):
+    def build_topology_graph(self, level=1, bridges=False):
         """
         Build the network topology graph of the service.
+        :param level: indicates the granulariy of the graph
+                    0: service level (does not show VNF interfaces)
+                    1: service level (with VNF interfaces) - default
+                    2: VNF level (showing VDUs but not VDU interfaces)
+
         :param deep: indicates the granularity of the graph
                      True - graph will include topology graphs of functions
                      False - graph will only include the service topology graph
-        :param interfaces: indicates whether should nodes include interface
-                           names
         :param bridges: indicates whether bridges should be included in
                         the graph
         """
+        assert 0 <= level <= 2  # level must be 0, 1, 2
 
-        self._graph = nx.Graph()
+        graph = nx.Graph()
 
         # assign nodes from service interfaces
-        if not bridges:
-            self._graph.add_nodes_from(self.link_interfaces)
+        graph.add_nodes_from(self.link_interfaces)
+        if bridges:
+            graph.add_nodes_from(self.bridge_interfaces)
 
         prefixes = []
         # assign sub-graphs of functions
@@ -699,28 +638,37 @@ class Service(Descriptor):
             # done to work with current descriptors of sonata demo
             prefix_map = {}
             prefix = self.vnf_id(function)
-            for node in function.graph.nodes():
-                prefix_map[node] = prefix + ':' + node
 
-            function_graph = nx.relabel_nodes(function.graph,
-                                              prefix_map,
-                                              copy=True)
-            if deep:
-                self._graph.add_edges_from(function_graph.edges())
-            else:
+            if level == 0:
+                for node in function.graph.nodes():
+                    pn = prefix + ':' + node
+                    if graph.has_node(pn):
+                        graph.remove_node(pn)
                 prefixes.append(prefix)
 
+            elif level == 1:
+                prefixes.append(prefix)
+
+            elif level == 2:
+                f_graph = function.build_topology_graph(bridges=bridges)
+
+                for node in f_graph.nodes():
+                    prefix_map[node] = prefix + ':' + node
+
+                re_f_graph = nx.relabel_nodes(f_graph, prefix_map, copy=True)
+                graph.add_edges_from(re_f_graph.edges())
+
         # build links topology graph
-        if not self.links:
+        if not self.links and not self.bridges:
             log.warning("No links were found")
 
-        for lid, link in self.links .items():
+        for lid, link in self.links.items():
 
-            if deep or interfaces:
+            if level == 1 or level == 2:
                 iface_u = link.iface_u
                 iface_v = link.iface_v
 
-            else:
+            elif level == 0:
                 iface_u = link.iface_u.split(':')
                 iface_v = link.iface_v.split(':')
 
@@ -733,22 +681,42 @@ class Service(Descriptor):
                     iface_v = iface_v[0]
                 else:
                     iface_v = link.iface_v
+            else:
+                return
 
-            self._graph.add_edge(iface_u, iface_v,
-                                 attr_dict={'label': link.id})
+            graph.add_edge(iface_u, iface_v, attr_dict={'label': link.id})
 
-        # if show interfaces, link interfaces within each function
-        if interfaces:
-            for node_u in self._graph.nodes():
+        # build bridge topology graph
+        if bridges:
+            for bid, bridge in self.bridges.items():
+                brnode = 'br-' + bid
+                graph.add_node(brnode)  # add 'router' node for this bridge
+                for iface in bridge.interfaces:
+                    if level == 1 or level == 2:
+                        s_iface = iface
+                    elif level == 0:
+                        s_iface = iface.split(':')
+                        if len(s_iface) > 1 and s_iface[0] in prefixes:
+                            s_iface = s_iface[0]
+                        else:
+                            s_iface = iface
+                    else:
+                        return
+                    graph.add_edge(brnode, s_iface, attr_dict={'label': bid})
+
+        # inter-connect VNF interfaces
+        if level == 1:
+            for node_u in graph.nodes():
                 node_u_tokens = node_u.split(':')
                 if len(node_u_tokens) > 1 and node_u_tokens[0] in prefixes:
-                    for node_v in self._graph.nodes():
+                    for node_v in graph.nodes():
                         if node_u == node_v:
                             continue
                         node_v_tokens = node_v.split(':')
                         if len(node_v_tokens) > 1 and \
                                 node_v_tokens[0] == node_u_tokens[0]:
-                            self._graph.add_edge(node_u, node_v)
+                            graph.add_edge(node_u, node_v)
+        return graph
 
     def load_forwarding_paths(self):
         """
@@ -921,18 +889,18 @@ class Function(Descriptor):
         Build the network topology graph of the function.
         :param bridges: indicates if bridges should be included in the graph
         """
-        self._graph = nx.Graph()
+        graph = nx.Graph()
 
         # assign nodes from function interfaces
-        if not bridges:
-            self._graph.add_nodes_from(self.link_interfaces)
+        graph.add_nodes_from(self.link_interfaces)
+        if bridges:
+            graph.add_nodes_from(self.bridge_interfaces)
 
         # assign nodes from units interfaces
         for uid, unit in self.units.items():
-            self._graph.add_node(uid,
-                                 attr_dict={'interfaces': unit.interfaces})
+            graph.add_node(uid, attr_dict={'interfaces': unit.interfaces})
 
-        # build topology graph
+        # build link topology graph
         for lid, link in self.links.items():
 
             # unit interfaces are not considered as nodes, just the unit itself
@@ -949,8 +917,25 @@ class Function(Descriptor):
             else:
                 iface_v = link.iface_v
 
-            self._graph.add_edge(iface_u, iface_v,
-                                 attr_dict={'label': link.id})
+            graph.add_edge(iface_u, iface_v, attr_dict={'label': link.id})
+
+        # build bridge topology graph
+        if bridges:
+            for bid, bridge in self.bridges.items():
+                # add bridge router
+                brnode = "br-" + bid
+                graph.add_node(brnode)
+
+                for iface in bridge.interfaces:
+                    s_iface = iface.split(':')
+                    if len(s_iface) > 1:
+                        s_iface = s_iface[0]
+                    else:
+                        s_iface = iface
+
+                    graph.add_edge(brnode, s_iface, attr_dict={'label': bid})
+
+        return graph
 
     def find_undeclared_interfaces(self, interfaces=None):
         """
@@ -971,33 +956,6 @@ class Function(Descriptor):
                 undeclared.append(iface)
 
         return undeclared
-
-
-    # def find_undeclared_interfaces(self):
-    #     """
-    #     Provides a list of interfaces that are referenced in 'virtual_links'
-    #     but not declared in the function and respective units
-    #     'connection_points' sections.
-    #     :return: list of undeclared interfaces
-    #     """
-    #
-    #     for iface in self.link_interfaces:
-    #         if iface
-    #
-    #     undeclared_ifaces = []
-    #     for link in self.links:
-    #
-    #         if iface not in self.link_interfaces and \
-    #                 iface not in self.bridge_interfaces:
-    #
-    #         for iface in link.interfaces:
-    #             if iface not in self.interfaces:
-    #                 log.error("Undeclared connection point '{0}' in "
-    #                           "virtual link id='{1}'"
-    #                           .format(iface, lid))
-    #                 if iface not in undeclared_ifaces:
-    #                     undeclared_ifaces.append(iface)
-    #     return undeclared_ifaces
 
 
 class Unit(Node):
