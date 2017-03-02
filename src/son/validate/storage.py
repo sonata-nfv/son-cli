@@ -108,6 +108,9 @@ class DescriptorStorage(object):
         if not os.path.isfile(descriptor_file):
             return
         new_service = Service(descriptor_file)
+        if not new_service.content or not new_service.id:
+            return
+
         if new_service.id in self._services:
             return self._services[new_service.id]
 
@@ -283,6 +286,8 @@ class Descriptor(Node):
         self._links = {}
         self._bridges = {}
 
+
+
     @property
     def id(self):
         """
@@ -325,7 +330,9 @@ class Descriptor(Node):
         :param value: descriptor filename
         """
         self._filename = value
-        self.content = read_descriptor_file(self._filename)
+        content = read_descriptor_file(self._filename)
+        if content:
+            self.content = read_descriptor_file(self._filename)
 
     @property
     def links(self):

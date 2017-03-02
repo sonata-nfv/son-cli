@@ -695,7 +695,7 @@ class Validator(object):
                                       function['vnf_version'])
             if fid not in path_vnfs.keys():
                 log.error("Referenced function descriptor id='{0}' couldn't "
-                          "be found in path '{1}'".format(fid, self._dpath))
+                          "be loaded".format(fid))
                 return
 
             vnf_id = function['vnf_id']
