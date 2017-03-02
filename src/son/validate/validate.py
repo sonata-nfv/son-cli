@@ -34,6 +34,7 @@ import zipfile
 import time
 import shutil
 import atexit
+import errno
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -755,14 +756,20 @@ class Validator(object):
         return backtrace
 
     def write_service_graphs(self, service):
+        graphsdir = 'graphs'
+        try:
+            os.makedirs(graphsdir)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(graphsdir):
+                pass
 
         for lvl in range(0, 3):
             g = service.build_topology_graph(level=lvl, bridges=False)
-            nx.write_graphml(g, os.path.join('graphs',
+            nx.write_graphml(g, os.path.join(graphsdir,
                                              "{0}-lvl{1}.graphml"
                                              .format(service.id, lvl)))
             g = service.build_topology_graph(level=lvl, bridges=True)
-            nx.write_graphml(g, os.path.join('graphs',
+            nx.write_graphml(g, os.path.join(graphsdir,
                                              "{0}-lvl{1}-br.graphml"
                                              .format(service.id, lvl)))
 
