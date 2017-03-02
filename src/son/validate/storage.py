@@ -638,6 +638,7 @@ class Service(Descriptor):
             # done to work with current descriptors of sonata demo
             prefix_map = {}
             prefix = self.vnf_id(function)
+            function.graph = function.build_topology_graph(bridges=bridges)
 
             if level == 0:
                 for node in function.graph.nodes():
@@ -650,12 +651,11 @@ class Service(Descriptor):
                 prefixes.append(prefix)
 
             elif level == 2:
-                f_graph = function.build_topology_graph(bridges=bridges)
 
-                for node in f_graph.nodes():
+                for node in function.graph.nodes():
                     prefix_map[node] = prefix + ':' + node
 
-                re_f_graph = nx.relabel_nodes(f_graph, prefix_map, copy=True)
+                re_f_graph = nx.relabel_nodes(function.graph, prefix_map, copy=True)
                 graph.add_edges_from(re_f_graph.edges())
 
         # build links topology graph
@@ -715,7 +715,15 @@ class Service(Descriptor):
                         node_v_tokens = node_v.split(':')
                         if len(node_v_tokens) > 1 and \
                                 node_v_tokens[0] == node_u_tokens[0]:
-                            graph.add_edge(node_u, node_v)
+                            # verify internally if these interfaces are connected
+                            function = self.mapped_function(node_v_tokens[0])
+                            if (function.graph.has_node(node_u_tokens[1]) and
+                                function.graph.has_node(node_v_tokens[1]) and
+                                nx.has_path(function.graph,
+                                            node_u_tokens[1],
+                                            node_v_tokens[1])):
+                                graph.add_edge(node_u, node_v)
+
         return graph
 
     def load_forwarding_paths(self):
@@ -785,6 +793,7 @@ class Service(Descriptor):
             trace.append(path[x])
             if not self._graph.has_node(path[x]):
                 trace.append("BREAK")
+                continue
             neighbours = self._graph.neighbors(path[x])
             if path[x+1] not in neighbours:
                 trace.append("BREAK")
@@ -883,6 +892,12 @@ class Function(Descriptor):
                 self.add_interface(cxpt['id'])
 
         return True
+
+    def topology_path(self, iface_a, iface_b):
+        graph = self.build_topology_graph(bridges=True)
+
+        nx.has
+
 
     def build_topology_graph(self, bridges=False):
         """
