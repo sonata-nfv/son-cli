@@ -34,6 +34,7 @@ import zipfile
 import time
 import shutil
 import atexit
+import errno
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -419,9 +420,9 @@ class Validator(object):
             manif_md5 = package.md5(strip_root(f))
             if manif_md5 and gen_md5 != manif_md5:
                 log.warning("MD5 hash of file '{0}' is not equal to the "
-                          "defined in package descriptor:\nGen MD5:\t{1}\n"
-                          "MANIF MD5:\t{2}"
-                          .format(f, gen_md5, manif_md5))
+                            "defined in package descriptor:\nGen MD5:\t{1}\n"
+                            "MANIF MD5:\t{2}"
+                            .format(f, gen_md5, manif_md5))
 
         # configure dpath for function referencing
         self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
@@ -449,21 +450,38 @@ class Validator(object):
             log.error("Failed to read service function descriptors")
             return
 
+        # validate service function descriptors (VNFDs)
+        for fid, function in service.functions.items():
+            if not self.validate_function(function.filename):
+                return
+
         # load service interfaces
         if not service.load_interfaces():
-            log.error("Couldn't load the interfaces of service id='{0}'"
+            log.error("Couldn't load the connection points of service id='{0}'"
                       .format(service.id))
             return
 
         # load service links
-        if not service.load_links():
-            log.error("Couldn't load the links of service id='{0}'"
+        if not service.load_virtual_links():
+            log.error("Couldn't load virtual links of service id='{0}'"
                       .format(service.id))
             return
 
+        undeclared = service.find_undeclared_interfaces()
+        if undeclared:
+            log.error("Virtual links section has undeclared connection "
+                      "points: {0}".format(undeclared))
+            return
+
+        # check for unused interfaces
+        unused_ifaces = service.find_unused_interfaces()
+        if unused_ifaces:
+            log.warning("Service has unused connection points: {0}"
+                        .format(unused_ifaces))
+
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
-            for iface in link.iface_pair:
+            for iface in link.interfaces:
                 if iface not in service.interfaces:
                     iface_tokens = iface.split(':')
                     if len(iface_tokens) != 2:
@@ -479,11 +497,6 @@ class Validator(object):
                                   "'{1}' is not defined"
                                   .format(vnf_id, iface, lid))
                         return
-
-        # validate service function descriptors (VNFDs)
-        for fid, function in service.functions.items():
-            if not self.validate_function(function.filename):
-                return
 
         return True
 
@@ -517,14 +530,27 @@ class Validator(object):
             return
 
         # load function links
-        if not function.load_links():
+        if not function.load_virtual_links():
             log.error("Couldn't load the links of function id='{0}'"
                       .format(function.id))
             return
 
+        # check for undeclared interfaces
+        undeclared = function.find_undeclared_interfaces()
+        if undeclared:
+            log.error("Virtual links section has undeclared connection "
+                      "points: {0}".format(undeclared))
+            return
+
+        # check for unused interfaces
+        unused_ifaces = function.find_unused_interfaces()
+        if unused_ifaces:
+            log.warning("Function has unused connection points: {0}"
+                        .format(unused_ifaces))
+
         # verify integrity between unit interfaces and units
         for lid, link in function.links.items():
-            for iface in link.iface_pair:
+            for iface in link.interfaces:
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
                     if iface_tokens[0] not in function.units.keys():
@@ -541,12 +567,18 @@ class Validator(object):
         """
         log.info("Validating topology of service '{0}'".format(service.id))
 
-        # build service topology graph
-        service.build_topology_graph(deep=False, interfaces=True,
-                                     link_type='e-line')
+        # build service topology graph with VNF interfaces
+        service.graph = service.build_topology_graph(level=1, bridges=False)
+        if not service.graph:
+            log.error("Couldn't build topology graph of service '{0}'"
+                      .format(service.id))
+            return
 
         log.debug("Built topology graph of service '{0}': {1}"
                   .format(service.id, service.graph.edges()))
+
+        # write service graphs with different levels and options
+        self.write_service_graphs(service)
 
         if nx.is_connected(service.graph):
             log.debug("Topology graph of service '{0}' is connected"
@@ -557,19 +589,29 @@ class Validator(object):
 
         # load forwarding paths
         if not service.load_forwarding_paths():
-            log.error("Couldn't load service forwarding paths")
+            log.error("Couldn't load service forwarding paths. "
+                      "Aborting validation.")
             return
 
         # analyse forwarding paths
         for fpid, fw_path in service.fw_paths.items():
+            log.debug("Building forwarding path id='{0}'".format(fpid))
+
+            # check if number of connection points is odd
+            if len(fw_path) % 2 != 0:
+                log.warning("The forwarding path id='{0}' has an odd number "
+                            "of connection points".format(fpid))
+
             trace = service.trace_path(fw_path)
             if 'BREAK' in trace:
-                log.warning("The forwarding path id='{0}' is invalid for the "
-                            "specified topology. {1} breakpoints were "
-                            "found in the path: {2}"
-                            .format(fpid, trace.count('BREAK'), trace))
+                log.error("The forwarding path id='{0}' is invalid for the "
+                          "specified topology. {1} breakpoint(s) "
+                          "found the path: {2}"
+                          .format(fpid, trace.count('BREAK'), trace))
                 # skip further analysis on this path
                 continue
+
+            log.debug("Forwarding path id='{0}': {1}".format(fpid, trace))
 
             # path is valid in specified topology, let's check for cycles
             fpg = nx.Graph()
@@ -579,8 +621,6 @@ class Validator(object):
                 log.warning("Found cycles forwarding path id={0}: {1}"
                             .format(fpid, cycles))
 
-        # TODO: find a more coherent method to do this
-        nx.write_graphml(service.graph, "{0}.graphml".format(service.id))
         return True
 
     def _validate_function_topology(self, function):
@@ -595,7 +635,11 @@ class Validator(object):
                  .format(function.id))
 
         # build function topology graph
-        function.build_topology_graph(link_type='e-line')
+        function.graph = function.build_topology_graph(bridges=True)
+        if not function.graph:
+            log.error("Couldn't build topology graph of function '{0}'"
+                      .format(function.id))
+            return
 
         log.debug("Built topology graph of function '{0}': {1}"
                   .format(function.id, function.graph.edges()))
@@ -646,7 +690,7 @@ class Validator(object):
                                       function['vnf_version'])
             if fid not in path_vnfs.keys():
                 log.error("Referenced function descriptor id='{0}' couldn't "
-                          "be found in path '{1}'".format(fid, self._dpath))
+                          "be loaded".format(fid))
                 return
 
             vnf_id = function['vnf_id']
@@ -710,6 +754,36 @@ class Validator(object):
                                                 prev_node=node,
                                                 backtrace=backtrace)
         return backtrace
+
+    def write_service_graphs(self, service):
+        graphsdir = 'graphs'
+        try:
+            os.makedirs(graphsdir)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(graphsdir):
+                pass
+
+        for lvl in range(0, 3):
+            g = service.build_topology_graph(level=lvl, bridges=False)
+            nx.write_graphml(g, os.path.join(graphsdir,
+                                             "{0}-lvl{1}.graphml"
+                                             .format(service.id, lvl)))
+            g = service.build_topology_graph(level=lvl, bridges=True)
+            nx.write_graphml(g, os.path.join(graphsdir,
+                                             "{0}-lvl{1}-br.graphml"
+                                             .format(service.id, lvl)))
+
+
+def print_result(validator):
+
+    if validator.error_count:
+        log.error("Validation failed with {0} error(s) and {1} warning(s)"
+                  .format(validator.error_count, validator.warning_count))
+    elif validator.warning_count:
+        log.warning("Validation completed with {0} warning(s)"
+                    .format(validator.warning_count))
+    else:
+        log.info("Validation succeeded")
 
 
 def main():
@@ -842,18 +916,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_package(args.package_file):
-            log.critical("Package validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of package '{0}' has succeeded."
-                     .format(args.package_file))
-        else:
-            log.warning("Validation of package '{0}' returned {1} warning(s)"
-                        .format(args.package_file,
-                                validator.warning_count))
-
-        print(validator.error_count)
+        validator.validate_package(args.package_file)
+        print_result(validator)
 
     elif args.project_path:
 
@@ -881,16 +945,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_project(project):
-            log.critical("Project validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of project '{0}' has succeeded."
-                     .format(project.project_root))
-        else:
-            log.warning("Validation of project '{0}' returned {1} warning(s)"
-                        .format(project.project_root,
-                                validator.warning_count))
+        validator.validate_project(project)
+        print_result(validator)
 
     elif args.nsd:
         validator = Validator()
@@ -900,15 +956,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_service(args.nsd):
-            log.critical("Project validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of service '{0}' has succeeded."
-                     .format(args.nsd))
-        else:
-            log.warning("Validation of service '{0}' returned {1} warning(s)"
-                        .format(args.nsd, validator.warning_count))
+        validator.validate_service(args.nsd)
+        print_result(validator)
 
     elif args.vnfd:
         validator = Validator()
@@ -918,19 +967,11 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        if not validator.validate_function(args.vnfd):
-            log.critical("Function validation has failed.")
-            exit(1)
-        if validator.warning_count == 0:
-            log.info("Validation of function '{0}' has succeeded."
-                     .format(args.vnfd))
-        else:
-            log.warning("Validation of function '{0}' returned {1} warning(s)"
-                        .format(args.vnfd, validator.warning_count))
-    else:
-        log.error("Provided arguments are invalid.")
-        exit(1)
+        validator.validate_function(args.vnfd)
+        print_result(validator)
 
-    log.info("Done.")
+    else:
+        log.error("Invalid arguments.")
+        exit(1)
 
     exit(0)

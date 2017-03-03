@@ -60,7 +60,14 @@ def read_descriptor_file(file):
     :return: descriptor dictionary
     """
     with open(file, 'r') as _file:
-        descriptor = yaml.load(_file)
+
+        try:
+            descriptor = yaml.load(_file)
+
+        except yaml.YAMLError as exc:
+            log.error("Error parsing descriptor file: {0}".format(exc))
+            return
+
         if not descriptor:
             log.error("Couldn't read descriptor file: '{0}'"
                       .format(file))
