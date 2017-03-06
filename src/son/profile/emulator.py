@@ -35,13 +35,14 @@ import mininet.clean
 import requests
 import time
 import threading
+import yaml
 
 # define some constants for easy changing
 # will likely be removed as default values dont make sense past testing
-DEFAULT_KEY_LOC = "/home/levathos/.ssh/id_rsa"
-PATH_COMMAND = "cd /home/levathos/son-emu"
-EXEC_COMMAND = "python src/emuvim/examples/profiling.py"
-DEFAULT_SSH_USER_NAME = "root"
+DEFAULT_KEY_LOC = "~/.ssh/id_rsa"
+PATH_COMMAND = "cd ~/son-emu"
+EXEC_COMMAND = "sudo python src/emuvim/examples/profiling.py"
+DEFAULT_SSH_USER_NAME = "ssh_user"
 
 # create a Logger
 logging.basicConfig()
@@ -56,11 +57,21 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 class Emulator:
 
     """
+     Initialize with a list of descriptors of workers to run experiments on
+     :wld_loc: worker list descriptor. A YAML file describing the workers available.
+    """
+    def __init__(self, wld_loc):
+        self.workers = list()
+        with open(wld_loc, "r") as wld:
+            self.workers = yaml.load(wld)["worker_list"]
+        wld.close()
+
+
+    """
      Conduct multiple experiments which are described by a yaml file using the do_experiment method
      :config_loc: the location of the yaml config file
     """
-    @staticmethod
-    def do_experiment_series(config_loc):
+    def do_experiment_series(self, config_loc):
         pass
 
 
@@ -78,18 +89,33 @@ class Emulator:
      :address: address of the remote server
      :package_port: the port to which the service package is uploaded. Default: 5000
      :ssh_port: the port which is used for the ssh connection. Default: 22
-     :username: the username which is used for the ssh connection
+     :username: the username which is used for the ssh connection, requires to be able to do passless sudo
      :key_loc: location of the ssh RSA-key used for the ssh connection
     """
-    @staticmethod
-    def do_experiment(
+    def do_experiment(self,
             path_to_pkg="",
             runtime=10,
-            address='127.0.0.1',
-            package_port=5000,
-            ssh_port=22,
-            username=DEFAULT_SSH_USER_NAME,
-            key_loc=DEFAULT_KEY_LOC):
+            worker_name=None):
+        #    address='127.0.0.1',
+        #    package_port=5000,
+        #    ssh_port=22,
+        #    username=DEFAULT_SSH_USER_NAME,
+        #    key_loc=DEFAULT_KEY_LOC):
+        # if a worker has been specified, get neccessary information
+        if worker_name:
+            worker = self.workers[worker_name]
+        else:
+            # choose a worker
+            # the first idle worker would be best
+            # for now choose worker number 1
+            worker = self.workers.values()[0]
+        address = worker["address"]
+        package_port = worker["package_port"] or 5000
+        ssh_port = worker["ssh_port"] or 22
+        username = worker["ssh_user"]
+        key_loc = worker["ssh_key_loc"]
+
+
         # ensure a clean mininet instance
         #mininet.clean.cleanUp().cleanup()
 
@@ -108,7 +134,7 @@ class Emulator:
 
         # start the profiling topology on the client
         # use a seperate thread to prevent blocking by the topology
-        comm = threading.Thread(target=Emulator._exec_command, args=(ssh, "%s;%s"%(PATH_COMMAND,EXEC_COMMAND)))
+        comm = threading.Thread(target=self._exec_command, args=(ssh, "%s;%s"%(PATH_COMMAND,EXEC_COMMAND)))
         comm.start()
 
         # wait a short while to let the topology start
@@ -131,7 +157,7 @@ class Emulator:
         r3 = requests.delete("http://%s:%s/instantiations"%(address,package_port), data={"service_uuid":service_uuid, "service_instance_uuid":service_instance_uuid})
 
         # stop the remote topology
-        Emulator._exec_command(ssh, "pkill -f %r"%EXEC_COMMAND)
+        self._exec_command(ssh, "sudo pkill -f %r"%EXEC_COMMAND)
 
         #gather the logs etc. here
         sftp = ssh.open_sftp()
@@ -146,8 +172,7 @@ class Emulator:
     Helper method to be called in a thread
     A single command is executed on a remote server via ssh
     """
-    @staticmethod
-    def _exec_command(ssh, command):
+    def _exec_command(self, ssh, command):
         comm_in, comm_out, comm_err = ssh.exec_command(command)
         comm_in.close()
         while not (comm_out.channel.exit_status_ready() and comm_err.channel.exit_status_ready()):
@@ -157,4 +182,5 @@ class Emulator:
                 LOG.error(line)
 
 if __name__=='__main__':
-    Emulator.do_experiment(path_to_pkg='/home/levathos/son-emu/misc/sonata-demo-service.son')
+    e = Emulator(wld_loc="src/son/profile/emulator_test.yml")
+    e.do_experiment(path_to_pkg='/home/levathos/son-emu/misc/sonata-demo-service.son')#, worker_name="worker01")
