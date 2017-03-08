@@ -132,12 +132,14 @@ class Project:
         :return:
         """
         self._prj_config = {
-            'name': 'sonata-project-sample',
-            'vendor': 'eu.sonata-nfv.package',
             'version': self.CONFIG_VERSION,
-            'project_version': '0.1',
-            'maintainer': 'Name, Company, Contact',
-            'description': 'Some description about this sample',
+            'package':  {
+                'name': 'sonata-project-sample',
+                'vendor': 'eu.sonata-nfv.package',
+                'version': '0.1',
+                'maintainer': 'Name, Company, Contact',
+                'description': 'Some description about this sample'
+            },
             'catalogues': ['personal'],
             'publish_to': ['personal'],
             'descriptor_extension': self._descriptor_extension
@@ -145,7 +147,7 @@ class Project:
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(self._prj_config))
+            prj_file.write(yaml.dump(self._prj_config, default_flow_style=False))
 
     def get_ns_descriptor(self):
         """
@@ -310,7 +312,12 @@ class Project:
         # 0.4
         if prj_config['version'] == "0.4":
             log.warning("Loading project with an old configuration version. "
-                        "Configuring 'project_version' = 0.1")
-            prj_config['project_version'] = "0.1"
+                        "Configuring 'package': {"
+                        "'name': 'sonata-project-sample', "
+                        "'vendor': 'eu.sonata-nfv.package', "
+                        "'version': '0.1'}")
+            prj_config['package'] = {'name': 'sonata-project-sample',
+                                     'vendor': 'eu.sonata-nfv.package',
+                                     'version': '0.1'}
 
         return Project(workspace, prj_root, config=prj_config)

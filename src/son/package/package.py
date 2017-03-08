@@ -181,7 +181,8 @@ class Packager(object):
         file located on the root of every project.
         """
         # List of mandatory fields to be included in the GDS
-        gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
+        gds_fields = ['vendor', 'name', 'version',
+                      'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
         gds['schema'] = self._schema_validator.get_remote_schema(
@@ -193,13 +194,13 @@ class Packager(object):
 
             errors = []
             for field in gds_fields:
-                if field not in prj_descriptor.keys():
+                if field not in prj_descriptor['package'].keys():
                     errors.append(field)
                 else:
-                    gds[field] = prj_descriptor[field]
+                    gds[field] = prj_descriptor['package'][field]
 
             if errors:
-                print('Please define {} on {}'
+                print('Please define {} in the package section of {}'
                       .format(', '.join(errors), Project.__descriptor_name__),
                       file=sys.stderr)
                 return False
