@@ -310,22 +310,24 @@ class Project:
             log.error("Project configuration version '{0}' is ahead of the "
                       "current supported version (={1})"
                       .format(prj_config['version'], Project.CONFIG_VERSION))
+            return
 
         # Make adjustments to support backwards compatibility
         # 0.4
         if prj_config['version'] == "0.4":
-            log.warning("Loading project with an old configuration version. "
-                        "Configuring 'package': {"
-                        "'name': 'sonata-project-sample', "
-                        "'vendor': 'eu.sonata-nfv.package', "
-                        "'version': '0.1',"
-                        "'maintainer': 'Name, Company, Contact', "
-                        "'description': 'Some description about this sample'}")
-            prj_config['package'] = {'name': 'sonata-project-sample',
-                                     'vendor': 'eu.sonata-nfv.package',
+
+            prj_config['package'] = {'name': prj_config['name'],
+                                     'vendor': prj_config['vendor'],
                                      'version': '0.1',
-                                     'maintainer': 'Name, Company, Contact',
-                                     'description': 'Some description about this sample'
+                                     'maintainer': prj_config['maintainer'],
+                                     'description': prj_config['description']
                                      }
+            prj_config.pop('name')
+            prj_config.pop('vendor')
+            prj_config.pop('maintainer')
+            prj_config.pop('description')
+            log.warning("Loading project with an old configuration "
+                        "version ({0}). Modified project configuration: {1}"
+                        .format(prj_config['version'], prj_config))
 
         return Project(workspace, prj_root, config=prj_config)
