@@ -151,7 +151,7 @@ class Project:
 
     def get_ns_descriptor(self):
         """
-        Obtain the file list of VNF descriptors
+        Obtain the file list of NS descriptors
         :return:
         """
         nsd_list = [os.path.join(self.nsd_root, file)
@@ -315,9 +315,14 @@ class Project:
                         "Configuring 'package': {"
                         "'name': 'sonata-project-sample', "
                         "'vendor': 'eu.sonata-nfv.package', "
-                        "'version': '0.1'}")
+                        "'version': '0.1',"
+                        "'maintainer': 'Name, Company, Contact', "
+                        "'description': 'Some description about this sample'}")
             prj_config['package'] = {'name': 'sonata-project-sample',
                                      'vendor': 'eu.sonata-nfv.package',
-                                     'version': '0.1'}
+                                     'version': '0.1',
+                                     'maintainer': 'Name, Company, Contact',
+                                     'description': 'Some description about this sample'
+                                     }
 
         return Project(workspace, prj_root, config=prj_config)

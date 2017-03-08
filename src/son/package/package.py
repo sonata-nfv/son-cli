@@ -151,6 +151,10 @@ class Packager(object):
         else:
             general_description = self.package_gds()
 
+        if not general_description:
+            log.error("Failed to package General Description Section.")
+            return
+
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
 
@@ -200,10 +204,9 @@ class Packager(object):
                     gds[field] = prj_descriptor['package'][field]
 
             if errors:
-                print('Please define {} in the package section of {}'
-                      .format(', '.join(errors), Project.__descriptor_name__),
-                      file=sys.stderr)
-                return False
+                log.error('Please define {} in the package section of {}'
+                      .format(', '.join(errors), Project.__descriptor_name__))
+                return
         else:
             #TODO: what properties to set in a custom package? TBD...
             gds['vendor'] = 'custom'
