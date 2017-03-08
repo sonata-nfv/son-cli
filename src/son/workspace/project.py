@@ -140,8 +140,6 @@ class Project:
                 'maintainer': 'Name, Company, Contact',
                 'description': 'Some description about this sample'
             },
-            'catalogues': ['personal'],
-            'publish_to': ['personal'],
             'descriptor_extension': self._descriptor_extension
         }
 
