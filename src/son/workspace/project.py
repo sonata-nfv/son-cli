@@ -38,7 +38,8 @@ log = logging.getLogger(__name__)
 
 class Project:
 
-    PROJECT_VERSION = "0.4"
+    BACK_CONFIG_VERSION = "0.4"
+    CONFIG_VERSION = "0.5"
 
     __descriptor_name__ = 'project.yml'
 
@@ -131,23 +132,24 @@ class Project:
         :return:
         """
         self._prj_config = {
-            'name': 'sonata-project-sample',
-            'vendor': 'eu.sonata-nfv.package',
-            'version': self.PROJECT_VERSION,
-            'maintainer': 'Name, Company, Contact',
-            'description': 'Some description about this sample',
-            'catalogues': ['personal'],
-            'publish_to': ['personal'],
+            'version': self.CONFIG_VERSION,
+            'package':  {
+                'name': 'sonata-project-sample',
+                'vendor': 'eu.sonata-nfv.package',
+                'version': '0.1',
+                'maintainer': 'Name, Company, Contact',
+                'description': 'Some description about this sample'
+            },
             'descriptor_extension': self._descriptor_extension
         }
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(self._prj_config))
+            prj_file.write(yaml.dump(self._prj_config, default_flow_style=False))
 
     def get_ns_descriptor(self):
         """
-        Obtain the file list of VNF descriptors
+        Obtain the file list of NS descriptors
         :return:
         """
         nsd_list = [os.path.join(self.nsd_root, file)
@@ -296,10 +298,36 @@ class Project:
         with open(prj_filename, 'r') as prj_file:
             prj_config = yaml.load(prj_file)
 
-        if not prj_config['version'] == Project.PROJECT_VERSION:
-            log.error("Reading a project configuration "
-                      "with a different version {}"
-                      .format(prj_config['version']))
+        if prj_config['version'] == Project.CONFIG_VERSION:
+            return Project(workspace, prj_root, config=prj_config)
+
+        # Protect against invalid versions
+        if prj_config['version'] < Project.BACK_CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is no longer "
+                      "supported.")
             return
+        if prj_config['version'] > Project.CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is ahead of the "
+                      "current supported version (={1})"
+                      .format(prj_config['version'], Project.CONFIG_VERSION))
+            return
+
+        # Make adjustments to support backwards compatibility
+        # 0.4
+        if prj_config['version'] == "0.4":
+
+            prj_config['package'] = {'name': prj_config['name'],
+                                     'vendor': prj_config['vendor'],
+                                     'version': '0.1',
+                                     'maintainer': prj_config['maintainer'],
+                                     'description': prj_config['description']
+                                     }
+            prj_config.pop('name')
+            prj_config.pop('vendor')
+            prj_config.pop('maintainer')
+            prj_config.pop('description')
+            log.warning("Loading project with an old configuration "
+                        "version ({0}). Modified project configuration: {1}"
+                        .format(prj_config['version'], prj_config))
 
         return Project(workspace, prj_root, config=prj_config)
