@@ -303,12 +303,17 @@ class Project:
         if prj_config['version'] == Project.CONFIG_VERSION:
             return Project(workspace, prj_root, config=prj_config)
 
-        # Make adjustments to support backwards compatibility
+        # Protect against invalid versions
         if prj_config['version'] < Project.BACK_CONFIG_VERSION:
             log.error("Project configuration version '{0}' is no longer "
                       "supported.")
             return
+        if prj_config['version'] > Project.CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is ahead of the "
+                      "current supported version (={1})"
+                      .format(prj_config['version'], Project.CONFIG_VERSION))
 
+        # Make adjustments to support backwards compatibility
         # 0.4
         if prj_config['version'] == "0.4":
             log.warning("Loading project with an old configuration version. "
