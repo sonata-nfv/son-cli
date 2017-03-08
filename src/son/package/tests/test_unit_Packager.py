@@ -37,9 +37,10 @@ class UnitCreatePackageTests(unittest.TestCase):
 
     @patch('son.package.package.generate_hash')
     @patch('son.package.package.Validator')
-    @patch('son.package.package.os.path')
+    @patch('son.package.package.os.path.abspath')
+    @patch('son.package.package.os.path.join')
     @patch('son.package.package.zipfile')
-    def test_generate_package(self, m_zipfile, m_path, m_validator, m_hash):
+    def test_generate_package(self, m_zipfile, m_join, m_abspath, m_validator, m_hash):
         """
         Ensures that a package file is created with correct name and location
         """
@@ -66,13 +67,13 @@ class UnitCreatePackageTests(unittest.TestCase):
         setattr(context_manager_mock, '__exit__', exit_mock)
         m_validator.validate_package.return_value = True
         m_hash.return_value = ''
-        m_path.abspath.return_value = ''
+        m_abspath.return_value = ''
 
         # execute
         packager.generate_package("package_name")
 
         # make assertions
-        self.assertEqual(m_path.join.call_args_list[-1],
+        self.assertEqual(m_join.call_args_list[-1],
                          mock.call('dst/path', 'package_name.son'))
 
     def test_package_gds(self):
