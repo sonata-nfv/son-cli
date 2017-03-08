@@ -196,6 +196,11 @@ class Packager(object):
         if prj_descriptor:
             gds['entry_service_template'] = self._entry_service_template
 
+            if not 'package' in prj_descriptor.keys():
+                log.error("Please define 'package' section in {}"
+                          .format(Project.__descriptor_name__))
+                return
+
             errors = []
             for field in gds_fields:
                 if field not in prj_descriptor['package'].keys():
@@ -205,7 +210,7 @@ class Packager(object):
 
             if errors:
                 log.error('Please define {} in the package section of {}'
-                      .format(', '.join(errors), Project.__descriptor_name__))
+                          .format(', '.join(errors), Project.__descriptor_name__))
                 return
         else:
             #TODO: what properties to set in a custom package? TBD...

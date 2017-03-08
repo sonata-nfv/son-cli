@@ -33,13 +33,15 @@ from son.workspace.workspace import Project
 class IntPDTester(unittest.TestCase):
 
     __pfd__ = {
-        'name': 'sonata-project-sample',
-        'vendor': 'com.sonata.project',
-        'version': '0.0.1',
-        'maintainer': 'Name, Company, Contact',
-        'description': 'Project description',
-        'catalogues': ['personal'],
-        'publish_to': ['personal']
+        'version': '0.5',
+        'package': {
+            'version': '0.1',
+            'name': 'sonata-project-sample',
+            'vendor': 'com.sonata.project',
+            'maintainer': 'Name, Company, Contact',
+            'description': 'Project description',
+        },
+        'descriptor_extension': 'yml'
     }
 
     def __init__(self, *args, **kwargs):
@@ -60,6 +62,6 @@ class IntPDTester(unittest.TestCase):
         project has incomplete information.
         """
         pfd = IntPDTester.__pfd__
-        pfd.pop('name')
+        pfd.pop('package')
         gsd = self.pck.package_gds(pfd)
-        self.assertEqual(gsd, False)
+        self.assertEqual(gsd, None)
