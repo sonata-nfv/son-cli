@@ -38,7 +38,8 @@ log = logging.getLogger(__name__)
 
 class Project:
 
-    PROJECT_VERSION = "0.4"
+    BACK_CONFIG_VERSION = "0.4"
+    CONFIG_VERSION = "0.5"
 
     __descriptor_name__ = 'project.yml'
 
@@ -133,7 +134,8 @@ class Project:
         self._prj_config = {
             'name': 'sonata-project-sample',
             'vendor': 'eu.sonata-nfv.package',
-            'version': self.PROJECT_VERSION,
+            'version': self.CONFIG_VERSION,
+            'project_version': '0.1',
             'maintainer': 'Name, Company, Contact',
             'description': 'Some description about this sample',
             'catalogues': ['personal'],
@@ -296,10 +298,19 @@ class Project:
         with open(prj_filename, 'r') as prj_file:
             prj_config = yaml.load(prj_file)
 
-        if not prj_config['version'] == Project.PROJECT_VERSION:
-            log.error("Reading a project configuration "
-                      "with a different version {}"
-                      .format(prj_config['version']))
+        if prj_config['version'] == Project.CONFIG_VERSION:
+            return Project(workspace, prj_root, config=prj_config)
+
+        # Make adjustments to support backwards compatibility
+        if prj_config['version'] < Project.BACK_CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is no longer "
+                      "supported.")
             return
+
+        # 0.4
+        if prj_config['version'] == "0.4":
+            log.warning("Loading project with an old configuration version. "
+                        "Configuring 'project_version' = 0.1")
+            prj_config['project_version'] = "0.1"
 
         return Project(workspace, prj_root, config=prj_config)
