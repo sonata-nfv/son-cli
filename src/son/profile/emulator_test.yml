@@ -14,9 +14,15 @@ description: "A worker list descriptor for testing purposes. Will not work on mo
 ## The worker list.
 ##
 worker_list:
-  worker01:
+  localhost1:
     address: "127.0.0.1"
     package_port: 5000
+    ssh_port: 22
+    ssh_user: "ssh_user"
+    ssh_key_loc: "/home/levathos/.ssh/id_rsa"
+  localhost2:
+    address: "127.0.0.1"
+    package_port: 6000
     ssh_port: 22
     ssh_user: "ssh_user"
     ssh_key_loc: "/home/levathos/.ssh/id_rsa"

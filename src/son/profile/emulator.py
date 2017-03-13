@@ -61,19 +61,38 @@ class Emulator:
      :wld_loc: worker list descriptor. A YAML file describing the workers available.
     """
     def __init__(self, wld_loc):
+        # extract the workers from the worker list descriptor file
         self.workers = list()
         with open(wld_loc, "r") as wld:
             self.workers = yaml.load(wld)["worker_list"]
         wld.close()
+        # check for empty worker lists
+        if not len(self.workers):
+            raise Exception("Need at least one worker to be specified in the worker list descriptor.")
+        # all workers are available at the start
+        self.available_workers = self.workers.keys()
+        LOG.info("%r workers found."%len(self.workers))
+        LOG.debug("List of workers: %r"%self.workers.keys())
 
 
     """
      Conduct multiple experiments which are described by a yaml file using the do_experiment method
-     :config_loc: the location of the yaml config file
+     :package_paths: a list of paths to packages that will be tested
+     :runtimes: a list of runtimes for the packages, needs to be same length as package_paths
+     :runtime: if the runtimes list is empty, use this time for all packages
     """
-    def do_experiment_series(self, config_loc):
-        pass
-
+    def do_experiment_series(self, package_paths, runtimes=[], runtime=10):
+        # if the runtimes are not specified for each package, choose the same runtime for all of them
+        if not len(runtimes):
+            for p in package_paths:
+                runtimes.append(runtime)
+        # check whether package paths and runtimes are the same size
+        if not len(package_paths) == len(runtimes):
+            raise Exception("Need a runtime for each package and a package for each runtime.")
+        # start the experiments
+        for i in range(len(package_paths)):
+            t = threading.Thread(target=self.do_experiment, kwargs={"path_to_pkg":package_paths[i], "runtime":runtimes[i]})
+            t.start()
 
     """
      Conduct a single experiment with given values
@@ -96,22 +115,20 @@ class Emulator:
             path_to_pkg="",
             runtime=10,
             worker_name=None):
-        #    address='127.0.0.1',
-        #    package_port=5000,
-        #    ssh_port=22,
-        #    username=DEFAULT_SSH_USER_NAME,
-        #    key_loc=DEFAULT_KEY_LOC):
-        # if a worker has been specified, get neccessary information
-        if worker_name:
-            worker = self.workers[worker_name]
-        else:
+        # get neccessary information from (un-)specified worker
+        if not worker_name:
             # choose a worker
             # the first idle worker would be best
-            # for now choose worker number 1
-            worker = self.workers.values()[0]
+            while not self.available_workers:
+                time.sleep(1)
+            worker_name = self.available_workers.pop()
+        worker=self.workers[worker_name]
+        LOG.info("Running package for %r seconds on worker %r"%(runtime, worker_name))
         address = worker["address"]
-        package_port = worker["package_port"] or 5000
-        ssh_port = worker["ssh_port"] or 22
+        # get the port to upload the packages to, if not specified, default to 5000
+        package_port = worker.get("package_port", 5000)
+        # get the ssh port, if not specified, default to 22
+        ssh_port = worker.get("ssh_port", 22)
         username = worker["ssh_user"]
         key_loc = worker["ssh_key_loc"]
 
@@ -134,7 +151,7 @@ class Emulator:
 
         # start the profiling topology on the client
         # use a seperate thread to prevent blocking by the topology
-        comm = threading.Thread(target=self._exec_command, args=(ssh, "%s;%s"%(PATH_COMMAND,EXEC_COMMAND)))
+        comm = threading.Thread(target=self._exec_command, args=(ssh, "%s;%s -p %s"%(PATH_COMMAND,EXEC_COMMAND,package_port)))
         comm.start()
 
         # wait a short while to let the topology start
@@ -151,15 +168,15 @@ class Emulator:
         # let the service run for a specified time
         LOG.info("Sleep for %r seconds." % runtime)
         time.sleep(runtime)
-        #stop the service
+        # stop the service
         LOG.info("Stopping service")
         service_instance_uuid = json.loads(r2.text).get("service_instance_uuid")
         r3 = requests.delete("http://%s:%s/instantiations"%(address,package_port), data={"service_uuid":service_uuid, "service_instance_uuid":service_instance_uuid})
 
         # stop the remote topology
-        self._exec_command(ssh, "sudo pkill -f %r"%EXEC_COMMAND)
+        self._exec_command(ssh, 'sudo pkill -f "%s -p %s"'%(EXEC_COMMAND, package_port))
 
-        #gather the logs etc. here
+        # gather the logs etc. here
         sftp = ssh.open_sftp()
         #sftp.chdir(path)
         #sftp.get(remote_path, local_path)
@@ -167,6 +184,9 @@ class Emulator:
 
         # close the ssh connection
         ssh.close()
+
+        # make the current worker available again
+        self.available_workers.append(worker_name)
 
     """
     Helper method to be called in a thread
@@ -183,4 +203,7 @@ class Emulator:
 
 if __name__=='__main__':
     e = Emulator(wld_loc="src/son/profile/emulator_test.yml")
-    e.do_experiment(path_to_pkg='/home/levathos/son-emu/misc/sonata-demo-service.son')#, worker_name="worker01")
+    paths=['/home/levathos/son-emu/misc/sonata-demo-service.son' for i in range(3)]
+    runtimes = [10, 30, 10]
+    e.do_experiment_series(package_paths=paths, runtimes=runtimes)
+#    e.do_experiment(path_to_pkg='/home/levathos/son-emu/misc/sonata-demo-service.son')#, worker_name="worker01")
