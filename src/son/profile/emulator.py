@@ -58,22 +58,50 @@ class Emulator:
 
     """
      Initialize with a list of descriptors of workers to run experiments on
-     :wld_loc: worker list descriptor. A YAML file describing the workers available.
+     :tpd_loc: target platforms descriptor. A YAML file describing the emulator nodes available.
     """
-    def __init__(self, wld_loc):
-        # extract the workers from the worker list descriptor file
-        self.workers = list()
-        with open(wld_loc, "r") as wld:
-            self.workers = yaml.load(wld)["worker_list"]
-        wld.close()
-        # check for empty worker lists
-        if not len(self.workers):
-            raise Exception("Need at least one worker to be specified in the worker list descriptor.")
-        # all workers are available at the start
-        self.available_workers = self.workers.keys()
-        LOG.info("%r workers found."%len(self.workers))
-        LOG.debug("List of workers: %r"%self.workers.keys())
+    def __init__(self, tpd_loc):
+        # extract the emulator nodes from the target platforms descriptor file
+        self.emulator_nodes = list()
+        with open(tpd_loc, "r") as tpd:
+            self.emulator_nodes = yaml.load(tpd)["target_platforms"]
+        tpd.close()
+        # check for empty emulator node lists
+        if not len(self.emulator_nodes):
+            raise Exception("Need at least one emulator to be specified in the target platforms descriptor.")
+        # all nodes are available at the start
+        self.available_nodes = self.emulator_nodes.keys()
+        LOG.info("%r nodes found."%len(self.emulator_nodes))
+        LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
 
+    """
+     Load another config file to use other target platforms
+     Does not need to be called to use an emulator object.
+     Will overwrite the existing emulator nodes list.
+     Will wait for currently running experiments to prevent unintended behaviour.
+     :tpd_loc: target platforms descriptor. A YAML file describing the emulator nodes available
+    """
+    def load_config_file(self, tpd_loc):
+        # wait for currently running experiments
+        # failing to do so will result in old emulator nodes being reused even after using a new list
+        while not self.emulator_nodes.keys() == self.available_nodes:
+            time.sleep(1)
+        # empty the available nodes to prevent further experiments
+        self.available_nodes = list()
+        # extract the emulator nodes from the target platforms descriptor file
+        emulator_nodes = list()
+        with open(tpd_loc, "r") as tpd:
+            emulator_nodes = yaml.load(tpd)["target_platforms"]
+        tpd.close()
+        # check for empty emulator node lists
+        if not len(emulator_nodes):
+            raise Exception("Need at least one emulator to be specified in the target platforms descriptor.")
+        # after checking for empty lists, apply the new node list
+        self.emulator_nodes = emulator_nodes
+        # all nodes are available at the start
+        self.available_nodes = self.emulator_nodes.keys()
+        LOG.info("%r nodes found."%len(self.emulator_nodes))
+        LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
 
     """
      Conduct multiple experiments which are described by a yaml file using the do_experiment method
@@ -105,32 +133,28 @@ class Emulator:
      6) gather log files
      :path_to_pkg: the path to the service package which is to be tested
      :runtime: the service will run for the specified amoutn of seconds
-     :address: address of the remote server
-     :package_port: the port to which the service package is uploaded. Default: 5000
-     :ssh_port: the port which is used for the ssh connection. Default: 22
-     :username: the username which is used for the ssh connection, requires to be able to do passless sudo
-     :key_loc: location of the ssh RSA-key used for the ssh connection
+     :node_name: the name of the emulator node to be used for the experiment. If not specified, the first available node will be used.
     """
     def do_experiment(self,
             path_to_pkg="",
             runtime=10,
-            worker_name=None):
+            node_name=None):
         # get neccessary information from (un-)specified worker
-        if not worker_name:
-            # choose a worker
-            # the first idle worker would be best
-            while not self.available_workers:
+        if not node_name:
+            # choose an emulator node
+            # the first idle node would be best
+            while not self.available_nodes:
                 time.sleep(1)
-            worker_name = self.available_workers.pop()
-        worker=self.workers[worker_name]
-        LOG.info("Running package for %r seconds on worker %r"%(runtime, worker_name))
-        address = worker["address"]
+            node_name = self.available_nodes.pop()
+        node=self.emulator_nodes[node_name]
+        LOG.info("Running package for %r seconds on emulator node %r"%(runtime, node_name))
+        address = node["address"]
         # get the port to upload the packages to, if not specified, default to 5000
-        package_port = worker.get("package_port", 5000)
+        package_port = node.get("package_port", 5000)
         # get the ssh port, if not specified, default to 22
-        ssh_port = worker.get("ssh_port", 22)
-        username = worker["ssh_user"]
-        key_loc = worker["ssh_key_loc"]
+        ssh_port = node.get("ssh_port", 22)
+        username = node["ssh_user"]
+        key_loc = node["ssh_key_loc"]
 
 
         # ensure a clean mininet instance
@@ -186,7 +210,7 @@ class Emulator:
         ssh.close()
 
         # make the current worker available again
-        self.available_workers.append(worker_name)
+        self.available_nodes.append(node_name)
 
     """
     Helper method to be called in a thread
