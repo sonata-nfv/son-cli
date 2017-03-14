@@ -2,18 +2,18 @@
 ---
 ##
 ## Some general informaton regarding this 
-## worker list descriptor.
+## target platforms descriptor.
 ##
 descriptor_version: "0.1"
 vendor: "eu.sonata-nfv"
-name: "test-wld"
+name: "test-tpd"
 version: "0.1"
 author: "Eduard Maas, Paderborn university, edmaas@mail.uni-paderborn.de"
-description: "A worker list descriptor for testing purposes. Will not work on most systems because of system specific information like addresses and usernames."
+description: "A target platforms descriptor for testing purposes. Will not work on most systems because of system specific information like addresses and usernames."
 ##
-## The worker list.
+## the target platforms list.
 ##
-worker_list:
+target_platforms:
   localhost1:
     address: "127.0.0.1"
     package_port: 5000
