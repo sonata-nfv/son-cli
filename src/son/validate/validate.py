@@ -775,13 +775,6 @@ class Validator(object):
                                              "{0}-lvl{1}-br.graphml"
                                              .format(service.id, lvl)))
 
-            data = json_graph.node_link_data(g)
-
-            with open(os.path.join(graphsdir,
-                      "{0}-lvl{1}.json"
-                      .format(service.id, lvl)), 'w') as outfile:
-                json.dump(data, outfile, indent=4, sort_keys=True)
-
 
 def print_result(validator):
 
