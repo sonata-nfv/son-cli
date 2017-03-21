@@ -36,7 +36,8 @@ import requests
 import time
 import threading
 import yaml
-from os.path import expanduser
+import os
+import stat
 
 # define some constants for easy changing
 # will likely be removed as default values dont make sense past testing
@@ -76,35 +77,6 @@ class Emulator:
         LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
 
     """
-     Load another config file to use other target platforms
-     Does not need to be called to use an emulator object.
-     Will overwrite the existing emulator nodes list.
-     Will wait for currently running experiments to prevent unintended behaviour.
-     :tpd_loc: target platforms descriptor. A YAML file describing the emulator nodes available
-    """
-    def load_config_file(self, tpd_loc):
-        # wait for currently running experiments
-        # failing to do so will result in old emulator nodes being reused even after using a new list
-        while not self.emulator_nodes.keys() == self.available_nodes:
-            time.sleep(1)
-        # empty the available nodes to prevent further experiments
-        self.available_nodes = list()
-        # extract the emulator nodes from the target platforms descriptor file
-        emulator_nodes = list()
-        with open(tpd_loc, "r") as tpd:
-            emulator_nodes = yaml.load(tpd)["target_platforms"]
-        tpd.close()
-        # check for empty emulator node lists
-        if not len(emulator_nodes):
-            raise Exception("Need at least one emulator to be specified in the target platforms descriptor.")
-        # after checking for empty lists, apply the new node list
-        self.emulator_nodes = emulator_nodes
-        # all nodes are available at the start
-        self.available_nodes = self.emulator_nodes.keys()
-        LOG.info("%r nodes found."%len(self.emulator_nodes))
-        LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
-
-    """
      Conduct multiple experiments using the do_experiment method
      All experiments are started in a separate thread
      The order in which the experiments are run is not fixed!
@@ -136,7 +108,7 @@ class Emulator:
             runtime=10,
             node_name=None):
         # if the package path contains a tilde, expand it to full directory path
-        path_to_pkg = expanduser(path_to_pkg)
+        path_to_pkg = os.path.expanduser(path_to_pkg)
         # get neccessary information from (un-)specified worker
         if not node_name:
             # choose an emulator node
@@ -152,7 +124,7 @@ class Emulator:
         # get the ssh port, if not specified, default to 22
         ssh_port = node.get("ssh_port", 22)
         username = node["ssh_user"]
-        key_loc = expanduser(node["ssh_key_loc"])
+        key_loc = os.path.expanduser(node["ssh_key_loc"])
 
 
         # ensure a clean mininet instance
@@ -198,10 +170,33 @@ class Emulator:
         # stop the remote topology
         self._exec_command(ssh, 'sudo pkill -f "%s -p %s"'%(EXEC_COMMAND, package_port))
 
-        # gather the logs etc. here
+        # gather the logs etc.
         sftp = ssh.open_sftp()
-        #sftp.chdir(path)
-        #sftp.get(remote_path, local_path)
+        # switch to directory containing relevant files
+        sftp.chdir("/tmp/results/%s/"%service_uuid)
+        # all files in the folder have to be copied, directories have to be handled differently
+        files_to_copy = sftp.listdir()
+        # as long as there are files to copy
+        while files_to_copy:
+            # get next "file"
+            file_path = files_to_copy.pop()
+            # if the "file" is a directory, put all files contained in the directory in the list of files to be copied
+            if stat.S_ISDIR(sftp.stat(file_path).st_mode):
+                more_files = sftp.listdir("file_path")
+                for f in more_files:
+                    # we need the full path
+                    files_to_copy.append("file_path/%s"%f)
+            else:
+                # the "file" is an actual file
+                # check whether the path already exists on the local system
+                head, _ = os.path.split(file_path)
+                if not os.path.exists(head):
+                    # if not, create it
+                    os.makedirs(head)
+                # copy the file to the local system, preserving the folder hierarchy
+                sftp.get(file_path, file_path)
+
+        # close the sftp connection
         sftp.close()
 
         # close the ssh connection
