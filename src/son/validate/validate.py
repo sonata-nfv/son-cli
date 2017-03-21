@@ -765,7 +765,9 @@ class Validator(object):
             if exc.errno == errno.EEXIST and os.path.isdir(graphsdir):
                 pass
 
-        for lvl in range(0, 3):
+        g = service.build_topology_graph(level=3, bridges=False)
+
+        for lvl in range(0, 4):
             g = service.build_topology_graph(level=lvl, bridges=False)
             nx.write_graphml(g, os.path.join(graphsdir,
                                              "{0}-lvl{1}.graphml"
