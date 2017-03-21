@@ -36,6 +36,7 @@ import requests
 import time
 import threading
 import yaml
+from os.path import expanduser
 
 # define some constants for easy changing
 # will likely be removed as default values dont make sense past testing
@@ -52,7 +53,6 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 """
  A class which provides methods to do experiments with service packages
- All methods are static
 """
 class Emulator:
 
@@ -60,12 +60,13 @@ class Emulator:
      Initialize with a list of descriptors of workers to run experiments on
      :tpd_loc: target platforms descriptor. A YAML file describing the emulator nodes available.
     """
-    def __init__(self, tpd_loc):
-        # extract the emulator nodes from the target platforms descriptor file
-        self.emulator_nodes = list()
-        with open(tpd_loc, "r") as tpd:
-            self.emulator_nodes = yaml.load(tpd)["target_platforms"]
-        tpd.close()
+    def __init__(self, tpd):
+        # if the whole config dictionary has been given, extract only the target platforms
+        # a descriptor version should only be in the top level of the file
+        if "descriptor_version" in tpd:
+            tpd = tpd.get("target_platforms")
+        # save the emulator nodes
+        self.emulator_nodes = tpd
         # check for empty emulator node lists
         if not len(self.emulator_nodes):
             raise Exception("Need at least one emulator to be specified in the target platforms descriptor.")
@@ -104,22 +105,16 @@ class Emulator:
         LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
 
     """
-     Conduct multiple experiments which are described by a yaml file using the do_experiment method
-     :package_paths: a list of paths to packages that will be tested
-     :runtimes: a list of runtimes for the packages, needs to be same length as package_paths
-     :runtime: if the runtimes list is empty, use this time for all packages
+     Conduct multiple experiments using the do_experiment method
+     All experiments are started in a separate thread
+     The order in which the experiments are run is not fixed!
+     :experiments: a dictionary mapping from run_id to package path
+     :runtime: the time an experiment runs for
     """
-    def do_experiment_series(self, package_paths, runtimes=[], runtime=10):
-        # if the runtimes are not specified for each package, choose the same runtime for all of them
-        if not len(runtimes):
-            for p in package_paths:
-                runtimes.append(runtime)
-        # check whether package paths and runtimes are the same size
-        if not len(package_paths) == len(runtimes):
-            raise Exception("Need a runtime for each package and a package for each runtime.")
-        # start the experiments
-        for i in range(len(package_paths)):
-            t = threading.Thread(target=self.do_experiment, kwargs={"path_to_pkg":package_paths[i], "runtime":runtimes[i]})
+    def do_experiment_series(self, experiments, runtime=10):
+        # start the experiments in separate threads
+        for i in experiments.keys():
+            t = threading.Thread(target=self.do_experiment, kwargs={"run_id":i, "path_to_pkg":experiments[i], "runtime":runtime})
             t.start()
 
     """
@@ -136,9 +131,12 @@ class Emulator:
      :node_name: the name of the emulator node to be used for the experiment. If not specified, the first available node will be used.
     """
     def do_experiment(self,
-            path_to_pkg="",
+            path_to_pkg,
+            run_id,
             runtime=10,
             node_name=None):
+        # if the package path contains a tilde, expand it to full directory path
+        path_to_pkg = expanduser(path_to_pkg)
         # get neccessary information from (un-)specified worker
         if not node_name:
             # choose an emulator node
@@ -154,7 +152,7 @@ class Emulator:
         # get the ssh port, if not specified, default to 22
         ssh_port = node.get("ssh_port", 22)
         username = node["ssh_user"]
-        key_loc = node["ssh_key_loc"]
+        key_loc = expanduser(node["ssh_key_loc"])
 
 
         # ensure a clean mininet instance
@@ -226,8 +224,15 @@ class Emulator:
                 LOG.error(line)
 
 if __name__=='__main__':
-    e = Emulator(wld_loc="src/son/profile/emulator_test.yml")
-    paths=['/home/levathos/son-emu/misc/sonata-demo-service.son' for i in range(3)]
-    runtimes = [10, 30, 10]
-    e.do_experiment_series(package_paths=paths, runtimes=runtimes)
-#    e.do_experiment(path_to_pkg='/home/levathos/son-emu/misc/sonata-demo-service.son')#, worker_name="worker01")
+    # open config file to extract target platforms
+    with open("src/son/profile/config.yml", "r") as tpd:
+        conf = yaml.load(tpd)
+    tpd.close()
+    # init emulator
+    e = Emulator(tpd=conf)
+    # define experiments, will be extracted from a file when used in code
+    experiments = dict()
+    for i in range(3):
+        experiments[i] = '~/son-emu/misc/sonata-demo-service.son'
+    # run the experiments
+    e.do_experiment_series(experiments, runtime=10)
