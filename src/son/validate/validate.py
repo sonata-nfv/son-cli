@@ -35,6 +35,7 @@ import time
 import shutil
 import atexit
 import errno
+import json
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -42,6 +43,7 @@ from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
     build_descriptor_id, CountCalls
+from networkx.readwrite import json_graph
 
 log = logging.getLogger(__name__)
 
@@ -645,11 +647,11 @@ class Validator(object):
                   .format(function.id, function.graph.edges()))
 
         # check for path cycles
-        cycles = Validator._find_graph_cycles(function.graph,
-                                              function.graph.nodes()[0])
-        if cycles and len(cycles) > 0:
-            log.warning("Found cycles in network graph of function "
-                        "'{0}':\n{0}".format(function.id, cycles))
+        #cycles = Validator._find_graph_cycles(function.graph,
+        #                                      function.graph.nodes()[0])
+        #if cycles and len(cycles) > 0:
+        #    log.warning("Found cycles in network graph of function "
+        #                "'{0}':\n{0}".format(function.id, cycles))
 
         return True
 
@@ -763,7 +765,9 @@ class Validator(object):
             if exc.errno == errno.EEXIST and os.path.isdir(graphsdir):
                 pass
 
-        for lvl in range(0, 3):
+        g = service.build_topology_graph(level=3, bridges=False)
+
+        for lvl in range(0, 4):
             g = service.build_topology_graph(level=lvl, bridges=False)
             nx.write_graphml(g, os.path.join(graphsdir,
                                              "{0}-lvl{1}.graphml"

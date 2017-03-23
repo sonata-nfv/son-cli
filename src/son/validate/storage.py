@@ -571,7 +571,7 @@ class Service(Descriptor):
         """
         if vnf_id not in self._vnf_id_map or self._vnf_id_map[vnf_id] not in\
                 self._functions:
-            log.error("Function of vnf_id='{}' is not mapped".format(vnf_id))
+            #log.error("Function of vnf_id='{}' is not mapped".format(vnf_id))
             return
         return self._functions[self._vnf_id_map[vnf_id]]
 
@@ -615,6 +615,7 @@ class Service(Descriptor):
                     0: service level (does not show VNF interfaces)
                     1: service level (with VNF interfaces) - default
                     2: VNF level (showing VDUs but not VDU interfaces)
+                    3: VDU level (with VDU interfaces)
 
         :param deep: indicates the granularity of the graph
                      True - graph will include topology graphs of functions
@@ -622,14 +623,52 @@ class Service(Descriptor):
         :param bridges: indicates whether bridges should be included in
                         the graph
         """
-        assert 0 <= level <= 2  # level must be 0, 1, 2
+        assert 0 <= level <= 3  # level must be 0, 1, 2, 3
 
         graph = nx.Graph()
 
+        def_node_attrs = {'label': '',
+                          'level': level,
+                          'parent_id': self.id,
+                          'type': ''  # 'iface' | 'br-iface' | 'bridge'
+                          }
+
+        def_link_attrs = {'label': '',
+                          'level': '',
+                          'type': ''  # 'iface' | 'br-iface' | 'vdu_in'
+                          }
+
         # assign nodes from service interfaces
-        graph.add_nodes_from(self.link_interfaces)
+        interfaces = self.link_interfaces
         if bridges:
-            graph.add_nodes_from(self.bridge_interfaces)
+            interfaces += self.bridge_interfaces
+
+        for iface in interfaces:
+            node_attrs = def_node_attrs.copy()
+            node_attrs['label'] = iface
+            s_iface = iface.split(':')
+            function = self.mapped_function(s_iface[0])
+            if len(s_iface) > 1 and function:
+
+                node_attrs['parent_id'] = self.id
+                node_attrs['level'] = 1
+                node_attrs['node_id'] = function.id
+                node_attrs['node_label'] = function.content['name']
+
+            else:
+                node_attrs['parent_id'] = ""
+                node_attrs['level'] = 0
+                node_attrs['node_id'] = self.id
+                node_attrs['node_label'] = self.content['name']
+
+            node_attrs['label'] = s_iface[1] if len(s_iface) > 1 else iface
+
+            if iface in self.link_interfaces:
+                node_attrs['type'] = 'iface'
+            elif iface in self.bridge_interfaces:
+                node_attrs['type'] = 'br-iface'
+
+            graph.add_node(iface, attr_dict=node_attrs)
 
         prefixes = []
         # assign sub-graphs of functions
@@ -638,8 +677,15 @@ class Service(Descriptor):
             # done to work with current descriptors of sonata demo
             prefix_map = {}
             prefix = self.vnf_id(function)
-            function.graph = function.build_topology_graph(bridges=bridges)
 
+            if level <= 2:
+                function.graph = function.build_topology_graph(parent_id=self.id,
+                                                               bridges=bridges,
+                                                               level=0)
+            else:
+                function.graph = function.build_topology_graph(parent_id=self.id,
+                                                               bridges=bridges,
+                                                               level=1)
             if level == 0:
                 for node in function.graph.nodes():
                     pn = prefix + ':' + node
@@ -650,13 +696,14 @@ class Service(Descriptor):
             elif level == 1:
                 prefixes.append(prefix)
 
-            elif level == 2:
+            elif level >= 2:
 
                 for node in function.graph.nodes():
                     prefix_map[node] = prefix + ':' + node
 
                 re_f_graph = nx.relabel_nodes(function.graph, prefix_map, copy=True)
-                graph.add_edges_from(re_f_graph.edges())
+                graph.add_nodes_from(re_f_graph.nodes(data=True))
+                graph.add_edges_from(re_f_graph.edges(data=True))
 
         # build links topology graph
         if not self.links and not self.bridges:
@@ -664,7 +711,7 @@ class Service(Descriptor):
 
         for lid, link in self.links.items():
 
-            if level == 1 or level == 2:
+            if level >= 1:
                 iface_u = link.iface_u
                 iface_v = link.iface_v
 
@@ -684,15 +731,26 @@ class Service(Descriptor):
             else:
                 return
 
-            graph.add_edge(iface_u, iface_v, attr_dict={'label': link.id})
+            link_attrs = def_link_attrs.copy()
+            link_attrs['label'] = link.id
+            link_attrs['level'] = 0 if level == 0 else 1
+            link_attrs['type'] = 'iface'
+
+            graph.add_edge(iface_u, iface_v, attr_dict=link_attrs)
 
         # build bridge topology graph
         if bridges:
             for bid, bridge in self.bridges.items():
                 brnode = 'br-' + bid
-                graph.add_node(brnode)  # add 'router' node for this bridge
+                node_attrs = def_node_attrs.copy()
+                node_attrs['label'] = brnode
+                node_attrs['level'] = 0
+                node_attrs['type'] = 'bridge'
+
+                # add 'router' node for this bridge
+                graph.add_node(brnode, attr_dict=node_attrs)
                 for iface in bridge.interfaces:
-                    if level == 1 or level == 2:
+                    if level >= 1:
                         s_iface = iface
                     elif level == 0:
                         s_iface = iface.split(':')
@@ -702,7 +760,12 @@ class Service(Descriptor):
                             s_iface = iface
                     else:
                         return
-                    graph.add_edge(brnode, s_iface, attr_dict={'label': bid})
+
+                    link_attrs = def_link_attrs
+                    link_attrs['label'] = bid
+                    link_attrs['level'] = 0 if level == 0 else 1
+                    link_attrs['type'] = 'br-iface'
+                    graph.add_edge(brnode, s_iface, attr_dict=link_attrs)
 
         # inter-connect VNF interfaces
         if level == 1:
@@ -715,6 +778,7 @@ class Service(Descriptor):
                         node_v_tokens = node_v.split(':')
                         if len(node_v_tokens) > 1 and \
                                 node_v_tokens[0] == node_u_tokens[0]:
+
                             # verify internally if these interfaces are connected
                             function = self.mapped_function(node_v_tokens[0])
                             if (function.graph.has_node(node_u_tokens[1]) and
@@ -722,7 +786,11 @@ class Service(Descriptor):
                                 nx.has_path(function.graph,
                                             node_u_tokens[1],
                                             node_v_tokens[1])):
-                                graph.add_edge(node_u, node_v)
+                                link_attrs = def_link_attrs
+                                link_attrs['label'] = node_u + '-' + node_v
+                                link_attrs['level'] = 1
+                                link_attrs['type'] = 'iface'
+                                graph.add_edge(node_u, node_v, attr_dict=link_attrs)
 
         return graph
 
@@ -893,57 +961,132 @@ class Function(Descriptor):
 
         return True
 
-    def topology_path(self, iface_a, iface_b):
-        graph = self.build_topology_graph(bridges=True)
-
-        nx.has
-
-
-    def build_topology_graph(self, bridges=False):
+    def build_topology_graph(self, bridges=False, parent_id='', level=0):
         """
         Build the network topology graph of the function.
         :param bridges: indicates if bridges should be included in the graph
+        :param level: indicates the granularity of the graph
+                    0: VNF level (showing VDUs but not VDU interfaces)
+                    1: VDU level (with VDU interfaces)
         """
         graph = nx.Graph()
 
-        # assign nodes from function interfaces
-        graph.add_nodes_from(self.link_interfaces)
-        if bridges:
-            graph.add_nodes_from(self.bridge_interfaces)
+        def_node_attrs = {'label': '',
+                          'level': level,
+                          'parent_id': self.id,
+                          'type': ''  # 'iface' | 'br-iface' | 'bridge'
+                          }
+        def_edge_attrs = {'label': '',
+                          'level': '',
+                          'type': ''}
 
-        # assign nodes from units interfaces
-        for uid, unit in self.units.items():
-            graph.add_node(uid, attr_dict={'interfaces': unit.interfaces})
+        # assign nodes from function interfaces
+        interfaces = self.link_interfaces
+        if bridges:
+            interfaces += self.bridge_interfaces
+
+        for iface in interfaces:
+            node_attrs = def_node_attrs.copy()
+            s_iface = iface.split(':')
+            unit = self.units[s_iface[0]] if s_iface[0] in self.units else None
+            if len(s_iface) > 1 and unit:
+
+                if level == 0:
+                    iface = s_iface[0]
+                node_attrs['parent_id'] = self.id
+                node_attrs['level'] = 2
+                node_attrs['node_id'] = unit.id
+                node_attrs['node_label'] = unit.id
+            else:
+                node_attrs['parent_id'] = parent_id
+                node_attrs['level'] = 1
+                node_attrs['node_id'] = self.id
+                node_attrs['node_label'] = self.content['name']
+
+            node_attrs['label'] = s_iface[1] if len(s_iface) > 1 else iface
+
+            if iface in self.link_interfaces:
+                node_attrs['type'] = 'iface'
+            elif iface in self.bridge_interfaces:
+                node_attrs['type'] = 'br-iface'
+
+            graph.add_node(iface, attr_dict=node_attrs)
 
         # build link topology graph
         for lid, link in self.links.items():
 
-            # unit interfaces are not considered as nodes, just the unit itself
+            edge_attrs = def_edge_attrs.copy()
+
             iface_u = link.iface_u.split(':')
             iface_v = link.iface_v.split(':')
 
-            if len(iface_u) > 1:
-                iface_u = iface_u[0]
-            else:
+            if level == 0:
+                # unit interfaces not considered as nodes, just the unit itself
+                if len(iface_u) > 1:
+                    iface_u = iface_u[0]
+                else:
+                    iface_u = link.iface_u
+
+                if len(iface_v) > 1:
+                    iface_v = iface_v[0]
+                else:
+                    iface_v = link.iface_v
+
+                edge_attrs['level'] = 1
+
+            elif level == 1:
+                # unit interfaces are nodes
                 iface_u = link.iface_u
-
-            if len(iface_v) > 1:
-                iface_v = iface_v[0]
-            else:
                 iface_v = link.iface_v
+                edge_attrs['level'] = 2
 
-            graph.add_edge(iface_u, iface_v, attr_dict={'label': link.id})
+            edge_attrs['type'] = 'iface'
+            edge_attrs['label'] = link.id
+            graph.add_edge(iface_u, iface_v, attr_dict=edge_attrs)
+
+        # link vdu interfaces if level 1
+        if level == 1:
+            for uid, unit in self.units.items():
+                edge_attrs = def_edge_attrs.copy()
+                join_ifaces = []
+                for iface in unit.interfaces:
+                    # patch for faulty descriptors regarding sep ':'
+                    s_iface = iface.split(':')
+                    if len(s_iface) > 1:
+                        join_ifaces.append(iface)
+                    else:
+                        join_ifaces.append(uid + ':' + iface)
+
+                for u_iface in join_ifaces:
+                    for v_iface in join_ifaces:
+                        if u_iface == v_iface:
+                            continue
+                        if graph.has_edge(u_iface, v_iface):
+                            continue
+                        if not bridges and (
+                                u_iface in self.bridge_interfaces or
+                                v_iface in self.bridge_interfaces):
+                            continue
+                        edge_attrs['level'] = 2
+                        edge_attrs['label'] = 'VDU_IN'
+                        edge_attrs['type'] = 'vdu_in'
+
+                        graph.add_edge(u_iface, v_iface)
 
         # build bridge topology graph
         if bridges:
             for bid, bridge in self.bridges.items():
                 # add bridge router
                 brnode = "br-" + bid
-                graph.add_node(brnode)
+                node_attrs = def_node_attrs.copy()
+                node_attrs['label'] = brnode
+                node_attrs['level'] = 1
+                node_attrs['type'] = 'bridge'
+                graph.add_node(brnode, attr_dict=node_attrs)
 
                 for iface in bridge.interfaces:
                     s_iface = iface.split(':')
-                    if len(s_iface) > 1:
+                    if level == 0 and len(s_iface) > 1:
                         s_iface = s_iface[0]
                     else:
                         s_iface = iface
