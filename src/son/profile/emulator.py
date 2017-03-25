@@ -194,7 +194,7 @@ class Emulator:
                     # if not, create it
                     os.makedirs(head)
                 # copy the file to the local system, preserving the folder hierarchy
-                sftp.get(file_path, file_path)
+                sftp.get(file_path, "result/%s/%s"(run_id,file_path))
 
         # close the sftp connection
         sftp.close()
