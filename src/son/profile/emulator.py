@@ -109,7 +109,8 @@ class Emulator:
             node_name=None):
         # if the package path contains a tilde, expand it to full directory path
         path_to_pkg = os.path.expanduser(path_to_pkg)
-        # get neccessary information from (un-)specified worker
+
+        # determine which worker to use (specified or first available)
         if not node_name:
             # choose an emulator node
             # the first idle node would be best
@@ -117,6 +118,8 @@ class Emulator:
                 time.sleep(1)
             node_name = self.available_nodes.pop()
         node=self.emulator_nodes[node_name]
+
+        # get neccessary information from (un-)specified worker
         LOG.info("Running package for %r seconds on emulator node %r"%(runtime, node_name))
         address = node["address"]
         # get the port to upload the packages to, if not specified, default to 5000
@@ -157,15 +160,20 @@ class Emulator:
         LOG.info("Uploading package to http://%r." % address)
         r1 = requests.post("http://%s:%s/packages"%(address,package_port), files={"package":f})
         service_uuid = json.loads(r1.text).get("service_uuid")
+        LOG.debug("Service uuid is %s"%service_uuid)
+
         # start the service
-        r2 = requests.post("http://%s:%s/instantiations"%(address,package_port), data={"service_uuid":service_uuid})
+        r2 = requests.post("http://%s:%s/instantiations"%(address,package_port), data=json.dumps({"service_uuid":service_uuid}))
+        service_instance_uuid = json.loads(r2.text).get("service_instance_uuid")
+        LOG.debug("Service instance uuid is %s"%service_instance_uuid)
+
         # let the service run for a specified time
         LOG.info("Sleep for %r seconds." % runtime)
         time.sleep(runtime)
+
         # stop the service
         LOG.info("Stopping service")
-        service_instance_uuid = json.loads(r2.text).get("service_instance_uuid")
-        r3 = requests.delete("http://%s:%s/instantiations"%(address,package_port), data={"service_uuid":service_uuid, "service_instance_uuid":service_instance_uuid})
+        requests.delete("http://%s:%s/instantiations"%(address,package_port), data=json.dumps({"service_uuid":service_uuid, "service_instance_uuid":service_instance_uuid}))
 
         # stop the remote topology
         self._exec_command(ssh, 'sudo pkill -f "%s -p %s"'%(EXEC_COMMAND, package_port))
@@ -174,6 +182,9 @@ class Emulator:
         sftp = ssh.open_sftp()
         # switch to directory containing relevant files
         sftp.chdir("/tmp/results/%s/"%service_uuid)
+        # the path to which the files will be copied
+        local_path = "result/%r"%run_id
+
         # all files in the folder have to be copied, directories have to be handled differently
         files_to_copy = sftp.listdir()
         # as long as there are files to copy
@@ -181,20 +192,26 @@ class Emulator:
             # get next "file"
             file_path = files_to_copy.pop()
             # if the "file" is a directory, put all files contained in the directory in the list of files to be copied
-            if stat.S_ISDIR(sftp.stat(file_path).st_mode):
-                more_files = sftp.listdir("file_path")
+            file_mode = sftp.stat(file_path).st_mode
+            if stat.S_ISDIR(file_mode):
+                LOG.debug("Found directory %s"%file_path)
+                more_files = sftp.listdir(path=file_path)
                 for f in more_files:
                     # we need the full path
-                    files_to_copy.append("file_path/%s"%f)
-            else:
+                    files_to_copy.append(os.path.join(file_path,f))
+                os.makedirs(os.path.join(local_path, file_path))
+            elif stat.S_ISREG(file_mode):
                 # the "file" is an actual file
-                # check whether the path already exists on the local system
-                head, _ = os.path.split(file_path)
-                if not os.path.exists(head):
-                    # if not, create it
-                    os.makedirs(head)
+                LOG.debug("Found file %s"%file_path)
                 # copy the file to the local system, preserving the folder hierarchy
-                sftp.get(file_path, "result/%s/%s"(run_id,file_path))
+                sftp.get(file_path, os.path.join(local_path,file_path))
+            else:
+                # neither file nor directory
+                # skip it
+                LOG.debug("Skipping %s: Neither file nor directory"%file_path)
+
+        # remove all temporary files and directories from the remote host
+        self._exec_command(ssh, "sudo rm -r /tmp/results/%s"%service_uuid)
 
         # close the sftp connection
         sftp.close()
@@ -227,7 +244,7 @@ if __name__=='__main__':
     e = Emulator(tpd=conf)
     # define experiments, will be extracted from a file when used in code
     experiments = dict()
-    for i in range(3):
+    for i in range(1):
         experiments[i] = '~/son-emu/misc/sonata-demo-service.son'
     # run the experiments
     e.do_experiment_series(experiments, runtime=10)
