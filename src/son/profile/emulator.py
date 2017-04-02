@@ -31,7 +31,6 @@ partner consortium (www.sonata-nfv.eu).
 import paramiko
 import json
 import logging
-import mininet.clean
 import requests
 import time
 import threading
@@ -59,7 +58,7 @@ class Emulator:
 
     """
      Initialize with a list of descriptors of workers to run experiments on
-     :tpd_loc: target platforms descriptor. A YAML file describing the emulator nodes available.
+     :tpd: target platforms descriptor. A dictionary describing the remote hosts on which service can be tested or a dictionary containing a key which value is the descriptor
     """
     def __init__(self, tpd):
         # if the whole config dictionary has been given, extract only the target platforms
@@ -98,7 +97,10 @@ class Emulator:
      4) wait a specified amount of time
      5) stop the service
      6) gather log files
+     7) clean up log files from remote server
+     8) close the connection
      :path_to_pkg: the path to the service package which is to be tested
+     :run_id: the experiment ID for this run. Log files will be found under result/run_id
      :runtime: the service will run for the specified amoutn of seconds
      :node_name: the name of the emulator node to be used for the experiment. If not specified, the first available node will be used.
     """
@@ -128,10 +130,6 @@ class Emulator:
         ssh_port = node.get("ssh_port", 22)
         username = node["ssh_user"]
         key_loc = os.path.expanduser(node["ssh_key_loc"])
-
-
-        # ensure a clean mininet instance
-        #mininet.clean.cleanUp().cleanup()
 
         # connect to the client per ssh
         ssh = paramiko.client.SSHClient()
