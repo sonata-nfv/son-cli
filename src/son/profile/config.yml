@@ -15,20 +15,14 @@ description: "A config file for use in the son profile environment. Currently on
 ##
 ## example:
 ##   address: "some_adress"
-##   package_port: this port and the next one will be used for the son-emu topology
-##   ssh_port: this port will be used to connect via ssh
+##   package_port: this port and the next one will be used for the son-emu topology. Optional, defaults to 5000
+##   ssh_port: this port will be used to connect via ssh. Optional, defaults to 22
 ##   ssh_user: this username will be used in the ssh connection. The user needs passless sudo!
 ##   ssh_key_loc: path to the ssh key that should be used. This should has to work with the ssh_user specified!
 target_platforms:
   localhost1:
     address: "127.0.0.1"
     package_port: 5000
-    ssh_port: 22
-    ssh_user: "ssh_user"
-    ssh_key_loc: "~/.ssh/id_rsa"
-  localhost2:
-    address: "127.0.0.1"
-    package_port: 6000
     ssh_port: 22
     ssh_user: "ssh_user"
     ssh_key_loc: "~/.ssh/id_rsa"
