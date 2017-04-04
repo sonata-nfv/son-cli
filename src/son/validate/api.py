@@ -1,3 +1,6 @@
+import os
+import json
+import coloredlogs
 from flask import Flask, Response, request, redirect
 from werkzeug.utils import secure_filename
 from son.validate.validate import Validator, print_result
@@ -5,6 +8,7 @@ from son.validate.validate import Validator, print_result
 UPLOAD_FOLDER = 'uploads'
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
 @app.route('/')
@@ -17,7 +21,8 @@ def validate_package():
 
     file = request.files['package']
     filename = secure_filename(file.filename)
-    file.save(filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
 
     syntax = (False if 'syntax' not in request.form
               else eval(request.form['syntax']))
@@ -32,23 +37,86 @@ def validate_package():
     validator.validate_package(filename)
     print_result(validator)
 
-    return "errors: {0}, warnings: {1}".format(validator.error_count,
-                                               validator.warning_count)
+    return generate_result(validator)
 
 
 @app.route('/validate/service/', methods=['POST'])
 def validate_service():
-    pass
+
+    file = request.files['service']
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    validator = Validator()
+    validator.configure(syntax=True, integrity=False,
+                        topology=False, debug=app.debug)
+    validator.validate_service(filepath)
+    print_result(validator)
+
+    return generate_result(validator)
 
 
 @app.route('/validate/function/', methods=['POST'])
 def validate_function():
-    pass
+
+    file = request.files['function']
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    validator = Validator()
+    validator.configure(syntax=True, integrity=False,
+                        topology=False, debug=app.debug)
+    validator.validate_function(filepath)
+    print_result(validator)
+
+    return generate_result(validator)
+
+
+def generate_result(validator):
+    report = dict()
+    report['errors'] = validator.error_count
+    report['warnings'] = validator.warning_count
+    return json.dumps(report).encode('ascii')
 
 
 def main():
+
+    coloredlogs.install(level='info')
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="SONATA Validator API. By default service runs on"
+                    " 127.0.0.1:5001\n"
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind address for this service",
+        required=False
+    )
+    parser.add_argument(
+        "--port",
+        default=5001,
+        type=int,
+        help="Bind port number",
+        required=False
+    )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        help="Sets verbosity level to debug",
+        required=False,
+        action="store_true"
+    )
+
+    args = parser.parse_args()
+
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
     app.run(
-        host='127.0.0.1',
-        port=5001,
-        debug=True
+        host=args.host,
+        port=args.port,
+        debug=args.debug
     )
