@@ -54,7 +54,8 @@ setup(
         package_data= {
             'son': ['schema/tests/son-schema/*', 'workspace/samples/*',
                     'monitor/docker_compose_files/*', 'monitor/grafana/*',
-                    'monitor/prometheus/*', 'monitor/*.exp']
+                    'monitor/prometheus/*', 'monitor/*.exp',
+                    'validate/eventcfg.yml']
         },
         # in jenkins, the last package in the list is installed first
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
