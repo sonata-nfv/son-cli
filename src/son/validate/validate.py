@@ -35,7 +35,9 @@ import time
 import shutil
 import atexit
 import errno
+import yaml
 import json
+from son.validate import event
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -46,6 +48,7 @@ from son.validate.util import read_descriptor_files, list_files, strip_root, \
 from networkx.readwrite import json_graph
 
 log = logging.getLogger(__name__)
+evtlog = event.get_logger(__name__)
 
 
 class Validator(object):
@@ -86,18 +89,26 @@ class Validator(object):
         log.warning = CountCalls(log.warning)
 
     @property
+    def errors(self):
+        return evtlog.errors
+
+    @property
     def error_count(self):
         """
         Provides the number of errors given during validation.
         """
-        return log.error.counter
+        return len(self.errors)
+
+    @property
+    def warnings(self):
+        return evtlog.warnings
 
     @property
     def warning_count(self):
         """
         Provides the number of warnings given during validation.
         """
-        return log.warning.counter
+        return len(self.warnings)
 
     def configure(self, syntax=None, integrity=None, topology=None,
                   dpath=None, dext=None, debug=False):
@@ -192,7 +203,9 @@ class Validator(object):
 
         # check if package is packed in the correct format
         if not zipfile.is_zipfile(package):
-            log.error("Invalid SONATA package '{}'".format(package))
+
+            evtlog.log("Invalid SONATA package '{}'".format(package),
+                       'evt_package_format_invalid')
             return
 
         package_dir = '.' + str(time.time())
@@ -205,6 +218,8 @@ class Validator(object):
 
         # validate package file structure
         if not self._validate_package_struct(package_dir):
+            evtlog.log("Invalid SONATA package structure '{}'".format(package),
+                       'evt_package_struct_invalid')
             return
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
@@ -259,8 +274,9 @@ class Validator(object):
 
         service = self._storage.create_service(nsd_file)
         if not service:
-            log.error("Failed to read the service descriptor of file '{}'"
-                      .format(nsd_file))
+            evtlog.log("Failed to read the service descriptor of file '{}'"
+                       .format(nsd_file),
+                       'evt_service_invalid_descriptor')
             return
 
         # validate service syntax
@@ -302,7 +318,8 @@ class Validator(object):
 
         function = self._storage.create_function(vnfd_path)
         if not function:
-            log.critical("Couldn't store VNF of file '{0}'".format(vnfd_path))
+            evtlog.log("Couldn't store VNF of file '{0}'".format(vnfd_path),
+                       'evt_function_invalid_descriptor')
             return
 
         if self._syntax and not self._validate_function_syntax(function):
@@ -368,8 +385,9 @@ class Validator(object):
                  .format(package.id))
         if not self._schema_validator.validate(
               package.content, SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
-            log.error("Invalid syntax in MANIFEST of package: '{0}'"
-                      .format(package.id))
+            evtlog.log("Invalid syntax in MANIFEST of package: '{0}'"
+                       .format(package.id),
+                       'evt_pd_stx_invalid')
             return
         return True
 
@@ -382,7 +400,8 @@ class Validator(object):
         log.info("Validating syntax of service '{0}'".format(service.id))
         if not self._schema_validator.validate(
               service.content, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-            log.error("Invalid syntax in service: '{0}'".format(service.id))
+            evtlog.log("Invalid syntax in service: '{0}'".format(service.id),
+                       'evt_nsd_stx_invalid')
             return
         return True
 
@@ -395,7 +414,8 @@ class Validator(object):
         log.info("Validating syntax of function '{0}'".format(function.id))
         if not self._schema_validator.validate(
               function.content, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-            log.error("Invalid syntax in function '{0}'".format(function.id))
+            evtlog.log("Invalid syntax in function '{0}'".format(function.id),
+                       'evt_vnfd_stx_invalid')
             return
         return True
 
@@ -414,17 +434,19 @@ class Validator(object):
             filename = os.path.join(root_dir, strip_root(f))
             log.debug("Verifying file '{0}'".format(f))
             if not os.path.isfile(filename):
-                log.error("Referenced descriptor file '{0}' is not "
-                          "packaged.".format(f))
+                evtlog.log("Referenced descriptor file '{0}' is not "
+                           "packaged.".format(f),
+                           'evt_pd_itg_invalid_reference')
                 return
 
             gen_md5 = generate_hash(filename)
             manif_md5 = package.md5(strip_root(f))
             if manif_md5 and gen_md5 != manif_md5:
-                log.warning("MD5 hash of file '{0}' is not equal to the "
-                            "defined in package descriptor:\nGen MD5:\t{1}\n"
-                            "MANIF MD5:\t{2}"
-                            .format(f, gen_md5, manif_md5))
+                evtlog.log("MD5 hash of file '{0}' is not equal to the "
+                           "defined in package descriptor:\nGen MD5:\t{1}\n"
+                           "MANIF MD5:\t{2}"
+                           .format(f, gen_md5, manif_md5),
+                           'evt_pd_itg_invalid_md5')
 
         # configure dpath for function referencing
         self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
@@ -449,37 +471,45 @@ class Validator(object):
 
         # get referenced function descriptors (VNFDs)
         if not self._load_service_functions(service):
-            log.error("Failed to read service function descriptors")
+            evtlog.log("Failed to read service function descriptors",
+                       'evt_nsd_itg_function_unavailable')
             return
 
         # validate service function descriptors (VNFDs)
         for fid, function in service.functions.items():
             if not self.validate_function(function.filename):
+                evtlog.log("Failed to validate function descriptor '{0}'"
+                           .format(function.filename),
+                           'evt_nsd_itg_function_invalid')
                 return
 
         # load service interfaces
         if not service.load_interfaces():
-            log.error("Couldn't load the connection points of service id='{0}'"
-                      .format(service.id))
+            evtlog.log("Couldn't load the connection points of service id='{0}'"
+                       .format(service.id),
+                       'evt_nsd_itg_badsection_cpoints')
             return
 
         # load service links
         if not service.load_virtual_links():
-            log.error("Couldn't load virtual links of service id='{0}'"
-                      .format(service.id))
+            evtlog.log("Couldn't load virtual links of service id='{0}'"
+                       .format(service.id),
+                       'evt_nsd_itg_badsection_vlinks')
             return
 
         undeclared = service.find_undeclared_interfaces()
         if undeclared:
-            log.error("Virtual links section has undeclared connection "
-                      "points: {0}".format(undeclared))
+            evtlog.log("Virtual links section has undeclared connection "
+                       "points: {0}".format(undeclared),
+                       'evt_nsd_itg_undeclared_cpoint')
             return
 
         # check for unused interfaces
         unused_ifaces = service.find_unused_interfaces()
         if unused_ifaces:
-            log.warning("Service has unused connection points: {0}"
-                        .format(unused_ifaces))
+            evtlog.log("Service has unused connection points: {0}"
+                       .format(unused_ifaces),
+                       'evt_nsd_itg_unused_cpoint')
 
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
@@ -487,17 +517,19 @@ class Validator(object):
                 if iface not in service.interfaces:
                     iface_tokens = iface.split(':')
                     if len(iface_tokens) != 2:
-                        log.error("Connection point '{0}' in virtual link "
-                                  "'{1}' is not defined"
-                                  .format(iface, lid))
+                        evtlog.log("Connection point '{0}' in virtual link "
+                                   "'{1}' is not defined"
+                                   .format(iface, lid),
+                                   'evt_nsd_itg_undefined_cpoint')
                         return
                     vnf_id = iface_tokens[0]
                     function = service.mapped_function(vnf_id)
                     if not function:
-                        log.error("Function (VNF) of vnf_id='{0}' declared "
-                                  "in connection point '{0}' in virtual link "
-                                  "'{1}' is not defined"
-                                  .format(vnf_id, iface, lid))
+                        evtlog.log("Function (VNF) of vnf_id='{0}' declared "
+                                   "in connection point '{0}' in virtual link "
+                                   "'{1}' is not defined"
+                                   .format(vnf_id, iface, lid),
+                                   'evt_nsd_itg_undefined_cpoint')
                         return
 
         return True
@@ -515,40 +547,46 @@ class Validator(object):
 
         # load function interfaces
         if not function.load_interfaces():
-            log.error("Couldn't load the interfaces of function id='{0}'"
-                      .format(function.id))
+            evtlog.log("Couldn't load the interfaces of function id='{0}'"
+                       .format(function.id),
+                       'evt_vnfd_itg_badsection_cpoints')
             return
 
         # load units
         if not function.load_units():
-            log.error("Couldn't load the units of function id='{0}'"
-                      .format(function.id))
+            evtlog.log("Couldn't load the units of function id='{0}'"
+                       .format(function.id),
+                       'evt_vnfd_itg_badsection_vdus')
             return
 
         # load interfaces of units
         if not function.load_unit_interfaces():
-            log.error("Couldn't load unit interfaces of function id='{0}'"
-                      .format(function.id))
+            evtlog.log("Couldn't load unit interfaces of function id='{0}'"
+                       .format(function.id),
+                       'evt_vnfd_itg_vdu_badsection_cpoints')
             return
 
         # load function links
         if not function.load_virtual_links():
-            log.error("Couldn't load the links of function id='{0}'"
-                      .format(function.id))
+            evtlog.log("Couldn't load the links of function id='{0}'"
+                       .format(function.id),
+                       'evt_vnfd_itg_badsection_vlinks')
             return
 
         # check for undeclared interfaces
         undeclared = function.find_undeclared_interfaces()
         if undeclared:
-            log.error("Virtual links section has undeclared connection "
-                      "points: {0}".format(undeclared))
+            evtlog.log("Virtual links section has undeclared connection "
+                       "points: {0}".format(undeclared),
+                       'evt_vnfd_itg_undeclared_cpoint')
             return
 
         # check for unused interfaces
         unused_ifaces = function.find_unused_interfaces()
         if unused_ifaces:
-            log.warning("Function has unused connection points: {0}"
-                        .format(unused_ifaces))
+            evtlog.log("Function has unused connection points: {0}"
+                       .format(unused_ifaces),
+                       'evt_vnfd_itg_unused_cpoint')
 
         # verify integrity between unit interfaces and units
         for lid, link in function.links.items():
@@ -556,9 +594,10 @@ class Validator(object):
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
                     if iface_tokens[0] not in function.units.keys():
-                        log.error("Invalid interface id='{0}' of link id='{1}'"
-                                  ": Unit id='{2}' is not defined"
-                                  .format(iface, lid, iface_tokens[0]))
+                        evtlog.log("Invalid interface id='{0}' of link id='{1}'"
+                                   ": Unit id='{2}' is not defined"
+                                   .format(iface, lid, iface_tokens[0]),
+                                   'evt_vnfd_itg_undefined_cpoint')
                         return
         return True
 
@@ -572,8 +611,9 @@ class Validator(object):
         # build service topology graph with VNF interfaces
         service.graph = service.build_topology_graph(level=1, bridges=False)
         if not service.graph:
-            log.error("Couldn't build topology graph of service '{0}'"
-                      .format(service.id))
+            evtlog.log("Couldn't build topology graph of service '{0}'"
+                       .format(service.id),
+                       'evt_nsd_top_topgraph_failed')
             return
 
         log.debug("Built topology graph of service '{0}': {1}"
@@ -586,13 +626,15 @@ class Validator(object):
             log.debug("Topology graph of service '{0}' is connected"
                       .format(service.id))
         else:
-            log.warning("Topology graph of service '{0}' is disconnected"
-                        .format(service.id))
+            evtlog.log("Topology graph of service '{0}' is disconnected"
+                       .format(service.id),
+                       'evt_nsd_top_topgraph_disconnected')
 
         # load forwarding paths
         if not service.load_forwarding_paths():
-            log.error("Couldn't load service forwarding paths. "
-                      "Aborting validation.")
+            evtlog.log("Couldn't load service forwarding paths. "
+                       "Aborting validation.",
+                       'evt_nsd_top_badsection_fwgraph')
             return
 
         # analyse forwarding paths
@@ -601,15 +643,17 @@ class Validator(object):
 
             # check if number of connection points is odd
             if len(fw_path) % 2 != 0:
-                log.warning("The forwarding path id='{0}' has an odd number "
-                            "of connection points".format(fpid))
+                evtlog.log("The forwarding path id='{0}' has an odd number "
+                           "of connection points".format(fpid),
+                           'evt_nsd_top_fwgraph_cpoints_odd')
 
             trace = service.trace_path(fw_path)
             if 'BREAK' in trace:
-                log.error("The forwarding path id='{0}' is invalid for the "
-                          "specified topology. {1} breakpoint(s) "
-                          "found the path: {2}"
-                          .format(fpid, trace.count('BREAK'), trace))
+                evtlog.log("The forwarding path id='{0}' is invalid for the "
+                           "specified topology. {1} breakpoint(s) "
+                           "found the path: {2}"
+                           .format(fpid, trace.count('BREAK'), trace),
+                           'evt_nsd_top_fwpath_invalid')
                 # skip further analysis on this path
                 continue
 
@@ -620,8 +664,9 @@ class Validator(object):
             fpg.add_path(trace)
             cycles = Validator._find_graph_cycles(fpg, fpg.nodes()[0])
             if cycles and len(cycles) > 0:
-                log.warning("Found cycles forwarding path id={0}: {1}"
-                            .format(fpid, cycles))
+                evtlog.log("Found cycles forwarding path id={0}: {1}"
+                           .format(fpid, cycles),
+                           'evt_nsd_top_fwpath_cycles')
 
         return True
 
@@ -639,8 +684,9 @@ class Validator(object):
         # build function topology graph
         function.graph = function.build_topology_graph(bridges=True)
         if not function.graph:
-            log.error("Couldn't build topology graph of function '{0}'"
-                      .format(function.id))
+            evtlog.log("Couldn't build topology graph of function '{0}'"
+                       .format(function.id),
+                       'evt_vnfd_top_topgraph_failed')
             return
 
         log.debug("Built topology graph of function '{0}': {1}"
@@ -712,14 +758,16 @@ class Validator(object):
         # load project service descriptor (NSD)
         nsd_files = project.get_ns_descriptor()
         if not nsd_files:
-            log.critical("Couldn't find a service descriptor in project '[0}'"
-                         .format(project.project_root))
+            evtlog.log("Couldn't find a service descriptor in project '[0}'"
+                       .format(project.project_root),
+                       'evt_project_service_invalid')
             return False
 
         if len(nsd_files) > 1:
-            log.critical("Found multiple service descriptors in project "
-                         "'{0}': {1}"
-                         .format(project.project_root, nsd_files))
+            evtlog.log("Found multiple service descriptors in project "
+                       "'{0}': {1}"
+                       .format(project.project_root, nsd_files),
+                       'evt_project_service_multiple')
             return False
 
         return nsd_files[0]
@@ -778,16 +826,26 @@ class Validator(object):
                                              .format(service.id, lvl)))
 
 
-def print_result(validator):
+def print_result(validator, result):
 
-    if validator.error_count:
-        log.error("Validation failed with {0} error(s) and {1} warning(s)"
-                  .format(validator.error_count, validator.warning_count))
-    elif validator.warning_count:
-        log.warning("Validation completed with {0} warning(s)"
-                    .format(validator.warning_count))
+    if not result:
+        log.critical("VALIDATION FAILED")
     else:
-        log.info("Validation succeeded")
+        log.info("VALIDATION SUCCEEDED")
+
+    print("==== Statistics: {0} error(s) and {1} warning(s) ===="
+          .format(validator.error_count, validator.warning_count))
+    print("Errors: {0}".format(validator.errors))
+    print("Warnings: {0}".format(validator.warnings))
+
+    # if validator.error_count:
+    #     log.error("Validation failed with {0} error(s) and {1} warning(s)"
+    #               .format(validator.error_count, validator.warning_count))
+    # elif validator.warning_count:
+    #     log.warning("Validation completed with {0} warning(s)"
+    #                 .format(validator.warning_count))
+    # else:
+    #     log.info("Validation succeeded")
 
 
 def main():
@@ -920,8 +978,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        validator.validate_package(args.package_file)
-        print_result(validator)
+        result = validator.validate_package(args.package_file)
+        print_result(validator, result)
 
     elif args.project_path:
 
