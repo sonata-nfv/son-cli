@@ -278,7 +278,7 @@ def config_file_exists(file_path):
     with open(file_path, "r") as f:
         config_dict = yaml.load(f)
         if not "target_platforms" in config_dict:
-            raise argparse.ArgumentError("%r does not contain a target platforms descriptor."%file_path)
+            raise argparse.ArgumentTypeError("%r does not contain a target platforms descriptor."%file_path)
     f.close()
     return file_path
 
@@ -287,7 +287,7 @@ def config_file_exists(file_path):
 """
 def package_file_exists(file_path):
     if not os.path.exists(file_path):
-        raise argparse.ArgumentError("%r needs to be an existing file."%file_path)
+        raise argparse.ArgumentTypeError("%r needs to be an existing file."%file_path)
     return file_path
 
 if __name__=='__main__':
