@@ -37,6 +37,7 @@ import threading
 import yaml
 import os
 import stat
+import argparse
 
 # define some constants for easy changing
 # will likely be removed as default values dont make sense past testing
@@ -267,16 +268,50 @@ class Emulator:
                 if self.remote_logging:
                     LOG.error(line)
 
+"""
+ Checks whether the given file path is an existing config file
+"""
+def config_file_exists(file_path):
+    if not os.path.exists(file_path):
+        raise argparse.ArgumentError("%r needs to be an existing file."%file_path)
+    with open(file_path, "r") as f:
+        config_dict = yaml.load(f)
+        if not "target_platforms" in config_dict:
+            raise argparse.ArgumentError("%r does not contain a target platforms descriptor."%file_path)
+    f.close()
+    return file_path
+
+"""
+ Checks whether the given file_path if an existing file
+"""
+def package_file_exists(file_path):
+    if not os.path.exists(file_path):
+        raise argparse.ArgumentError("%r needs to be an existing file."%file_path)
+    return file_path
+
 if __name__=='__main__':
-    # open config file to extract target platforms
-    with open("src/son/profile/config.yml", "r") as tpd:
+    parser = argparse.ArgumentParser(description="Run experiments with the given son packages")
+    parser.add_argument("--time", "-t",
+            help="The runtime of every experiment",
+            type=int, default=10, required=False, dest="time", metavar="seconds")
+    parser.add_argument("--remote-logging",
+            help="Enable showing logs of remote topology",
+            action="store_true", required=False, dest="rem_log")
+    parser.add_argument("--config-file", "-c",
+            help="Specify which config file to use for specification of remote hosts",
+            required=False, dest="config", type=config_file_exists, metavar="Config Path")
+    parser.add_argument("package_path",
+            help="Path to a package",
+            nargs="+", type=package_file_exists, metavar="Package Path")
+    args = parser.parse_args()
+
+    config_path = args.config
+    if not config_path:
+        config_path = "src/son/profile/config.yml"
+    with open(config_path, "r") as tpd:
         conf = yaml.load(tpd)
     tpd.close()
-    # init emulator
-    e = Emulator(tpd=conf)
-    # define experiments, will be extracted from a file when used in code
-    experiments = dict()
-    for i in range(1):
-        experiments[i] = '~/son-emu/misc/sonata-demo-service.son'
-    # run the experiments
-    e.do_experiment_series(experiments, runtime=10)
+    remote_logging = args.rem_log
+    e = Emulator(tpd=conf, remote_logging=remote_logging)
+    experiments = {i: args.package_path[i] for i in range(len(args.package_path))}
+    e.do_experiment_series(experiments, runtime=args.time)
