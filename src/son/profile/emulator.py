@@ -40,10 +40,8 @@ import stat
 
 # define some constants for easy changing
 # will likely be removed as default values dont make sense past testing
-DEFAULT_KEY_LOC = "~/.ssh/id_rsa"
 PATH_COMMAND = "cd ~/son-emu"
 EXEC_COMMAND = "sudo python src/emuvim/examples/profiling.py"
-DEFAULT_SSH_USER_NAME = "ssh_user"
 
 # create a Logger
 logging.basicConfig()
