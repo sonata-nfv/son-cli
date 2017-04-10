@@ -228,7 +228,8 @@ class Emulator:
                 for f in more_files:
                     # we need the full path
                     files_to_copy.append(os.path.join(file_path,f))
-                os.makedirs(os.path.join(local_path, file_path))
+                if not os.path.exists(os.path.join(local_path, file_path)):
+                    os.makedirs(os.path.join(local_path, file_path))
             elif stat.S_ISREG(file_mode):
                 # the "file" is an actual file
                 LOG.debug("Run %r: Found file %s"%(run_id, file_path))
