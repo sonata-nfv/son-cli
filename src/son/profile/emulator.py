@@ -57,8 +57,10 @@ class Emulator:
     """
      Initialize with a list of descriptors of workers to run experiments on
      :tpd: target platforms descriptor. A dictionary describing the remote hosts on which service can be tested or a dictionary containing a key which value is the descriptor
+     :remote_logging: Set it to True if logs of the remote topology should be shown in the local log files.
+        WARNING: They will be shown at the end of each experiment, will not neccessarily be complete and are output as logging error, probably because of mininet
     """
-    def __init__(self, tpd):
+    def __init__(self, tpd, remote_logging=False):
         # if the whole config dictionary has been given, extract only the target platforms
         # a descriptor version should only be in the top level of the file
         if "descriptor_version" in tpd:
@@ -72,6 +74,13 @@ class Emulator:
         self.available_nodes = self.emulator_nodes.keys()
         LOG.info("%r nodes found."%len(self.emulator_nodes))
         LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
+
+        # save the remote_logging flag
+        if remote_logging:
+            LOG.info("Remote logs will be shown.")
+        else:
+            LOG.info("Remote logs will not be shown.")
+        self.remote_logging = remote_logging
 
     """
      Conduct multiple experiments using the do_experiment method
@@ -227,9 +236,11 @@ class Emulator:
         comm_in.close()
         while not (comm_out.channel.exit_status_ready() and comm_err.channel.exit_status_ready()):
             for line in comm_out.read().splitlines():
-                LOG.debug(line)
+                if self.remote_logging:
+                    LOG.debug(line)
             for line in comm_err.read().splitlines():
-                LOG.error(line)
+                if self.remote_logging:
+                    LOG.error(line)
 
 if __name__=='__main__':
     # open config file to extract target platforms
