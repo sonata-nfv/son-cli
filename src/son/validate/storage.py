@@ -29,8 +29,10 @@ import logging
 import networkx as nx
 from collections import OrderedDict
 from son.validate.util import descriptor_id, read_descriptor_file
+from son.validate import event
 
 log = logging.getLogger(__name__)
+evtlog = event.get_logger(__name__)
 
 
 class DescriptorStorage(object):
@@ -182,8 +184,9 @@ class Node:
         :param interface: interface id
         """
         if interface in self.interfaces:
-            log.error("The interface id='{0}' is already stored in node "
-                      "id='{1}'".format(interface, self.id))
+            evtlog.log("The interface id='{0}' is already stored in node "
+                       "id='{1}'".format(interface, self.id),
+                       'evt_duplicate_cpoint')
             return
         log.debug("Node id='{0}': adding connection point '{1}'"
                   .format(self.id, interface))
@@ -800,8 +803,9 @@ class Service(Descriptor):
         service content.
         """
         if 'forwarding_graphs' not in self.content:
-            log.debug("No forwarding graphs available in service id='{0}'"
-                      .format(self.id))
+            evtlog.log("No forwarding graphs available in service id='{0}'"
+                       .format(self.id),
+                       'evt_nsd_top_fwgraph_unavailable')
             return
 
         for fgraph in self.content['forwarding_graphs']:
@@ -812,15 +816,17 @@ class Service(Descriptor):
                     pos = cxpt['position']
                     if iface not in self.interfaces and \
                        not self._interface_in_functions(iface):
-                        log.error("Connection point '{0}' of forwarding path "
-                                  "'{1}' is not defined"
-                                  .format(iface, fpath['fp_id']))
+                        evtlog.log("Connection point '{0}' of forwarding path "
+                                   "'{1}' is not defined"
+                                   .format(iface, fpath['fp_id']),
+                                   'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
                     if pos in path_dict:
-                        log.warning("Duplicate referenced position '{0}' "
-                                    "in forwarding path id='{1}'. Ignoring "
-                                    "connection point: '{2}'"
-                                    .format(pos, fpath['fp_id'], path_dict[pos]))
+                        evtlog.log("Duplicate referenced position '{0}' "
+                                   "in forwarding path id='{1}'. Ignoring "
+                                   "connection point: '{2}'"
+                                   .format(pos, fpath['fp_id'], path_dict[pos]),
+                                   'evt_nsd_top_fwgraph_position_duplicate')
                     path_dict[pos] = iface
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
