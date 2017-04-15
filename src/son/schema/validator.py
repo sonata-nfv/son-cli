@@ -32,8 +32,6 @@ import yaml
 import jsonschema
 
 # using urllib sometimes results in connection reset errors when trying to download remote schema
-#import urllib
-#from urllib.request import URLError
 # using requests instead
 import requests
 from requests import RequestException
@@ -280,8 +278,6 @@ def load_remote_schema(template_url):
     :param template_url: The URL of the required schema
     :return: The loaded schema as a dictionary
     """
-    #response = urllib.request.urlopen(template_url)
-    #tf = response.read().decode(response.headers.get_content_charset())
     response = requests.get(template_url)
     tf = response.text
     schema = yaml.load(tf)

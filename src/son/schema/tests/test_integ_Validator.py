@@ -27,7 +27,7 @@
 import unittest
 import pkg_resources
 import os
-from urllib.error import HTTPError
+from requests import RequestException
 from son.schema.validator import load_local_schema, load_remote_schema
 
 
@@ -63,7 +63,7 @@ class IntLoadSchemaTests(unittest.TestCase):
         Test if it raises a HTTP error with a valid
         but unavailable schema URL.
         """
-        self.assertRaises(HTTPError,
+        self.assertRaises(RequestException,
                           load_remote_schema,
                           "http://somerandomurl.com/artifact.yml")
 
