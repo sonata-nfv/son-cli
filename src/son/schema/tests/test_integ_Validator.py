@@ -28,7 +28,9 @@ import unittest
 import pkg_resources
 import os
 from requests import RequestException
+from requests.exceptions import InvalidURL, HTTPError, MissingSchema
 from son.schema.validator import load_local_schema, load_remote_schema
+
 
 
 class IntLoadSchemaTests(unittest.TestCase):
@@ -63,7 +65,7 @@ class IntLoadSchemaTests(unittest.TestCase):
         Test if it raises a HTTP error with a valid
         but unavailable schema URL.
         """
-        self.assertRaises(RequestException,
+        self.assertRaises(HTTPError,
                           load_remote_schema,
                           "http://somerandomurl.com/artifact.yml")
 
@@ -72,7 +74,7 @@ class IntLoadSchemaTests(unittest.TestCase):
         Test if it raises an error with an invalid
         schema URL.
         """
-        self.assertRaises(ValueError,
+        self.assertRaises(MissingSchema,
                           load_remote_schema,
                           "some.incorrect/..url")
 

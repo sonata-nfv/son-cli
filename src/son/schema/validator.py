@@ -34,14 +34,13 @@ import jsonschema
 # using urllib sometimes results in connection reset errors when trying to download remote schema
 # using requests instead
 import requests
-from requests import RequestException
+from requests.exceptions import RequestException
 
 from jsonschema import SchemaError
 from jsonschema import ValidationError
 from son.workspace.workspace import Workspace
 
 log = logging.getLogger(__name__)
-
 
 class SchemaValidator(object):
 
@@ -147,10 +146,10 @@ class SchemaValidator(object):
 
                 return self._schemas_library[template]
 
-            except RequestException:
+            except RequestException as e:
                 log.warning("Could not load schema '{}' from remote "
-                            "location '{}'"
-                            .format(template, schema_addr))
+                            "location '{}', error: {}"
+                            .format(template, schema_addr, e))
         else:
             log.warning("Invalid schema URL '{}'".format(schema_addr))
 
@@ -279,6 +278,7 @@ def load_remote_schema(template_url):
     :return: The loaded schema as a dictionary
     """
     response = requests.get(template_url)
+    response.raise_for_status()
     tf = response.text
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
