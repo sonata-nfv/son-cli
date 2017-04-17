@@ -1,9 +1,13 @@
 import os
 import json
+import logging
 import coloredlogs
-from flask import Flask, Response, request, redirect
+import atexit
+from flask import Flask, Response, request, redirect, g
 from werkzeug.utils import secure_filename
 from son.validate.validate import Validator, print_result
+
+log = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = 'uploads'
 
@@ -16,13 +20,11 @@ def root():
     pass
 
 
-@app.route('/validate/package/', methods=['POST'])
+@app.route('/validate/package', methods=['POST'])
 def validate_package():
 
     file = request.files['package']
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    filepath = upload_file(file)
 
     syntax = (False if 'syntax' not in request.form
               else eval(request.form['syntax']))
@@ -34,51 +36,78 @@ def validate_package():
     validator = Validator()
     validator.configure(syntax=syntax, integrity=integrity,
                         topology=topology, debug=app.debug)
-    validator.validate_package(filename)
-    print_result(validator)
+    result = validator.validate_package(filepath)
+    print_result(validator, result)
+    remove_file(filepath)
 
     return generate_result(validator)
 
 
-@app.route('/validate/service/', methods=['POST'])
+@app.route('/validate/service', methods=['POST'])
 def validate_service():
 
     file = request.files['service']
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    filepath = upload_file(file)
 
     validator = Validator()
     validator.configure(syntax=True, integrity=False,
                         topology=False, debug=app.debug)
-    validator.validate_service(filepath)
-    print_result(validator)
+    result = validator.validate_service(filepath)
+    print_result(validator, result)
+    remove_file(filepath)
 
     return generate_result(validator)
 
 
-@app.route('/validate/function/', methods=['POST'])
+@app.route('/validate/function', methods=['POST'])
 def validate_function():
 
     file = request.files['function']
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    filepath = upload_file(file)
 
     validator = Validator()
     validator.configure(syntax=True, integrity=False,
                         topology=False, debug=app.debug)
-    validator.validate_function(filepath)
-    print_result(validator)
+    result = validator.validate_function(filepath)
+    print_result(validator, result)
+    remove_file(filepath)
 
     return generate_result(validator)
 
 
 def generate_result(validator):
     report = dict()
-    report['errors'] = validator.error_count
-    report['warnings'] = validator.warning_count
-    return json.dumps(report).encode('ascii')
+    report['error_count'] = validator.error_count
+    report['warning_count'] = validator.warning_count
+
+    if validator.error_count:
+        report['errors'] = validator.errors
+    if validator.warning_count:
+        report['warnings'] = validator.warnings
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('ascii')
+
+
+def upload_file(file):
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    return filepath
+
+
+def remove_file(filepath):
+    os.remove(filepath)
+
+
+@atexit.register
+def clear_artifacts():
+    log.debug("Cleaning up")
+    try:
+        os.rmdir(app.config['UPLOAD_FOLDER'], )
+    except OSError:
+        pass
 
 
 def main():
@@ -113,7 +142,8 @@ def main():
 
     args = parser.parse_args()
 
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    if args.debug:
+        coloredlogs.install(level='debug')
 
     app.run(
         host=args.host,
