@@ -133,6 +133,7 @@ class Validator(object):
         if dpath is not None:
             self._dpath = dpath
         if debug:
+            print("yay")
             coloredlogs.install(level='debug')
 
     def _assert_configuration(self):
