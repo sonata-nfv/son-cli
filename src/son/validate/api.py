@@ -104,7 +104,10 @@ def remove_file(filepath):
 @atexit.register
 def clear_artifacts():
     log.debug("Cleaning up")
-    os.rmdir(app.config['UPLOAD_FOLDER'])
+    try:
+        os.rmdir(app.config['UPLOAD_FOLDER'], )
+    except OSError:
+        pass
 
 
 def main():
