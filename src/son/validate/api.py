@@ -20,7 +20,7 @@ def root():
     pass
 
 
-@app.route('/validate/package/', methods=['POST'])
+@app.route('/validate/package', methods=['POST'])
 def validate_package():
 
     file = request.files['package']
@@ -43,7 +43,7 @@ def validate_package():
     return generate_result(validator)
 
 
-@app.route('/validate/service/', methods=['POST'])
+@app.route('/validate/service', methods=['POST'])
 def validate_service():
 
     file = request.files['service']
@@ -59,7 +59,7 @@ def validate_service():
     return generate_result(validator)
 
 
-@app.route('/validate/function/', methods=['POST'])
+@app.route('/validate/function', methods=['POST'])
 def validate_function():
 
     file = request.files['function']
