@@ -34,8 +34,8 @@ def validate_package():
     validator = Validator()
     validator.configure(syntax=syntax, integrity=integrity,
                         topology=topology, debug=app.debug)
-    validator.validate_package(filename)
-    print_result(validator)
+    result = validator.validate_package(filename)
+    print_result(validator, result)
 
     return generate_result(validator)
 
@@ -51,8 +51,8 @@ def validate_service():
     validator = Validator()
     validator.configure(syntax=True, integrity=False,
                         topology=False, debug=app.debug)
-    validator.validate_service(filepath)
-    print_result(validator)
+    result = validator.validate_service(filepath)
+    print_result(validator, result)
 
     return generate_result(validator)
 
@@ -68,17 +68,23 @@ def validate_function():
     validator = Validator()
     validator.configure(syntax=True, integrity=False,
                         topology=False, debug=app.debug)
-    validator.validate_function(filepath)
-    print_result(validator)
+    result = validator.validate_function(filepath)
+    print_result(validator, result)
 
     return generate_result(validator)
 
 
 def generate_result(validator):
     report = dict()
-    report['errors'] = validator.error_count
-    report['warnings'] = validator.warning_count
-    return json.dumps(report).encode('ascii')
+    report['error_count'] = validator.error_count
+    report['warning_count'] = validator.warning_count
+
+    if validator.error_count:
+        report['errors'] = validator.errors
+    if validator.warning_count:
+        report['warnings'] = validator.warnings
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('ascii')
 
 
 def main():

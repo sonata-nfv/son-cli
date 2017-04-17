@@ -10,10 +10,8 @@ class EventLogger(object):
         self._name = name
         self._log = logging.getLogger(name)
         self._events = dict()
+        self.init_events()
 
-        # initialize events logger
-        for l in ['error', 'warning', 'none']:
-            self._events[l] = []
 
         # load events config
         configpath = pkg_resources.resource_filename(
@@ -28,6 +26,15 @@ class EventLogger(object):
     @property
     def warnings(self):
         return self._events['warning']
+
+    def reset(self):
+        self._events.clear()
+        self.init_events()
+
+    def init_events(self):
+        # initialize events logger
+        for l in ['error', 'warning', 'none']:
+            self._events[l] = []
 
     def log(self, msg, event):
         level = self._eventdict[event]

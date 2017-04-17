@@ -84,9 +84,8 @@ class Validator(object):
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-        # wrapper to count number of errors and warnings
-        log.error = CountCalls(log.error)
-        log.warning = CountCalls(log.warning)
+        # reset event logger
+        evtlog.reset()
 
     @property
     def errors(self):
