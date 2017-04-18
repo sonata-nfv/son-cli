@@ -68,17 +68,3 @@ def get_logger(name):
     if not name:
         return
     return EventLogger.manager.get_logger(name)
-
-
-if __name__ == "__main__":
-
-    evtlog_ola = get_logger('ola')
-    evtlog_ola.log("invalid package format", 'evt_package_invalid_format')
-
-    evtlog_mundo = get_logger('mundo')
-    evtlog_mundo.log("invalid md5 in package", 'evt_package_invalid_md5')
-
-
-    print(evtlog_ola.errors)
-
-
