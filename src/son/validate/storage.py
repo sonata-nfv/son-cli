@@ -747,7 +747,7 @@ class Service(Descriptor):
                 brnode = 'br-' + bid
                 node_attrs = def_node_attrs.copy()
                 node_attrs['label'] = brnode
-                node_attrs['level'] = 0
+                node_attrs['level'] = 1
                 node_attrs['type'] = 'bridge'
 
                 # add 'router' node for this bridge
@@ -1086,7 +1086,7 @@ class Function(Descriptor):
                 brnode = "br-" + bid
                 node_attrs = def_node_attrs.copy()
                 node_attrs['label'] = brnode
-                node_attrs['level'] = 1
+                node_attrs['level'] = 2
                 node_attrs['type'] = 'bridge'
                 graph.add_node(brnode, attr_dict=node_attrs)
 

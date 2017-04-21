@@ -46,5 +46,5 @@ def __generate_hash_path__(p, cs=128):
     hash = hashlib.md5()
     for root, dir, files in os.walk(p):
         for f in files:
-            hash.update(__generate_hash__(f, cs))
+            hash.update(__generate_hash__(f), cs)
     return hash.hexdigest()
