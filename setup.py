@@ -70,7 +70,7 @@ setup(
                 'son-monitor=son.monitor.monitor:main',
                 'son-profile=son.profile.profile:main',
                 'son-validate=son.validate.validate:main',
-                'son-validate-api=son.validate.api:main',
+                'son-validate-api=son.validate.api.api:main',
                 'son-access=son.access.access:main'
             ],
         },
