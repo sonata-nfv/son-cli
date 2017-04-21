@@ -405,7 +405,7 @@ class Emu():
             if self.emu_in_vm:
                 terminal_cmd = "./ssh_login.exp {0} {1} {2} '{3}'".format(self.son_emu_ip, self.ssh_user,
                                                                        self.ssh_password, terminal_cmd)
-            cmd = ['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
+            cmd = ['xterm', '-xrm', 'XTerm*selectToClipboard: true', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
                    '-e', terminal_cmd]
             Popen(cmd)
 

@@ -314,6 +314,8 @@ class msd():
             flow_metric = metric2flow_metric[metric_type2]
             # metrics of cadvisor al already exported by default
             if not '_cadv' in metric_type:
+                if vnf_interface is None:
+                    vnf_interface = ''
                 r = self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
                 LOG.info('start link metric ret:{0}'.format(r))
             query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
