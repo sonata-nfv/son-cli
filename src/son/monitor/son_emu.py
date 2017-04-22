@@ -24,7 +24,7 @@ partner consortium (www.sonata-nfv.eu).
 from requests import get, put, delete, Session
 from son.monitor.utils import *
 from son.monitor.prometheus_lib import query_Prometheus
-from subprocess import Popen
+from subprocess import Popen, check_output, check_call
 import os
 import sys
 import pkg_resources
@@ -170,7 +170,30 @@ class Emu():
         #process.wait()
         return process
 
-    def docker_exec(self, cmd, vnf_name, action='start'):
+    def host_exec(self, cmd, action='start'):
+        wait = False
+        if action == "stop":
+            # remove quotes from command
+            # remove whole process tree
+            # send SIGTERM (not SIGKILL -9)
+            cmd_new = cmd.replace('"', '')
+            cmd_new = "pkill -15 -f '" + cmd_new + "'"
+            #cmd = "kill -TERM -- -$(pgrep -f '{cmd}')".format(cmd=cmd.replace('"',''))
+            cmd_list = shlex.split(cmd_new)
+            wait = True
+        else:
+            cmd_list = shlex.split(cmd)
+
+        p = Popen(cmd_list)
+
+        LOG.info('vnf: {0} executing command: {1}'.format('host', cmd_list))
+        if wait:
+            p.wait()
+        else:
+            # allow some time to start the cmd
+            sleep(1)
+
+    def docker_exec(self, cmd, vnf_name, action):
 
         docker_name = 'mn.' + str(vnf_name)
         container = self.docker_client.containers.get(docker_name)
@@ -198,6 +221,13 @@ class Emu():
         else:
             # allow some time to start the cmd
             sleep(1)
+
+    def exec(self, cmd, vnf_name, action='start'):
+        if vnf_name == 'host':
+            self.host_exec(cmd, action)
+        else:
+            self.docker_exec(cmd, vnf_name, action)
+
 
     # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):

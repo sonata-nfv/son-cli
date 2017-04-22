@@ -48,6 +48,9 @@ class Experiment(object):
         self.configuration_space_dict = dict()
         self.overload_vnf_list = list()
 
+    def get(self, key, default=None):
+        return self.__dict__.get(key, default)
+
     def populate(self):
         """
         Search for parameter study macros and generate
@@ -55,10 +58,10 @@ class Experiment(object):
         to be tested.
         """
         # convert parameter macros from PED file to plain lists
-        for rl in self.resource_limitations:
+        for rl in self.get('resource_limitations', []):
             rewrite_parameter_macros_to_lists(rl)
         # convert measurment points from PED file to plain lists
-        for mp in self.measurement_points:
+        for mp in self.get('measurement_points', []):
             rewrite_parameter_macros_to_lists(mp)
 
         # check for vnfs that need overload detection
@@ -97,7 +100,7 @@ class Experiment(object):
         }
         """
         m = dict()
-        for mp in self.measurement_points:
+        for mp in self.get('measurement_points', []):
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("configuration")
             # check if not empty
@@ -120,13 +123,13 @@ class Experiment(object):
         cmds = dict()
         vnf_name2order = dict()
         vnforder_list = []
-        for mp in self.measurement_points:
+        for mp in self.get('measurement_points', []):
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("cmd")
             cmd_order = mp.get("cmd_order")
             # check if not empty
             if not vnf_cmds:
-                return (cmds, vnforder_list)
+                continue
             # make sure the cmds are in a list
             if not isinstance(vnf_cmds, list):
                 vnf_cmds = [vnf_cmds]
@@ -153,7 +156,7 @@ class Experiment(object):
          "repetition" : [1, 2, 3]}
         """
         r = dict()
-        for rl in self.resource_limitations:
+        for rl in self.get('resource_limitations', []):
             name = rl.get("function")
             for k, v in rl.items():
                 if k == "function":

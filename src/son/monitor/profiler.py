@@ -86,13 +86,18 @@ class Emu_Profiler():
         #class to control son-emu (export/query metrics)
         self.emu = Emu(SON_EMU_API)
         # list of class Metric
-        self.input_msd = msd(input_msd_path, self.emu, title=self.title)
-        self.input_metrics = self.input_msd.get_metrics_list()
-        LOG.info('input metrics:{0}'.format(self.input_metrics))
-
-        self.output_msd = msd(output_msd_path, self.emu, title=self.title)
-        self.output_metrics = self.output_msd.get_metrics_list()
-        LOG.info('output metrics:{0}'.format(self.output_metrics))
+        self.input_metrics = []
+        self.input_msd = None
+        if input_msd_path:
+            self.input_msd = msd(input_msd_path, self.emu, title=self.title)
+            self.input_metrics = self.input_msd.get_metrics_list()
+            LOG.info('input metrics:{0}'.format(self.input_metrics))
+        self.output_metrics = []
+        self.output_msd = None
+        if output_msd_path:
+            self.output_msd = msd(output_msd_path, self.emu, title=self.title)
+            self.output_metrics = self.output_msd.get_metrics_list()
+            LOG.debug('output metrics:{0}'.format(self.output_metrics))
 
 
         # each list item is a dict with {vnf_name:"cmd_to_execute", ..}
@@ -118,8 +123,10 @@ class Emu_Profiler():
         sonmonitor.monitor.start_containers()
 
         # export msd's to Grafana
-        self.input_msd.start()
-        self.output_msd.start(overwrite=False)
+        if input_msd_path:
+            self.input_msd.start()
+        if output_msd_path:
+            self.output_msd.start(overwrite=True)
 
         overload_vnf_list = defaults.get('overload_vnf_list')
         self.overload_monitor = Overload_Monitor(vnf_list=overload_vnf_list)
@@ -142,7 +149,7 @@ class Emu_Profiler():
         # start configuration commands
         for vnf_name, cmd_list in self.configuration_commands.items():
             for cmd in cmd_list:
-                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd)
 
         # start overload detection
         self.overload_monitor.start(self.emu)
@@ -182,8 +189,10 @@ class Emu_Profiler():
         self.run_number = 1
 
         # one cmd_dict per profile run
+        LOG.info("input commands: {0}".format(self.input_commands))
         for cmd_dict in self.input_commands:
             # configure all resource settings for every input command
+            LOG.info("resource config: {0}".format(self.resource_configuration))
             for resource_dict in self.resource_configuration:
 
                 # reset metrics
@@ -195,7 +204,7 @@ class Emu_Profiler():
                 # start the load
                 for vnf_name in self.vnforder_list:
                     cmd = cmd_dict[vnf_name]
-                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+                    self.emu.exec(vnf_name=vnf_name, cmd=cmd)
                 #for vnf_name, cmd in cmd_dict:
                 #    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, ensure=True)
 
@@ -217,7 +226,7 @@ class Emu_Profiler():
 
                 # stop the load
                 for vnf_name, cmd in cmd_dict.items():
-                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, action='stop')
+                    self.emu.exec(vnf_name=vnf_name, cmd=cmd, action='stop')
 
                 # add the result of this profiling run to the results list
                 profiling_result = dict(
@@ -375,6 +384,7 @@ class Emu_Profiler():
             try:
                 ret = query_Prometheus(query)
                 metric.addValue(float(ret[1]))
+                LOG.info('metric: {0}={1}'.format(metric.metric_name, float(ret[1])))
             except:
                  LOG.info('Prometheus query failed: {0} \nquery: {1} \nerror:{2}'.format(ret, query, sys.exc_info()[0]))
                  continue

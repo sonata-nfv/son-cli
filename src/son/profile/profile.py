@@ -76,7 +76,8 @@ class ProfileManager(object):
         """
         # try to load PED file
         self.ped = self._load_ped_file(self.args.config)
-        self._validate_ped_file(self.ped)
+        # temporarily disabled until format is fixed
+        #self._validate_ped_file(self.ped)
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
 
@@ -84,12 +85,12 @@ class ProfileManager(object):
         # only service experiments are executed
         if not self.args.no_execution :
             for experiment in self.service_experiments:
-                input_msd_path = experiment.input_metrics
-                output_msd_path = experiment.output_metrics
-                input_commands = experiment.command_space_list
-                configuration_commands = experiment.configuration_space_dict
-                resource_list = experiment.resource_space_list
-                timeout = experiment.time_limit
+                input_msd_path = experiment.get('input_metrics')
+                output_msd_path = experiment.get('output_metrics')
+                input_commands = experiment.get('command_space_list')
+                configuration_commands = experiment.get('configuration_space_dict')
+                resource_list = experiment.get('resource_space_list')
+                timeout = experiment.get('time_limit')
                 profiler = Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,
@@ -164,13 +165,13 @@ class ProfileManager(object):
         function_experiments = list()
 
         # service experiments
-        for e in input_ped.get("service_experiments"):
+        for e in input_ped.get("service_experiments", []):
             e_obj = ServiceExperiment(e)
             e_obj.populate()
             service_experiments.append(e_obj)
 
         # function experiments
-        for e in input_ped.get("function_experiments"):
+        for e in input_ped.get("function_experiments", []):
             e_obj = FunctionExperiment(e)
             e_obj.populate()
             function_experiments.append(e_obj)
