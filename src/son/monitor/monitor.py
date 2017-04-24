@@ -337,7 +337,7 @@ def _execute_command(args):
     elif args["command"] is not None:
         VIM_class = eval(args.get('vim'))
         # call the VIM class method with the same name as the command arg
-        ret = getattr(VIM_class, args["command"][0])(**args)
+        ret = getattr(VIM_class, args["command"][0])(**args, monitor=monitor)
         logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
 
         pp.pprint(ret)

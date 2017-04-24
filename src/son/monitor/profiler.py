@@ -128,8 +128,8 @@ class Emu_Profiler():
         if output_msd_path:
             self.output_msd.start(overwrite=True)
 
-        overload_vnf_list = defaults.get('overload_vnf_list')
-        self.overload_monitor = Overload_Monitor(vnf_list=overload_vnf_list)
+        self.overload_vnf_list = defaults.get('overload_vnf_list')
+        self.overload_monitor = Overload_Monitor(vnf_list=self.overload_vnf_list)
         # host overload flag
         self.overload = self.overload_monitor.overload_flag
 
@@ -152,7 +152,8 @@ class Emu_Profiler():
                 self.emu.exec(vnf_name=vnf_name, cmd=cmd)
 
         # start overload detection
-        self.overload_monitor.start(self.emu)
+        if len(self.overload_vnf_list) > 0 :
+            self.overload_monitor.start(self.emu)
 
         # start the profling loop
         self.profiling_thread.start()

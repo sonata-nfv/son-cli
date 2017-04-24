@@ -93,7 +93,8 @@ class Emu():
 
     # parse the msd file and export the metrics from son-emu and show in grafana
     def start_msd(self, file=None, **kwargs):
-
+        # check if prometheus is running
+        kwargs.get('monitor').start_containers()
         # initialize msd object
         msd_obj = msd_object(file, self)
         msd_obj.start()
