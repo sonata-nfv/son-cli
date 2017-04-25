@@ -94,7 +94,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         """
         # extract service project from SONATA package
         base_service_path = self._extract(input_reference, working_path)
-        return None
+        return SonataService.load(base_service_path)
 
     def _generate_function_experiments(self, base_service_obj, experiments):
         LOG.warning("SONATA function experiment generation not implemented.")
@@ -112,7 +112,35 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
 
 
 class SonataService(object):
-    pass
+
+    @staticmethod
+    def load(path):
+        """
+        Loads the service package contents from the given path.
+        :param path: path to a folder with service package contents.
+        :return: SonataService object.
+        """
+        # load manifest
+        manifest = read_yaml(
+            os.path.join(path, "META-INF/MANIFEST.MF"))
+        # load nsd
+        nsd = read_yaml(
+            os.path.join(
+                path,
+                relative_path(manifest.get("entry_service_template"))))
+        # load vnfds
+        vnfd_list = list()
+        for ctx in manifest.get("package_content"):
+            if "function_descriptor" in ctx.get("content-type"):
+                vnfd_list.append(
+                    read_yaml(
+                        os.path.join(path,
+                                     relative_path(ctx.get("name")))))
+        LOG.info(
+            "Loaded SONATA service package contents. Service: '{}' ({} VNFDs).".format(
+                nsd.get("name"), len(vnfd_list)))
+        # create SonataServicePackage object
+        return SonataService()  # TODO initialize service object
 
 
 class SonataServicePackage(object):
