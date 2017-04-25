@@ -133,6 +133,7 @@ class SonataServicePackage(object):
         """
         start_time = time.time()
         pkg_destination_path = os.path.join(output_path, self.pkg_name())
+        ensure_dir(pkg_destination_path)
         # obtain workspace
         # TODO have workspace dir as command line argument
         workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
