@@ -304,7 +304,7 @@ class Project:
         # Protect against invalid versions
         if prj_config['version'] < Project.BACK_CONFIG_VERSION:
             log.error("Project configuration version '{0}' is no longer "
-                      "supported.")
+                      "supported (<{1})".format(prj_config['version'], Project.CONFIG_VERSION))
             return
         if prj_config['version'] > Project.CONFIG_VERSION:
             log.error("Project configuration version '{0}' is ahead of the "
