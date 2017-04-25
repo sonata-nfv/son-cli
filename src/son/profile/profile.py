@@ -34,7 +34,7 @@ from termcolor import colored
 from tabulate import tabulate
 
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
-from son.profile.sonpkg import extract_son_package, SonataServicePackage
+from son.profile.generator.sonata import extract_son_package, SonataServicePackage
 from son.profile.helper import read_yaml
 from son.monitor.profiler import Emu_Profiler
 
