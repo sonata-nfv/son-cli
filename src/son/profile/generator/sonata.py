@@ -30,12 +30,54 @@ import os
 import copy
 import time
 from son.profile.helper import read_yaml, write_yaml, relative_path, ensure_dir
+from son.profile.generator import ServiceConfigurationGenerator
 from son.workspace.project import Project
 from son.workspace.workspace import Workspace
 from son.package.package import Packager
 
 
 LOG = logging.getLogger(__name__)
+
+class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
+    """
+    SONATA Service Configuration Generator.
+    Input: SONATA service package.
+    Output: SONATA service packages.
+    """
+
+    def generate(self, input_reference, function_experiments, service_experiments, output_path):
+        """
+        Generates service configurations according to the inputs.
+        Returns a list of identifiers / paths to the generated service configurations.
+        """
+        # load base service using PED reference (to a *.son file)
+        base_service_obj = self._load(input_reference)
+        # generate one SonataService for each experiment
+        gen_conf_obj_list = list()
+        gen_conf_obj_list += self._generate_function_experiments(
+            base_service_obj, function_experiments)
+        gen_conf_obj_list += self._generate_service_experiments(
+            base_service_obj, service_experiments)
+        # pack all generated services and write them to disk
+        return self._pack(output_path, gen_conf_obj_list)
+
+    def _load(self, input_reference):
+        LOG.warning("SONATA load not implemented.")
+        return None
+
+    def _generate_function_experiments(self, base_service_obj, experiments):
+        LOG.warning("SONATA function experiment generation not implemented.")
+        return list()
+
+    def _generate_service_experiments(self, base_service_obj, experiments):
+        LOG.warning("SONATA service experiment generation not implemented.")
+        return list()
+
+    def _write(self, output_path, conf_obj_list):
+        LOG.warning("SONATA write not implemented.")
+
+    def _pack(self, output_path, conf_obj_list):
+        LOG.warning("SONATA pack not implemented.")
 
 
 class SonataServicePackage(object):

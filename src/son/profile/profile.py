@@ -32,9 +32,7 @@ import coloredlogs
 import time
 from termcolor import colored
 from tabulate import tabulate
-
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
-from son.profile.generator.sonata import extract_son_package, SonataServicePackage
 from son.profile.helper import read_yaml
 from son.monitor.profiler import Emu_Profiler
 
@@ -102,17 +100,41 @@ class ProfileManager(object):
                                         vnforder_list=experiment.vnforder_list)
                 profiler.start_experiment()
 
-        # generate service packages
-        if not self.args.no_generation :
-            # unzip *.son package to be profiled and load its contents
-            extract_son_package(self.ped, self.son_pkg_input_dir)
-            self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
-            # generate experiment services (modified NSDs, VNFDs for each experiment run)
-            self.generated_services = self.generate_experiment_services()
-            # package experiment services
-            self.package_experiment_services()
-            # print generation statistics
-            self.print_generation_and_packaging_statistics()
+        # generate service configuration using the specified generator module
+        if not self.args.no_generation:
+            # select and instantiate configuration generator
+            cgen = None
+            if self.args.service_generator == "sonata":
+                from son.profile.generator.sonata import SonataServiceConfigurationGenerator
+                cgen = SonataServiceConfigurationGenerator()
+            else:
+                LOG.error(
+                    "Unknown service configuration generator specified: {0}".format(
+                        self.args.service_generator))
+                exit(1)
+            if cgen is None:
+                LOG.error("Service configuration generator instantiation failed.")
+                exit(1)
+            # generate one service configuration for each experiment based
+            # on the service referenced in the PED file.
+            gen_conf_list =  cgen.generate(
+                self.ped.get("service_package"),
+                list(),
+                list(),
+                self.son_pkg_output_dir)
+            LOG.debug("Generated service configurations: {}".format(gen_conf_list))
+            
+            
+        #if not self.args.no_generation :
+        #    # unzip *.son package to be profiled and load its contents
+        #    extract_son_package(self.ped, self.son_pkg_input_dir)
+        #    self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
+        #    # generate experiment services (modified NSDs, VNFDs for each experiment run)
+        #    self.generated_services = self.generate_experiment_services()
+        #    # package experiment services
+        #    self.package_experiment_services()
+        #    # print generation statistics
+        #    self.print_generation_and_packaging_statistics()
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -315,6 +337,13 @@ def parse_args(manual_args=None):
         default=False,
         dest="no_display",
         action="store_true")
+
+    parser.add_argument(
+        "--generator",
+        help="Service configuration generator to be used. Default: 'sonata'",
+        required=False,
+        default="sonata",
+        dest="service_generator")
 
     if manual_args is not None:
         return parser.parse_args(manual_args)
