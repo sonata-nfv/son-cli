@@ -132,8 +132,8 @@ class SonataServicePackage(object):
         :return: package path
         """
         start_time = time.time()
-        pkg_destination_path = os.path.join(output_path, self.pkg_name())
-        ensure_dir(pkg_destination_path)
+        # be sure the target directory exists
+        ensure_dir(output_path)
         # obtain workspace
         # TODO have workspace dir as command line argument
         workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
@@ -146,7 +146,7 @@ class SonataServicePackage(object):
             LOG.error("Packager couldn't load service project: %r. Abort." % self.pkg_service_path)
             exit(1)
         # initialize and run packager
-        pck = Packager(workspace, project, dst_path=pkg_destination_path)
+        pck = Packager(workspace, project, dst_path=output_path)
         pck.generate_package(os.path.join(output_path, self.pkg_name()))
         self.pkg_package_path = os.path.join(output_path, self.pkg_name()) + ".son"
         self.pkg_file_size = os.path.getsize(self.pkg_package_path)
