@@ -159,13 +159,15 @@ class SonataServicePackage(object):
         :return: dictionary with project.yml information
         """
         d = dict()
-        d["catalogues"] = "[personal]"
-        d["publish_to"] = "[personal]"
-        d["description"] = self.manifest.get("description")
-        d["maintainer"] = self.manifest.get("maintainer")
-        d["name"] = self.manifest.get("name")
-        d["vendor"] = self.manifest.get("vendor")
-        d["version"] = self.manifest.get("version")
+        d["descriptor_extension"] = "yml"
+        d["version"] = "0.5"
+        p = dict()
+        p["description"] = self.manifest.get("description")
+        p["maintainer"] = self.manifest.get("maintainer")
+        p["name"] = self.manifest.get("name")
+        p["vendor"] = self.manifest.get("vendor")
+        p["version"] = self.manifest.get("version")
+        d["package"] = p
         return d
 
     def pkg_name(self):
