@@ -38,6 +38,10 @@ from son.package.package import Packager
 
 LOG = logging.getLogger(__name__)
 
+# working directories created in "output_path"
+SON_BASE_DIR = ".tmp_base_service"  # temp folder with input package contents
+SON_GEN_SERVICES = ".tmp_gen_services"  # temp folder holding the unpacked generated services
+
 class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
     """
     SONATA Service Configuration Generator.
@@ -45,13 +49,16 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
     Output: SONATA service packages.
     """
 
-    def generate(self, input_reference, function_experiments, service_experiments, output_path):
+    def __init__(self):
+        LOG.info("SONATA service configuration generator initialized")
+
+    def generate(self, input_reference, function_experiments, service_experiments, working_path):
         """
         Generates service configurations according to the inputs.
         Returns a list of identifiers / paths to the generated service configurations.
         """
         # load base service using PED reference (to a *.son file)
-        base_service_obj = self._load(input_reference)
+        base_service_obj = self._load(input_reference, working_path)
         # generate one SonataService for each experiment
         gen_conf_obj_list = list()
         gen_conf_obj_list += self._generate_function_experiments(
@@ -59,10 +66,34 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         gen_conf_obj_list += self._generate_service_experiments(
             base_service_obj, service_experiments)
         # pack all generated services and write them to disk
-        return self._pack(output_path, gen_conf_obj_list)
+        return self._pack(working_path, gen_conf_obj_list)
 
-    def _load(self, input_reference):
-        LOG.warning("SONATA load not implemented.")
+    def _extract(self, input_reference, working_path):
+        """
+        Unzips a SONATA service package and stores all its contents
+        to working_path + SON_BASE_DIR
+        """
+        # prepare working directory
+        base_service_path = os.path.join(working_path, SON_BASE_DIR)
+        ensure_dir(base_service_path)
+        # locate referenced *.son file
+        if not os.path.exists(input_reference):
+            raise BaseException("Couldn't find referenced SONATA package: %r" % input_reference)
+        # extract *.son file and put it into base_service_path
+        LOG.debug("Unzipping: {} to {}".format(input_reference, base_service_path))
+        with zipfile.ZipFile(input_reference, "r") as z:
+            z.extractall(base_service_path)
+        LOG.info("Extracted SONATA service package: {}".format(input_reference))
+        return base_service_path
+
+    def _load(self, input_reference, working_path):
+        """
+        Load a SONATA from the specified package (*.son).
+        Creates temporary files in working_path.
+        Returns SonataService objecct.
+        """
+        # extract service project from SONATA package
+        base_service_path = self._extract(input_reference, working_path)
         return None
 
     def _generate_function_experiments(self, base_service_obj, experiments):
@@ -78,6 +109,10 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
 
     def _pack(self, output_path, conf_obj_list):
         LOG.warning("SONATA pack not implemented.")
+
+
+class SonataService(object):
+    pass
 
 
 class SonataServicePackage(object):

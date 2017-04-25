@@ -118,7 +118,10 @@ class ProfileManager(object):
             # generate one service configuration for each experiment based
             # on the service referenced in the PED file.
             gen_conf_list =  cgen.generate(
-                self.ped.get("service_package"),
+                os.path.join(  # ensure that the reference is an absolute path
+                    os.path.dirname(
+                        self.ped.get("ped_path", "/")),
+                        self.ped.get("service_package")),
                 list(),
                 list(),
                 self.son_pkg_output_dir)
@@ -147,7 +150,7 @@ class ProfileManager(object):
         try:
             yml = read_yaml(ped_path)
             if yml is None:
-                raise BaseException("PED file YMAL error.")
+                raise BaseException("PED file YAML error.")
         except:
             LOG.error("Couldn't load PED file %r. Abort." % ped_path)
             exit(1)
