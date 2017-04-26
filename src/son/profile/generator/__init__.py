@@ -41,3 +41,6 @@ class ServiceConfigurationGenerator(object):
         """
         LOG.warning("Service configuration generation not implemented.")
         return list()
+
+    def print_generation_and_packaging_statistics(self):
+        LOG.warning("Statics printer not implemented.")

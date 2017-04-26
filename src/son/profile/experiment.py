@@ -27,7 +27,6 @@
 import logging
 from son.profile.macro import rewrite_parameter_macros_to_lists
 from son.profile.helper import compute_cartesian_product
-from son.profile.generator.sonata import SonataServicePackage
 import operator
 from collections import OrderedDict
 

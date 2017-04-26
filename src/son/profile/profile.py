@@ -117,7 +117,7 @@ class ProfileManager(object):
                 exit(1)
             # generate one service configuration for each experiment based
             # on the service referenced in the PED file.
-            gen_conf_list =  cgen.generate(
+            gen_conf_list = cgen.generate(
                 os.path.join(  # ensure that the reference is an absolute path
                     os.path.dirname(
                         self.ped.get("ped_path", "/")),
@@ -125,19 +125,15 @@ class ProfileManager(object):
                 list(),
                 list(),
                 self.son_pkg_output_dir)
-            LOG.debug("Generated service configurations: {}".format(gen_conf_list))
-            
-            
-        #if not self.args.no_generation :
-        #    # unzip *.son package to be profiled and load its contents
-        #    extract_son_package(self.ped, self.son_pkg_input_dir)
-        #    self.son_pkg_input = SonataServicePackage.load(self.son_pkg_input_dir)
-        #    # generate experiment services (modified NSDs, VNFDs for each experiment run)
-        #    self.generated_services = self.generate_experiment_services()
-        #    # package experiment services
-        #    self.package_experiment_services()
-        #    # print generation statistics
-        #    self.print_generation_and_packaging_statistics()
+            LOG.debug("Generation result: {}".format(gen_conf_list))
+            # display generator statistics
+            if not self.args.no_display:
+                cgen.print_generation_and_packaging_statistics()
+
+            #
+            # @Edmaas dict 'gen_conf_list' holds the generation data you need.
+            #
+
 
     @staticmethod
     def _load_ped_file(ped_path):
@@ -235,48 +231,6 @@ class ProfileManager(object):
             LOG.debug(
                 "Packaged service %r to %r" % (s, son_pkg_path))
         LOG.info("Packaged %d services." % len(self.generated_services))
-
-    def print_generation_and_packaging_statistics(self):
-
-        def b(txt):
-            return colored(txt, attrs=['bold'])
-
-        def get_pkg_time(e):
-            return sum([s.pack_time for s in e.generated_services])
-
-        def get_pkg_size(e):
-            return sum([float(s.pkg_file_size) / 1024 for s in e.generated_services])
-
-        def generate_table():
-            rows = list()
-            # header
-            rows.append([b("Experiment"), b("Num. Pkg."), b("Pkg. Time (s)"), b("Pkg. Sizes (kB)")])
-            # body
-            sum_pack_time = 0.0
-            sum_file_size = 0.0
-            for e in self.service_experiments:
-                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
-                sum_pack_time += get_pkg_time(e)
-                sum_file_size += get_pkg_size(e)
-            for e in self.function_experiments:
-                rows.append([e.name, len(e.run_configurations), get_pkg_time(e), get_pkg_size(e)])
-                sum_pack_time += get_pkg_time(e)
-                sum_file_size += get_pkg_size(e)
-            # footer
-            rows.append([b("Total"), b(len(self.generated_services)), b(sum_pack_time), b(sum_file_size)])
-            return rows
-
-        print(b("-" * 80))
-        print(b("SONATA Profiler: Experiment Package Generation Report"))
-        print(b("-" * 80))
-        print("")
-        print(tabulate(generate_table(), headers="firstrow", tablefmt="orgtbl"))
-        print("")
-        print("Temporary service projects path: %s" % b(self.son_pkg_service_dir))
-        print("Generated service packages path: %s" % b(self.son_pkg_output_dir))
-        print("Total time: %s" % b("%.4f" % (time.time() - self.start_time)))
-        print("")
-
 
 
 def parse_args(manual_args=None):
