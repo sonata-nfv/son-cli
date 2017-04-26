@@ -38,13 +38,6 @@ from son.monitor.profiler import Emu_Profiler
 
 LOG = logging.getLogger(__name__)
 
-"""
-Configurations:
-"""
-SON_PKG_INPUT_DIR = "input_service"  # location of input package contents in args.work_dir
-SON_PKG_SERVICE_DIR = "output_services"  # location of generated services in args.work_dir
-SON_PKG_OUTPUT_DIR = "output_packages"  # location of generated packages in args.work_dir
-
 
 class ProfileManager(object):
     """
@@ -59,9 +52,8 @@ class ProfileManager(object):
         # arguments
         self.args = args
         self.args.config = os.path.join(os.getcwd(), self.args.config)
-        self.son_pkg_input_dir = os.path.join(self.args.work_dir, SON_PKG_INPUT_DIR)
-        self.son_pkg_service_dir = os.path.join(self.args.work_dir, SON_PKG_SERVICE_DIR)
-        self.son_pkg_output_dir = os.path.join(self.args.work_dir, SON_PKG_OUTPUT_DIR)
+        self.work_dir = self.args.work_dir
+        self.output_dir = self.args.output_dir
         # logging setup
         coloredlogs.install(level="DEBUG" if args.verbose else "INFO")
         LOG.info("SONATA profiling tool initialized")
@@ -124,7 +116,7 @@ class ProfileManager(object):
                         self.ped.get("service_package")),
                 list(),
                 list(),
-                self.son_pkg_output_dir)
+                self.work_dir)
             LOG.debug("Generation result: {}".format(gen_conf_list))
             # display generator statistics
             if not self.args.no_display:

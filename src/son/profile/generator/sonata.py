@@ -308,6 +308,7 @@ class SonataService(object):
         start_time = time.time()
         tmp_path = self._write(output_path)
         pkg_path = os.path.join(output_path, self.pkg_name) + ".son"
+        LOG.warning(pkg_path)
         self.metadata["package_disk_path"] = pkg_path
         # be sure the target directory exists
         ensure_dir(output_path)
@@ -326,7 +327,7 @@ class SonataService(object):
             exit(1)
         # initialize and run packager
         pck = Packager(workspace, project, dst_path=output_path)
-        pck.generate_package(pkg_path.replace(".son", ""))  # the packager does not want file endings
+        pck.generate_package(self.pkg_name)
         self.metadata["package_disk_size"] = os.path.getsize(pkg_path)
         self.metadata["package_generation_time"] = time.time() - start_time
         LOG.debug("Packed: {} to {}".format(self, pkg_path))
