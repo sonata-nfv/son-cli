@@ -51,7 +51,8 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
     Output: SONATA service packages.
     """
 
-    def __init__(self):
+    def __init__(self, args):
+        self.args = args
         self.RUN_ID = 0
         self.generated_services = dict()
         LOG.info("SONATA service configuration generator initialized")
@@ -134,7 +135,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         """
         r = dict()
         for i, s in service_objs.items():
-            r[i] = s.pack(output_path)
+            r[i] = s.pack(output_path, self.args.verbose)
             self.generated_services[i] = s  # keep a pointer for statistics output
         LOG.info("Generated {} service packages in '{}'".format(len(r), output_path))
         return r
@@ -299,7 +300,7 @@ class SonataService(object):
         LOG.debug("Wrote: {} to {}".format(self, path))
         return path
     
-    def pack(self, output_path):
+    def pack(self, output_path, verbose=False):
         """
         Creates a *.son file of this service object.
         First writes the normal project structure to disk (to be used with packaging tool)
@@ -316,6 +317,8 @@ class SonataService(object):
         if workspace is None:
             LOG.error("Couldn't initialize workspace: %r. Abort." % Workspace.DEFAULT_WORKSPACE_DIR)
             exit(1)
+        # force verbosity of external tools if required
+        workspace.log_level = "DEBUG" if verbose else "INFO"
         # obtain project
         project = Project.__create_from_descriptor__(workspace, tmp_path)
         if project is None:

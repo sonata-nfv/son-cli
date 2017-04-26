@@ -106,7 +106,7 @@ class ProfileManager(object):
             cgen = None
             if self.args.service_generator == "sonata":
                 from son.profile.generator.sonata import SonataServiceConfigurationGenerator
-                cgen = SonataServiceConfigurationGenerator()
+                cgen = SonataServiceConfigurationGenerator(self.args)
             else:
                 LOG.error(
                     "Unknown service configuration generator specified: {0}".format(
