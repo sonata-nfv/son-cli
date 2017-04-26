@@ -105,6 +105,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
             n = base_service_obj.copy()
             n.manifest["name"] += "-f-{}".format(self.RUN_ID)
             n.metadata["run_id"] = self.RUN_ID
+            n.metadata["exname"] = "function-experiment"
             r[self.RUN_ID] = n
             self.RUN_ID += 1
         return r
@@ -113,22 +114,22 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         LOG.warning("SONATA service experiment generation not implemented.")
         # TODO some dummy generation for testing
         r = dict()
-        for i in range(0, 2):
+        for i in range(0, 4):
             n = base_service_obj.copy()
             n.manifest["name"] += "-s-{}".format(self.RUN_ID)
             n.metadata["run_id"] = self.RUN_ID
+            n.metadata["exname"] = "service-experiment"
             r[self.RUN_ID] = n
             self.RUN_ID += 1
         return r
 
     def _pack(self, output_path, service_objs):
-        LOG.warning("SONATA pack not implemented.")
-        # TOOD for s in service_objs: s.pack() -> path
-        # TODO return some fake data
-        # build return data structure: dict<run_id, package_path>
+        """
+        return: dict<run_id: package_path>
+        """
         r = dict()
-        for k, v in service_objs.items():
-            r[k] = v.metadata.get("project_disk_path")
+        for i, s in service_objs.items():
+            r[i] = s.pack(output_path)
         return r
 
 
@@ -153,6 +154,7 @@ class SonataService(object):
     def _init_metadata():
         m = dict()
         m["run_id"] = -1
+        m["exname"] = None
         m["project_disk_path"] = None
         m["package_disk_path"] = None
         return m
@@ -210,6 +212,14 @@ class SonataService(object):
         d["package"] = p
         return d
 
+    @property
+    def pkg_name(self):
+        """
+        Generate name used for generated service project folder and package.
+        :return: string
+        """
+        return "%s_%05d" % (self.metadata.get("exname"), self.metadata.get("run_id"))
+
     def copy(self):
         """
         Create a real copy of this service object.
@@ -217,6 +227,32 @@ class SonataService(object):
         """
         LOG.debug("Copy: {}".format(self))
         return copy.deepcopy(self)
+
+    def _write(self, output_path):
+        path = os.path.join(output_path, SON_GEN_SERVICES, self.pkg_name)
+        # update package path to reflect new location
+        self.metadata["project_disk_path"] = path
+        # create output folder
+        ensure_dir(path)
+        # write project yml
+        write_yaml(os.path.join(path, "project.yml"), self.pd)
+        # write nsd
+        nsd_dir = os.path.join(path, "sources/nsd")
+        ensure_dir(nsd_dir)
+        write_yaml(os.path.join(nsd_dir,  "%s.yml" % self.nsd.get("name")), self.nsd)
+        # write all vnfds
+        vnf_dir = os.path.join(path, "sources/vnf")
+        for vnfd in self.vnfd_list:
+            d = os.path.join(vnf_dir, vnfd.get("name"))
+            ensure_dir(d)
+            write_yaml(os.path.join(d, "%s.yml" % vnfd.get("name")), vnfd)
+        LOG.debug("Wrote: {} to {}".format(self, path))
+        return path
+    
+    def pack(self, output_path):
+        tmp_path = self._write(output_path)
+        
+        return "not implemented"
 
 
 class SonataServicePackage(object):
@@ -263,6 +299,13 @@ class SonataServicePackage(object):
         LOG.info("Loaded SONATA service package contents (%d VNFDs)." % len(vnfd_list))
         # create SonataServicePackage object
         return SonataServicePackage(pkg_path, manifest, nsd, vnfd_list)
+
+    def pkg_name(self):
+        """
+        Generate name used for generated service project folder and package.
+        :return: string
+        """
+        return "%s_%05d" % (self.metadata.get("exname"), self.metadata.get("run_id"))
 
     def copy(self):
         """
