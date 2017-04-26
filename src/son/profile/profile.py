@@ -166,11 +166,7 @@ class ProfileManager(object):
         try:
             if "service_package" not in input_ped:
                 raise BaseException("No service_package field found.")
-            if "service_experiments" not in input_ped:
-                raise BaseException("No service_experiments field found.")
-            if "function_experiments" not in input_ped:
-                raise BaseException("No function_experiments field found.")
-            # TODO extend this when PED format is finally fixed
+            # TODO extend this with PED fields that are REQUIRED
         except:
             LOG.exception("PED file verification error:")
 
@@ -197,40 +193,6 @@ class ProfileManager(object):
             function_experiments.append(e_obj)
 
         return service_experiments, function_experiments
-
-    def generate_experiment_services(self):
-        """
-        Generate SONATA service projects for each experiment and its configurations. The project is based
-        on the contents of the service package referenced in the PED file and loaded to self.son_pkg_input.
-        The generated project files are stored in self.args.work_dir.
-        :return: list of service objects
-        """
-        services = list()
-        # generate service objects
-        for e in self.service_experiments:
-            services += e.generate_sonata_services(self.son_pkg_input)
-        for e in self.function_experiments:
-            services += e.generate_sonata_services(self.son_pkg_input)
-        LOG.info("Generated %d services." % len(services))
-        # write services to disk
-        for s in services:
-            s.write(self.son_pkg_service_dir)
-        LOG.info("Wrote %d services to disk." % len(services))
-        return services
-
-    def package_experiment_services(self):
-        """
-        Use son-package to package all previously generated service projects.
-        :param services: list of service objects.
-        :return:
-        """
-        for s in self.generated_services:
-            son_pkg_path = s.pack(self.son_pkg_output_dir)
-            # reset loglevel (ugly, but workspace and packaging tool overwrite it)
-            coloredlogs.install(level="DEBUG" if self.args.verbose else "INFO")
-            LOG.debug(
-                "Packaged service %r to %r" % (s, son_pkg_path))
-        LOG.info("Packaged %d services." % len(self.generated_services))
 
 
 def parse_args(manual_args=None):
