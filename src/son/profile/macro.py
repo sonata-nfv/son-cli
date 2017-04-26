@@ -96,7 +96,6 @@ def loop_macro_to_list(m):
     cls = float
     if not '.' in str(m):
         cls = int
-
     m = [cls(i) for i in m]
     step = DEFAULT_STEP
     if len(m) > 2:
@@ -116,9 +115,11 @@ def list_macro_to_list(m):
     m = m.strip("${}")
     m = re.split(',', m)
     # detect if the values should be float or int
-    cls = float
-    if not '.' in str(m):
-        cls = int
+    cls = str
+    if is_number(str(m)):  
+        cls = float
+        if not '.' in str(m):
+            cls = int
     m = [cls(i) for i in m]
     return m
 
@@ -139,3 +140,11 @@ def frange(start, stop, step):
             return
         yield x
         x += step
+
+def is_number(s):
+    try:
+        float(s) 
+    except ValueError:
+        return False
+    return True
+

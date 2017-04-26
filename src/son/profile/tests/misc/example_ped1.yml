@@ -29,12 +29,12 @@ service_experiments:
       - name: "mp.output"
         connection_point: "ns:serviceout"
         container: "sonata-son-emu-sap:latest"
-        cmd_start: "iperf -s"
+        cmd_start: ${"iperf -s", "iperf -s -u"}
         cmd_stop: null
       - name: "mp.input"
         connection_point: "ns:servicein"
         container: "sonata-son-emu-sap:latest"
-        cmd_start: "iperf -c 1.1.1.1 -t 120"
+        cmd_start: ${"iperf -c 1.1.1.1 -t 120", "iperf -c 1.1.1.1 -t 120 -u"}
         cmd_stop: null
     # resource configurations to be tested during profiling run (defined per VNF)
     resource_limitations:
