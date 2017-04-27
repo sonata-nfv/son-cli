@@ -129,7 +129,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         """
         for mp in ec.experiment.measurement_points:
             # generate VNFD
-            vnfd = measurement_point_to_vnfd(mp)
+            vnfd = measurement_point_to_vnfd(mp, ec)
             # add VNFD to service object
             service.vnfd_list.append(vnfd)
             # add MP VNF to NSD
@@ -166,8 +166,48 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
 
             LOG.debug("Added measurement point VNF '{}' to '{}'".format(
                 vnfd.get("name"),
-                service.nsd.get("name")
+                service
             ))
+
+    def _apply_resource_limitations(self, service, ec):
+        """
+        Apply resource limitations to VNFDs of 'service'.
+        VNFDs and parameter names are identified by the keys of
+        the configuration dict to be used ('ec').
+        """
+        # for each resource_limit in ec.parameter
+        # get function by id
+        # update parameter in resource limitation section
+
+        for rlk, rlv in ec.parameter.items():
+            # only consider resource limit parameters
+            if "resource_limitation" in rlk:
+                # for each resource limit config find the corresponding VNFD in service
+                vnf_uid, param_name = split_conf_parameter_key(rlk)
+                vnfd = service.get_vnfd_by_uid(vnf_uid)
+                if vnfd is None:
+                    LOG.error("VNF '{}' not found in service '{}'. Skip.".format(
+                        vnf_uid, service
+                    ))
+                    continue
+                # apply configuration to corresponding VNFD field (we assume a single VDU!)
+                rr = vnfd.get("virtual_deployment_units")[0].get("resource_requirements")
+                # cpu cores
+                if param_name == "cpu_cores":
+                    rr.get("cpu")["vcpus"] = int(float(rlv))
+                if param_name == "cpu_bw":
+                    rr.get("cpu")["cpu_bw"] = float(rlv)
+                if param_name == "mem_max":
+                    rr.get("memory")["size"] = int(float(rlv))
+                    rr.get("memory")["size_unit"] = "MB"
+                if param_name == "disk_max":
+                    rr.get("storage")["size"] = int(float(rlv))
+                    rr.get("storage")["size_unit"] = "GB"
+                # TODO extend this with io_bw etc?
+                LOG.debug("Updated '{}' resource requirements '{}': {}".format(
+                    param_name, vnf_uid, rr
+                ))
+        LOG.debug("Applied resource limitations to service '{}'".format(service))
 
     def _generate_function_experiments(self, base_service_obj, experiments):
         r = dict()
@@ -181,7 +221,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 # add measurement points to service
                 self._add_measurement_points(ns, ec)
                 # apply resource limitations
-                # TODO
+                self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
                 # TODO INFO message
@@ -196,7 +236,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 # add measurement points to service
                 self._add_measurement_points(ns, ec)
                 # apply resource limitations
-                # TODO
+                self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
                 # TODO INFO message
@@ -406,11 +446,27 @@ class SonataService(object):
         LOG.debug("Packed: {} to {}".format(self, pkg_path))
         return pkg_path
 
+    def get_vnfd_by_uid(self, vnf_uid):
+        """
+        Fuzzy find VNFD by either:
+        - vnf_uid == name
+        - vnf_uid == vandor.name.version
+        return vnfd
+        """
+        for vnfd in self.vnfd_list:
+            if vnfd.get("name") == vnf_uid:
+                return vnfd
+            elif "{}.{}.{}".format(
+                    vnfd.get("vendor"), vnfd.get("name"), vnfd.get("version")
+            ) == vnf_uid:
+                return vnfd
+        return None
+
 ###
 ### Helper
 ###
 
-def measurement_point_to_vnfd(mp, template="template/sonata_vnfd_mp.yml"):
+def measurement_point_to_vnfd(mp, ec, template="template/sonata_vnfd_mp.yml"):
     """
     Generates a VNFD data structure using measurement point information
     from a PED file. VNFD is based on given template.
@@ -420,5 +476,20 @@ def measurement_point_to_vnfd(mp, template="template/sonata_vnfd_mp.yml"):
     vnfd = read_yaml(template_path)
     # replace placeholder fields (this highly depends on used template!)
     vnfd["name"] = mp.get("name")
-    vnfd["virtual_deployment_units"][0]["vm_image"] = mp.get("container")
+    # allow different containers as parameter study
+    vnfd["virtual_deployment_units"][0]["vm_image"] = ec.parameter.get(
+        "measurement_point:{}:container".format(mp.get("name")))
     return vnfd
+
+
+def split_conf_parameter_key(rlk):
+    """
+    Splits key of configuration parameter dict.
+    return function_uid, parameter_name
+    """
+    try:
+        p = rlk.split(":")
+        return p[1], p[2]
+    except:
+        LOG.error("Couldn't parse configuration parameter key.")
+    return None, None
