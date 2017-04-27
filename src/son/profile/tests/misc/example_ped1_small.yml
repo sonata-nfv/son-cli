@@ -29,7 +29,7 @@ service_experiments:
       - name: "mp.output"
         connection_point: "ns:serviceout"
         container: "sonata-son-emu-sap:latest"
-        cmd_start: ${"iperf -s", "iperf -s -u"}
+        cmd_start: ${"iperf -s"}
         cmd_stop: null
       - name: "mp.input"
         connection_point: "ns:servicein"
@@ -40,7 +40,7 @@ service_experiments:
     resource_limitations:
       # again: SONATA-like references
       - function: "eu.sonata-nfv.fw-vnf.0.1"
-        cpu_bw: "${0.05 to 0.2 step 0.05}" # Omnet++ style parameter study macros
+        cpu_bw: "${0.05 to 0.1 step 0.05}" # Omnet++ style parameter study macros
         cpu_cores: 1
         mem_max: "${64, 128}" # Omnet++ style parameter study macros
         mem_swap_max: null
@@ -90,7 +90,7 @@ function_experiments:
     resource_limitations:  # shortened (fields are optional)
       # again: SONATA-like references
       - function: "eu.sonata-nfv.fw-vnf.0.1"
-        cpu_bw: "${0.01 to 0.03 step 0.01}" # Omnet++ style parameter study macros
+        cpu_bw: "${0.01 to 0.02 step 0.01}" # Omnet++ style parameter study macros
       - function: "mp.input"
         cpu_bw: 0.2
       - function: "mp.output"
