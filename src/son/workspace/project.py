@@ -47,7 +47,6 @@ class Project:
         coloredlogs.install(level=workspace.log_level)
         self._prj_root = prj_root
         self._workspace = workspace
-        self._descriptor_extension = workspace.default_descriptor_extension
         self._prj_config = config
 
     @property
@@ -68,7 +67,7 @@ class Project:
 
     @property
     def descriptor_extension(self):
-        return self._descriptor_extension
+        return self.project_config['descriptor_extension']
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))
@@ -140,12 +139,14 @@ class Project:
                 'maintainer': 'Name, Company, Contact',
                 'description': 'Some description about this sample'
             },
-            'descriptor_extension': self._descriptor_extension
+            'descriptor_extension':
+                self._workspace.default_descriptor_extension
         }
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(self._prj_config, default_flow_style=False))
+            prj_file.write(yaml.dump(self._prj_config,
+                                     default_flow_style=False))
 
     def get_ns_descriptor(self):
         """
@@ -155,7 +156,7 @@ class Project:
         nsd_list = [os.path.join(self.nsd_root, file)
                     for file in os.listdir(self.nsd_root)
                     if os.path.isfile(os.path.join(self.nsd_root, file)) and
-                    file.endswith(self._descriptor_extension)]
+                    file.endswith(self.descriptor_extension)]
 
         if len(nsd_list) == 0:
             log.error("Project does not contain a NS Descriptor")
@@ -174,7 +175,7 @@ class Project:
         vnfd_list = []
         for root, dirs, files in os.walk(self.vnfd_root):
             for file in files:
-                if file.endswith(self._workspace.descriptor_extension):
+                if file.endswith(self.descriptor_extension):
                     vnfd_list.append(os.path.join(root, file))
         return vnfd_list
 
@@ -304,7 +305,8 @@ class Project:
         # Protect against invalid versions
         if prj_config['version'] < Project.BACK_CONFIG_VERSION:
             log.error("Project configuration version '{0}' is no longer "
-                      "supported (<{1})".format(prj_config['version'], Project.CONFIG_VERSION))
+                      "supported (<{1})".format(prj_config['version'],
+                                                Project.CONFIG_VERSION))
             return
         if prj_config['version'] > Project.CONFIG_VERSION:
             log.error("Project configuration version '{0}' is ahead of the "

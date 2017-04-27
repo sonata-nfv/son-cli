@@ -245,9 +245,13 @@ class Validator(object):
         self._assert_configuration()
 
         # consider cases when project is a path
-        if os.path.isdir(project):
-            project = Project.__create_from_descriptor__()
+        if type(project) is not Project and os.path.isdir(project):
+            if not self._workspace:
+                log.error("Workspace not defined. Unable to validate project")
+                return
 
+            project = Project.__create_from_descriptor__(self._workspace,
+                                                         project)
 
         log.info("Validating project '{0}'".format(project.project_root))
         log.info("... syntax: {0}, integrity: {1}, topology: {2}"

@@ -53,11 +53,8 @@ class SchemaValidator(object):
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._workspace = workspace
-        self._schemas_local_master = \
-            workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
-
-        self._schemas_remote_master = \
-            workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        self._schemas_local_master = workspace.schemas_local_master
+        self._schemas_remote_master = workspace.schemas_remote_master
 
         self._schemas = {}
 
