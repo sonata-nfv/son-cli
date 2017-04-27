@@ -114,8 +114,8 @@ class ProfileManager(object):
                     os.path.dirname(
                         self.ped.get("ped_path", "/")),
                         self.ped.get("service_package")),
-                list(),
-                list(),
+                self.function_experiments,
+                self.service_experiments,
                 self.work_dir)
             LOG.debug("Generation result: {}".format(gen_conf_list))
             # display generator statistics

@@ -82,7 +82,7 @@ class Experiment(object):
         configuration_space_list = compute_cartesian_product(configuration_dict)
         # create a experiment configuration objects for each calculated configuration to test
         for c in configuration_space_list:
-            rc = ExperimentConfiguration(self.name, c)
+            rc = ExperimentConfiguration(self, c)
             self.experiment_configurations.append(rc)
         LOG.info("Populated experiment specification: {} with {} configurations to be executed.".format(
             self.name,
@@ -194,10 +194,11 @@ class ExperimentConfiguration(object):
     # have globally unique run_ids for simplicity
     RUN_ID = 0
 
-    def __init__(self, name, p):
+    def __init__(self, experiment, p):
         self.run_id = ExperimentConfiguration.RUN_ID
         ExperimentConfiguration.RUN_ID += 1
-        self.name = name
+        self.name = experiment.name
+        self.experiment = experiment  # have backward point to ease navigation in generators
         self.parameter = p
         LOG.debug("Created: {}".format(self))
 

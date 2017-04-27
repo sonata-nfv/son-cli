@@ -103,30 +103,103 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         base_service_path = self._extract(input_reference, working_path)
         return SonataService.load(base_service_path)
 
+    def _generate_from_base_service(self, base_service_obj, ec):
+        """
+        Generates a new SonataService object based on given service using
+        the given experiment configurations.
+        """
+        n = base_service_obj.copy()
+        #n.manifest["name"] += "-{}".format(ec.run_id)
+        n.metadata["run_id"] = ec.run_id
+        n.metadata["exname"] = ec.name
+        LOG.debug("Created service from base: '{}' for experiment '{}' with run ID: {}".format(
+            n.manifest["name"],
+            n.metadata["exname"],
+            n.metadata["run_id"]
+        ))
+        return n
+
+    def _add_measurement_points(self, service, ec):
+        """
+        Adds the measurement points specified in 'ec' to the given
+        service object and interconnects them to the existing connection
+        points, like specified in the PED.
+        It basically replaces network service's external connection points
+        with measurement VNFs.
+        """
+        for mp in ec.experiment.measurement_points:
+            # generate VNFD
+            vnfd = measurement_point_to_vnfd(mp)
+            # add VNFD to service object
+            service.vnfd_list.append(vnfd)
+            # add MP VNF to NSD
+            service.nsd.get("network_functions").append({
+                "vnf_id": mp.get("name"),
+                "vnf_name": mp.get("name"),
+                "vnf_vendor": "son-profile",
+                "vnf_version": "1.0"
+            })
+            # connect measurement point to service (replace virt. links)
+            mp_cp = mp.get("connection_point")
+            new_cp = "{}:data".format(mp.get("name"))
+            for vl in service.nsd.get("virtual_links"):
+                cprs = vl.get("connection_points_reference")
+                # replace ns in/out link endpoints in NSD
+                for i in range(0, len(cprs)):
+                    if cprs[i] == mp_cp:
+                        cprs[i] = new_cp
+                        LOG.debug(
+                            "Replaced virtual link CPR '{}' by '{}'".format(mp_cp, cprs[i]))
+            # update forwarding graph (replace ns in and out)
+            for fg in service.nsd.get("forwarding_graphs"):
+                # add MP VNF to constituent VNF list
+                fg.get("constituent_vnfs").append(mp.get("name"))
+                # update forwarding paths
+                for fp in fg.get("network_forwarding_paths"):
+                    # search and replace connection points specified in PED
+                    for fp_cp in fp.get("connection_points"):
+                        if fp_cp.get("connection_point_ref") == mp_cp:
+                            fp_cp["connection_point_ref"] = new_cp
+                # update number of endpoints
+                fg["number_of_endpoints"] -= 1
+                LOG.debug("Updated forwarding graph '{}': {}".format(fg.get("fg_id"), fg))
+
+            LOG.debug("Added measurement point VNF '{}' to '{}'".format(
+                vnfd.get("name"),
+                service.nsd.get("name")
+            ))
+
     def _generate_function_experiments(self, base_service_obj, experiments):
-        LOG.warning("SONATA function experiment generation not implemented.")
-        # TODO some dummy generation for testing
         r = dict()
-        for i in range(0, 2):
-            n = base_service_obj.copy()
-            n.manifest["name"] += "-f-{}".format(self.RUN_ID)
-            n.metadata["run_id"] = self.RUN_ID
-            n.metadata["exname"] = "function-experiment"
-            r[self.RUN_ID] = n
-            self.RUN_ID += 1
+        for e in experiments:
+            for ec in e.experiment_configurations:
+                # generate new service obj from base_service_obj
+                ns = self._generate_from_base_service(base_service_obj, ec)
+                # embed function experiment into a test service
+                # TODO (folder template, add nsd with "placeholder")
+                # replace original nsd with test nsd
+                # add measurement points to service
+                self._add_measurement_points(ns, ec)
+                # apply resource limitations
+                # TODO
+                # add service to result data structure
+                r[ec.run_id] = ns
+                # TODO INFO message
         return r
 
     def _generate_service_experiments(self, base_service_obj, experiments):
-        LOG.warning("SONATA service experiment generation not implemented.")
-        # TODO some dummy generation for testing
         r = dict()
-        for i in range(0, 1):
-            n = base_service_obj.copy()
-            n.manifest["name"] += "-s-{}".format(self.RUN_ID)
-            n.metadata["run_id"] = self.RUN_ID
-            n.metadata["exname"] = "service-experiment"
-            r[self.RUN_ID] = n
-            self.RUN_ID += 1
+        for e in experiments:
+            for ec in e.experiment_configurations:
+                # generate new service obj from base_service_obj
+                ns = self._generate_from_base_service(base_service_obj, ec)
+                # add measurement points to service
+                self._add_measurement_points(ns, ec)
+                # apply resource limitations
+                # TODO
+                # add service to result data structure
+                r[ec.run_id] = ns
+                # TODO INFO message
         return r
 
     def _pack(self, output_path, service_objs):
@@ -333,3 +406,19 @@ class SonataService(object):
         LOG.debug("Packed: {} to {}".format(self, pkg_path))
         return pkg_path
 
+###
+### Helper
+###
+
+def measurement_point_to_vnfd(mp, template="template/sonata_vnfd_mp.yml"):
+    """
+    Generates a VNFD data structure using measurement point information
+    from a PED file. VNFD is based on given template.
+    """
+    template_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), template)
+    vnfd = read_yaml(template_path)
+    # replace placeholder fields (this highly depends on used template!)
+    vnfd["name"] = mp.get("name")
+    vnfd["virtual_deployment_units"][0]["vm_image"] = mp.get("container")
+    return vnfd
