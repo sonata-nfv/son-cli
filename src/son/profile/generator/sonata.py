@@ -119,6 +119,60 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         ))
         return n
 
+    def _embed_function_into_experiment_nsd(
+            self, service, ec,
+            template="template/sonata_nsd_function_experiment.yml"):
+        """
+        Generates a NSD that contains the single VNF of the given
+        function experiment and embeds the specified function into it.
+        The new NSD overwrites the existing NSD in service.
+        This unifies the follow up procedures for measurement point
+        inclusion etc.
+        The NSD template for this can be found in the template/ folder.
+        """
+        template_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), template)
+        new_nsd = read_yaml(template_path)
+        # 1. update VNF section
+        old_vnf_dict = None
+        for vnf in service.nsd.get("network_functions"):
+            if str(vnf.get("vnf_name")) in ec.experiment.function:
+                old_vnf_dict = vnf
+        if old_vnf_dict is None:
+            LOG.error("Couldn't find function '{}' in service '{}'".format(
+                ec.experiment.function,
+                service
+            ))
+        new_vnf_dict = new_nsd.get("network_functions")[0]
+        new_vnf_dict.update(old_vnf_dict)
+        LOG.debug("Updated VNF section in '{}': {}".format(new_nsd.get("name"), new_vnf_dict))
+        # 2. update virtual link section (get first three CPs from VNFD)
+        # TODO remove order assumptions (current version is more a HACK!)
+        vnfd = service.get_vnfd_by_uid(ec.experiment.function)
+        new_link_list = new_nsd.get("virtual_links")
+        LOG.warning(new_link_list)
+        cp_ids = [cp.get("id") for cp in vnfd.get("connection_points")]
+        for i in range(0, min(len(new_link_list), len(cp_ids))):
+            cpr = new_link_list[i]["connection_points_reference"]
+            for j in range(0, len(cpr)):
+                if "test_vnf" in cpr[j]:
+                    cpr[j] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
+        LOG.warning(new_link_list)
+        # 3. update forwarding path section
+        # TODO remove order assumptions (current version is more a HACK!)
+        LOG.warning(new_nsd.get("forwarding_graphs"))
+        for fg in new_nsd.get("forwarding_graphs"):
+            fg.get("constituent_vnfs")[0] = new_vnf_dict.get("vnf_id")
+            for nfp in fg.get("network_forwarding_paths"):
+                nfp_cp_list = nfp.get("connection_points")
+                for i in range(1, min(len(nfp_cp_list), len(cp_ids))):
+                    if "test_vnf" in nfp_cp_list[i].get("connection_point_ref"):
+                        nfp_cp_list[i]["connection_point_ref"] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
+        LOG.warning(new_nsd.get("forwarding_graphs"))
+                
+        # 4. replace NSD
+        service.nsd = new_nsd
+
     def _add_measurement_points(self, service, ec):
         """
         Adds the measurement points specified in 'ec' to the given
@@ -216,7 +270,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 # generate new service obj from base_service_obj
                 ns = self._generate_from_base_service(base_service_obj, ec)
                 # embed function experiment into a test service
-                # TODO (folder template, add nsd with "placeholder")
+                self._embed_function_into_experiment_nsd(ns, ec)
                 # replace original nsd with test nsd
                 # add measurement points to service
                 self._add_measurement_points(ns, ec)

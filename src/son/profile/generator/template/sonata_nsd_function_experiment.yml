@@ -9,75 +9,52 @@ connection_points:
 - id: ns:output
   interface: ipv4
   type: external
-description: 'SONATA Y1 review demo service: firewall/vTC'
+description: 'son-profile function experiment wrapper NSD'
+name: 'son-profile-function-experiment'
 descriptor_version: '1.0'
 forwarding_graphs:
 - constituent_virtual_links:
   - mgmt
   - link-input
-  - link-interconnect
   - link-output
-  - link-back
   constituent_vnfs:
-  - vtc_vnf
-  - fw_vnf
+  - "{{test_vnf}}"
   fg_id: ns:fg01
   network_forwarding_paths:
   - connection_points:
-    - connection_point_ref: ns:servicein
+    - connection_point_ref: ns:input
       position: 1
-    - connection_point_ref: fw_vnf:fwin
+    - connection_point_ref: "{{test_vnf:input}}"
       position: 2
-    - connection_point_ref: fw_vnf:fwout
+    - connection_point_ref: "{{test_vnf:output}}"
       position: 3
-    - connection_point_ref: vtc_vnf:input
+    - connection_point_ref: ns:output
       position: 4
-    - connection_point_ref: vtc_vnf:output
-      position: 5
-    - connection_point_ref: ns:serviceout
-      position: 6
-    - connection_point_ref: ns:servicein
-      position: 7
     fp_id: ns:fg01:fp01
     policy: none
-  number_of_endpoints: 2
-  number_of_virtual_links: 6
-name: sonata-fw-vtc-service
+  number_of_endpoints: 3
+  number_of_virtual_links: 3
 network_functions:
-- vnf_id: fw_vnf
-  vnf_name: fw-vnf
-  vnf_vendor: eu.sonata-nfv
-  vnf_version: '0.1'
-- vnf_id: vtc_vnf
-  vnf_name: vtc-vnf
-  vnf_vendor: eu.sonata-nfv
-  vnf_version: '0.1'
-vendor: eu.sonata-nfv
-version: '0.1'
+- vnf_id: "{{test_vnf}}"
+  vnf_name: "{{vnf-name}}"
+  vnf_vendor: "{{vnf-vendor}}"
+  vnf_version: "{{vnf-version}}"
+vendor: son-profile
+version: '1.0'
 virtual_links:
 - connection_points_reference:
-  - fw_vnf:mgmt
-  - vtc_vnf:mgmt
+  - "{{test_vnf:mgmt}}"
   - ns:mgmt
   connectivity_type: E-LAN
   id: mgmt
 - connection_points_reference:
-  - ns:servicein
-  - fw_vnf:fwin
+  - ns:input
+  - "{{test_vnf:input}}"
   connectivity_type: E-Line
   id: link-input
 - connection_points_reference:
-  - fw_vnf:fwout
-  - vtc_vnf:input
-  connectivity_type: E-Line
-  id: link-interconnect
-- connection_points_reference:
-  - vtc_vnf:output
-  - ns:serviceout
+  - "{{test_vnf:output}}"
+  - ns:output
   connectivity_type: E-Line
   id: link-output
-- connection_points_reference:
-  - ns:serviceout
-  - ns:servicein
-  connectivity_type: E-Line
-  id: link-back
+ 
