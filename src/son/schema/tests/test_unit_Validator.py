@@ -62,15 +62,12 @@ class UnitLoadSchemaTests(unittest.TestCase):
         self.assertEqual(sample_dict, return_dict)
 
     @patch("son.schema.validator.yaml")
-    @patch("son.schema.validator.urllib.request.urlopen.headers."
-           "get_content_charset")
-    @patch("son.schema.validator.urllib.request.urlopen.read.decode")
-    @patch("son.schema.validator.urllib.request.urlopen")
-    def test_load_remote_schema(self, m_urlopen, m_decode, m_cs, m_yaml):
+    @patch("son.schema.validator.requests.get")
+    def test_load_remote_schema(self, m_urlopen, m_yaml):
 
         sample_dict = {"key": "content"}
-        m_decode.return_value = ""
-        m_cs.return_value = ""
+        #m_decode.return_value = ""
+        #m_cs.return_value = ""
         m_yaml.load.return_value = sample_dict
 
         # Ensure that urlopen is accessing the same address of the argument
