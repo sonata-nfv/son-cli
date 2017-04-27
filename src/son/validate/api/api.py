@@ -69,7 +69,7 @@ def set_resource(key, type=None, result=None, topology=None, fwgraph=None):
 
 
 def get_resource(key):
-    if key not in cache.get('resources'):
+    if key not in cache.get('resources').keys():
         return
     return cache.get('resources')[key]
 
@@ -117,11 +117,17 @@ def _validate_object(object_type):
         log.debug("Returning cached result for '{0}'".format(key))
         return resource['result']
 
+    print("starting validation")
     validator = Validator()
-    validator.configure(syntax=request.form['syntax'] or False,
-                        integrity=request.form['integrity'] or False,
-                        topology=request.form['topology'] or False,
+    validator.configure(syntax=request.form['syntax']
+                        if 'syntax' in request.form else True,
+                        integrity=request.form['integrity']
+                        if 'integrity' in request.form else False,
+                        topology=request.form['topology']
+                        if 'topology' in request.form else False,
                         debug=app.debug)
+
+    print("as")
 
     val_function = getattr(validator, 'validate_' + object_type)
     result = val_function(path)
