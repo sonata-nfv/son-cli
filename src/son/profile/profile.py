@@ -70,6 +70,12 @@ class ProfileManager(object):
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
 
+        if self.args.mode=="passive":
+            self._passive_execution()
+        elif self.args.mode=="active":
+            self._active_execution()
+
+    def _passive_execution(self):
         # execute profiling run on pre-deployed service
         # only service experiments are executed
         if not self.args.no_execution :
@@ -92,6 +98,7 @@ class ProfileManager(object):
                                         vnforder_list=experiment.vnforder_list)
                 profiler.start_experiment()
 
+    def _active_execution(self):
         # generate service configuration using the specified generator module
         if not self.args.no_generation:
             # select and instantiate configuration generator
@@ -255,6 +262,14 @@ def parse_args(manual_args=None):
         required=False,
         default="sonata",
         dest="service_generator")
+
+    parser.add_argument(
+        "--mode",
+        help="Choose between active and passive execution. Default is passive",
+        required=False,
+        choices=["active", "passive"],
+        default="passive",
+        dest="mode")
 
     parser.add_argument(
         "-c",
