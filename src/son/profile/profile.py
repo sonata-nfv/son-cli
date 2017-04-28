@@ -34,7 +34,7 @@ from termcolor import colored
 from tabulate import tabulate
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.helper import read_yaml
-from son.monitor.profiler import Emu_Profiler
+from son.monitor.profiler import Emu_Profiler as Passive_Emu_Profiler
 
 LOG = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class ProfileManager(object):
                 configuration_commands = dict() # experiment.configuration_space_dict (TODO imec: needs to be adapted to new experiment.py)
                 resource_list = [] # experiment.resource_space_list (TODO imec: needs to be adapted to new experiment.py)
                 timeout = experiment.time_limit
-                profiler = Emu_Profiler(input_msd_path=input_msd_path,
+                profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,
                                         configuration_commands=configuration_commands,
