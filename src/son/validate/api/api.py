@@ -238,17 +238,16 @@ def _validate_object_from_request(object_type):
 
 
 def _validate_object(path, obj_type, syntax, integrity, topology):
-
-    log.info("Validating {0} '{1}'".format(obj_type, path))
     key = get_resource_key(path)
-    log.debug("MD5 hash key: '{}'".format(key))
+    log.info("Validating {0} '{1}' --> MD5 hash: {2}"
+             .format(obj_type, path, key))
 
     resource = get_resource(key)
     if resource and resource['type'] == obj_type and \
             resource['syntax'] == syntax and \
             resource['integrity'] == integrity and \
             resource['topology'] == topology:
-        log.debug("Returning cached result for '{0}'".format(key))
+        log.info("Returning cached result for '{0}'".format(key))
         return resource['result']
 
     validator = Validator()
@@ -398,7 +397,6 @@ def remove_artifacts():
 
 def main():
 
-    coloredlogs.install(level='info')
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -451,8 +449,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.debug:
-        coloredlogs.install(level='debug')
+    coloredlogs.install(level='debug' if args.debug else 'info')
 
     initialize(debug=args.debug)
 
@@ -463,10 +460,6 @@ def main():
             log.error("Could not find a SONATA workspace "
                       "at the specified location")
             exit(1)
-
-        # enforce debug (if is the case) after workspace init
-        if args.debug:
-            coloredlogs.install(level='debug')
 
         load_watch_dirs(ws)
 

@@ -110,7 +110,7 @@ class Validator(object):
         return len(self.warnings)
 
     def configure(self, syntax=None, integrity=None, topology=None,
-                  dpath=None, dext=None, debug=False):
+                  dpath=None, dext=None, debug=None):
         """
         Configure parameters for validation. It is recommended to call this
         function before performing a validation.
@@ -132,8 +132,12 @@ class Validator(object):
             self._dext = dext
         if dpath is not None:
             self._dpath = dpath
-        if debug:
+        if debug is True:
+            self._workspace.log_level = 'debug'
             coloredlogs.install(level='debug')
+        if debug is False:
+            self._workspace.log_level = 'info'
+            coloredlogs.install(level='info')
 
     def _assert_configuration(self):
         """

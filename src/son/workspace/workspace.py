@@ -76,6 +76,11 @@ class Workspace:
     def log_level(self):
         return self.config['log_level']
 
+    @log_level.setter
+    def log_level(self, value):
+        self.config['log_level'] = value
+        coloredlogs.install(level=value)
+
     @property
     def schemas_local_master(self):
         return self.config['schemas_local_master']
