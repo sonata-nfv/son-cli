@@ -47,7 +47,10 @@ class Project:
         coloredlogs.install(level=workspace.log_level)
         self._prj_root = prj_root
         self._workspace = workspace
-        self._prj_config = config
+        if config:
+            self._prj_config = config
+        else:
+            self.load_default_config()
 
     @property
     def project_root(self):
@@ -68,6 +71,20 @@ class Project:
     @property
     def descriptor_extension(self):
         return self.project_config['descriptor_extension']
+
+    def load_default_config(self):
+        self._prj_config = {
+            'version': self.CONFIG_VERSION,
+            'package': {
+                'name': 'sonata-project-sample',
+                'vendor': 'eu.sonata-nfv.package',
+                'version': '0.1',
+                'maintainer': 'Name, Company, Contact',
+                'description': 'Some description about this sample'
+            },
+            'descriptor_extension':
+                self._workspace.default_descriptor_extension
+        }
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))

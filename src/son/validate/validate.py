@@ -133,7 +133,6 @@ class Validator(object):
         if dpath is not None:
             self._dpath = dpath
         if debug:
-            print("yay")
             coloredlogs.install(level='debug')
 
     def _assert_configuration(self):
@@ -252,6 +251,9 @@ class Validator(object):
 
             project = Project.__create_from_descriptor__(self._workspace,
                                                          project)
+
+        if type(project) is not Project:
+            return
 
         log.info("Validating project '{0}'".format(project.project_root))
         log.info("... syntax: {0}, integrity: {1}, topology: {2}"

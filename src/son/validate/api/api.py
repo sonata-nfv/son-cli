@@ -12,6 +12,9 @@ from son.package.md5 import generate_hash
 from flask_cache import Cache
 from werkzeug.utils import secure_filename
 from son.validate.validate import Validator, print_result
+from son.workspace.workspace import Workspace
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 
 log = logging.getLogger(__name__)
@@ -24,13 +27,102 @@ cache = Cache(app, config={'CACHE_TYPE': 'redis'})
 req_errors = []
 
 
-def initialize():
+class ValidateWatcher(FileSystemEventHandler):
+
+    def __init__(self, path, callback, filename=None):
+        self.path = path
+        self.filename = filename
+        self.callback = callback
+        self.observer = Observer()
+        self.observer.schedule(self, self.path,
+                               recursive=False if self.filename else True)
+        self.observer.start()
+        #self.observer.join()
+
+    def on_modified(self, event):
+        if self.filename and not event.is_directory \
+                and event.src_path.endswith(self.filename):
+            self.observer.stop()
+            self.callback(self.path)
+        elif not self.filename and event.is_directory:
+            self.observer.stop()
+            self.callback(self.path)
+        else:
+            log.error("Internal error: unknown watchdog event")
+
+
+def initialize(debug=False):
+    log.info("Initializing validator service")
     cache.clear()
+    cache.add('debug', debug)
     cache.add('artifacts', list())
     cache.add('resources', dict())
+    cache.add('watches', dict())
 
     os.makedirs(app.config['ARTIFACTS_DIR'], exist_ok=True)
     set_artifact(app.config['ARTIFACTS_DIR'])
+
+
+def install_watcher(watch_path, obj_type, syntax, integrity, topology):
+    log.debug("Setting watcher for {0} validation on path: {1}"
+              .format(obj_type, watch_path))
+    if os.path.isdir(watch_path):
+        ValidateWatcher(watch_path, _validate_object_from_watch)
+    elif os.path.isfile(watch_path):
+        filename = os.path.basename(watch_path)
+        dirname = os.path.dirname(watch_path)
+        ValidateWatcher(dirname, _validate_object_from_watch,
+                        filename=filename)
+
+    set_watch(watch_path, obj_type, syntax, integrity, topology)
+
+
+def load_watch_dirs(workspace):
+    if not workspace:
+        return
+
+    log.info("Loading validator watchers")
+
+    for watch_path, watch in workspace.validate_watchers.items():
+        if watch_exists(watch_path):
+            log.warning("Watcher path '{0}' does not exist. Ignoring."
+                        .format(watch_path))
+            continue
+
+        log.debug("Loading validator watcher: {0}".format(watch_path))
+
+        assert watch['type'] == 'project' or watch['type'] == 'package' or \
+            watch['type'] == 'service' or watch['type'] == 'function'
+
+        install_watcher(watch_path, watch['type'], watch['type'],
+                        watch['integrity'], watch['topology'])
+
+        _validate_object(watch_path, watch['type'], watch['syntax'],
+                         watch['topology'], watch['integrity'])
+
+
+def set_watch(path, obj_type, syntax, integrity, topology):
+    log.debug("Caching watch '{0}".format(path))
+    watches = cache.get('watches')
+    if not watch_exists(path):
+        watches[path] = dict()
+
+    watches[path]['type'] = obj_type
+    watches[path]['syntax'] = syntax
+    watches[path]['integrity'] = integrity
+    watches[path]['topology'] = topology
+
+    cache.set('watches', watches)
+
+
+def watch_exists(path):
+    return path in cache.get('watches').keys()
+
+
+def get_watch(path):
+    if not watch_exists(path):
+        return
+    return cache.get('watches')[path]
 
 
 def set_artifact(artifact_path):
@@ -48,22 +140,31 @@ def add_artifact_root():
     return artifact_root
 
 
-def set_resource(key, type=None, result=None, topology=None, fwgraph=None):
-    assert type or result or topology or fwgraph
+def set_resource(key, obj_type=None, syntax=None, integrity=None, topology=None,
+                 result=None, res_topology=None, res_fwgraph=None):
+
+    assert obj_type or syntax or topology or integrity or \
+           result or res_topology or res_fwgraph
 
     log.debug("Caching resource '{0}'".format(key))
     resources = cache.get('resources')
     if key not in resources.keys():
         resources[key] = dict()
 
-    if type:
-        resources[key]['type'] = type
-    if result:
-        resources[key]['result'] = result
+    if obj_type:
+        resources[key]['type'] = obj_type
+    if syntax:
+        resources[key]['syntax'] = syntax
+    if integrity:
+        resources[key]['integrity'] = integrity
     if topology:
         resources[key]['topology'] = topology
-    if fwgraph:
-        resources[key]['fwgraph'] = fwgraph
+    if result:
+        resources[key]['result'] = result
+    if res_topology:
+        resources[key]['res_topology'] = res_topology
+    if res_fwgraph:
+        resources[key]['res_fwgraph'] = res_fwgraph
 
     cache.set('resources', resources)
 
@@ -75,7 +176,6 @@ def get_resource(key):
 
 
 def get_resource_key(path):
-    print(os.path.abspath(path))
     return generate_hash(os.path.abspath(path))
 
 
@@ -100,7 +200,26 @@ def process_request():
     return path
 
 
-def _validate_object(object_type):
+def _validate_object_from_watch(path):
+    if not watch_exists(path):
+        log.error("Invalid cached watch. Cannot proceed with validation")
+        return
+
+    watch = get_watch(path)
+    log.debug("Validating {0} from watch: {1}".format(watch['type'], path))
+    result = _validate_object(path, watch['type'], watch['syntax'],
+                              watch['integrity'], watch['topology'])
+
+    # re-schedule watcher
+    install_watcher(path, watch['type'], watch['syntax'], watch['integrity'],
+                    watch['topology'])
+
+    if not result:
+        return
+    log.debug(result)
+
+
+def _validate_object_from_request(object_type):
     assert object_type == 'project' or object_type == 'package' or \
            object_type == 'service' or object_type == 'function'
 
@@ -108,33 +227,45 @@ def _validate_object(object_type):
     if not path:
         return render_errors(), 400
 
-    log.info("Validating {0} '{1}'".format(object_type, path))
+    syntax = request.form['syntax'] \
+        if 'syntax' in request.form else True
+    integrity = request.form['integrity'] \
+        if 'integrity' in request.form else False
+    topology = request.form['topology'] \
+        if 'topology' in request.form else False
+
+    return _validate_object(path, object_type, syntax, integrity, topology)
+
+
+def _validate_object(path, obj_type, syntax, integrity, topology):
+
+    log.info("Validating {0} '{1}'".format(obj_type, path))
     key = get_resource_key(path)
     log.debug("MD5 hash key: '{}'".format(key))
 
     resource = get_resource(key)
-    if resource and resource['type'] == object_type:
+    if resource and resource['type'] == obj_type and \
+            resource['syntax'] == syntax and \
+            resource['integrity'] == integrity and \
+            resource['topology'] == topology:
         log.debug("Returning cached result for '{0}'".format(key))
         return resource['result']
 
-    print("starting validation")
     validator = Validator()
-    validator.configure(syntax=request.form['syntax']
-                        if 'syntax' in request.form else True,
-                        integrity=request.form['integrity']
-                        if 'integrity' in request.form else False,
-                        topology=request.form['topology']
-                        if 'topology' in request.form else False,
-                        debug=app.debug)
+    print(cache.get('debug'))
+    validator.configure(syntax, integrity, topology, debug=cache.get('debug'))
+    val_function = getattr(validator, 'validate_' + obj_type)
 
-    print("as")
+    print(coloredlogs.get_level())
 
-    val_function = getattr(validator, 'validate_' + object_type)
     result = val_function(path)
+    if not result:
+        return
     print_result(validator, result)
     json_result = generate_result(validator)
     # todo: missing topology and fwgraphs
-    set_resource(key, type=object_type, result=json_result)
+    set_resource(key, obj_type=obj_type, result=json_result, syntax=syntax,
+                 integrity=integrity, topology=topology)
 
     return json_result
 
@@ -166,22 +297,22 @@ def flush_artifacts():
 
 @app.route('/validate/project', methods=['POST'])
 def validate_project():
-    return _validate_object('project')
+    return _validate_object_from_request('project')
 
 
 @app.route('/validate/package', methods=['POST'])
 def validate_package():
-    return _validate_object('package')
+    return _validate_object_from_request('package')
 
 
 @app.route('/validate/service', methods=['POST'])
 def validate_service():
-    return _validate_object('service')
+    return _validate_object_from_request('service')
 
 
 @app.route('/validate/function', methods=['POST'])
 def validate_function():
-    return _validate_object('function')
+    return _validate_object_from_request('function')
 
 
 def generate_result(validator):
@@ -274,6 +405,17 @@ def main():
         description="SONATA Validator API. By default service runs on"
                     " 127.0.0.1:5001\n"
     )
+    parser.add_argument(
+        "--mode",
+        choices=['service', 'local'],
+        default='service',
+        help="Specify the mode of operation. 'service' mode will run as "
+             "a stateless service only. 'local' mode will run as a "
+             "service and will also provide automatic monitoring and "
+             "validation of local SDK projects, services, etc. that are "
+             "configured in the developer workspace",
+        required=False
+    )
 
     parser.add_argument(
         "--host",
@@ -290,10 +432,13 @@ def main():
     )
     parser.add_argument(
         "-w", "--workspace",
-        help=""
-             "Specify the directory of the SDK workspace. Projects defined "
-             "in the workspace configuration will be monitored and "
-             "automatically validated",
+        help="Only valid in 'local' mode. "
+             "Specify the directory of the SDK workspace. "
+             "Validation objects defined in the workspace configuration will "
+             "be monitored and automatically validated. "
+             "If not specified will assume '{}'"
+             .format(Workspace.DEFAULT_WORKSPACE_DIR),
+        default=Workspace.DEFAULT_WORKSPACE_DIR,
         required=False
     )
     parser.add_argument(
@@ -309,9 +454,29 @@ def main():
     if args.debug:
         coloredlogs.install(level='debug')
 
-    initialize()
+    initialize(debug=args.debug)
+
+    if args.mode == 'local' and args.workspace:
+        ws_root = os.path.expanduser(args.workspace)
+        ws = Workspace.__create_from_descriptor__(ws_root)
+        if not ws:
+            log.error("Could not find a SONATA workspace "
+                      "at the specified location")
+            exit(1)
+
+        # enforce debug (if is the case) after workspace init
+        if args.debug:
+            coloredlogs.install(level='debug')
+
+        load_watch_dirs(ws)
+
     app.run(
         host=args.host,
         port=args.port,
-        debug=args.debug
+        debug=args.debug,
+        use_reloader=False,
     )
+
+    # enforce debug (if is the case) after app init
+    if args.debug:
+        coloredlogs.install(level='debug')

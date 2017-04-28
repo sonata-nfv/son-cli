@@ -39,27 +39,8 @@ log = logging.getLogger(__name__)
 class Workspace:
     BACK_CONFIG_VERSION = "0.03"
     CONFIG_VERSION = "0.04"
-
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
-
-    # Parameter strings for the configuration descriptor.
-    # CONFIG_STR_NAME = "name"
-    # CONFIG_STR_VERSION = "version"
-    # CONFIG_STR_CATALOGUES_DIR = "catalogues_dir"
-    # CONFIG_STR_CATALOGUE_NS_DIR = "ns_catalogue"
-    # CONFIG_STR_CATALOGUE_VNF_DIR = "vnf_catalogue"
-    # CONFIG_STR_CONFIG_DIR = "configuration_dir"
-    # CONFIG_STR_PLATFORMS_DIR = "platforms_dir"
-    # CONFIG_STR_PROJECTS_DIR = "projects_dir"
-    # CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
-    # CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
-    # CONFIG_STR_DESCRIPTOR_EXTENSION = "default_descriptor_extension"
-    # CONFIG_STR_SERVICE_PLATFORMS = "service_platforms"
-    # CONFIG_STR_DEF_SERVICE_PLATFORM = "default_service_platform"
-    # CONFIG_STR_LOGGING_LEVEL = "log_level"
-    # CONFIG_STR_VALIDATE_WATCH = "validate_watch"
-
     __descriptor_name__ = "workspace.yml"
 
     def __init__(self, ws_root, config=None, ws_name=None, log_level=None):
@@ -104,14 +85,15 @@ class Workspace:
         return self.config['schemas_remote_master']
 
     @property
-    def validate_watch(self):
-        return self.config['validate_watch']
+    def validate_watchers(self):
+        return self.config['validate_watchers']
 
     @property
     def config(self):
         return self._ws_config
 
     def load_default_config(self):
+        self.config['version'] = self.CONFIG_VERSION
         self.config['name'] = 'SONATA Workspace'
         self.config['log_level'] = 'INFO'
 
@@ -136,8 +118,15 @@ class Workspace:
                  }
              }
         self.config['default_service_platform'] = 'sp1'
-        self.config['validate_watch'] = [
-            os.path.join(self.workspace_root, self.config['projects_dir'])]
+        self.config['validate_watchers'] = \
+            {os.path.join(self.workspace_root, self.config['projects_dir'])
+             : {'type': 'project',
+                'syntax': True,
+                'integrity': True,
+                'topology': True
+                }
+             }
+
 
     def create_dirs(self):
         """
@@ -165,8 +154,6 @@ class Workspace:
         :return:
         """
         cfg_d = self.config.copy()
-        cfg_d['version'] = Workspace.CONFIG_VERSION
-
         ws_file_path = os.path.join(self.workspace_root,
                                     Workspace.__descriptor_name__)
 
@@ -220,8 +207,14 @@ class Workspace:
         # Make adjustments to support backwards compatibility
         # 0.03
         if ws_config['version'] == "0.03":
-            ws.config['validate_watch'] = [
-                os.path.join(ws.workspace_root, ws.config['projects_dir'])]
+            ws.config['validate_watchers'] = \
+                {os.path.join(ws.workspace_root, ws.config['projects_dir'])
+                 : {'type': 'project',
+                    'syntax': True,
+                    'integrity': True,
+                    'topology': True
+                    }
+                 }
             log.warning("Loading workspace with an old configuration "
                         "version ({0}). Updated configuration: {1}"
                         .format(ws_config['version'], ws.config))
