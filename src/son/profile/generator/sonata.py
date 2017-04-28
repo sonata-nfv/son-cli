@@ -262,6 +262,13 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         LOG.debug("Applied resource limitations to service '{}'".format(service))
 
     def _generate_function_experiments(self, base_service_obj, experiments):
+        """
+        Generate function experiments according to given experiment descriptions.
+        Generated experiments are based on the given network service.
+        A single function is extracted and embedded into a test service descriptor
+        to test the function in isolation.
+        return: dict<run_id, service_obj>
+        """
         r = dict()
         for e in experiments:
             for ec in e.experiment_configurations:
@@ -283,6 +290,11 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         return r
 
     def _generate_service_experiments(self, base_service_obj, experiments):
+        """
+        Generate service experiments according to given experiment descriptions.
+        Generated experiments are based on the given network service.
+        return: dict<run_id, service_obj>
+        """
         r = dict()
         for e in experiments:
             for ec in e.experiment_configurations:
@@ -356,6 +368,11 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
 
 
 class SonataService(object):
+    """
+    Represents a SONATA network service project.
+    Contains NSD and multiple VNFDs and offers methods to store
+    the network service project and to package it.
+    """
 
     def __init__(self, manifest, nsd, vnfd_list, metadata):
         self.manifest = manifest
@@ -451,6 +468,11 @@ class SonataService(object):
         return copy.deepcopy(self)
 
     def _write(self, output_path):
+        """
+        Write this SONATA service project structure to disk. This includes
+        all descriptors etc. The generated files can be used as input to
+        the SONATA packaging tool.
+        """
         path = os.path.join(output_path, SON_GEN_SERVICES, self.pkg_name)
         # update package path to reflect new location
         self.metadata["project_disk_path"] = path
