@@ -57,4 +57,12 @@ def __generate_hash_path__(p, cs=128):
         for d in sorted(dirs):  # guarantee same order to obtain same hash
             hashes.append(__generate_hash_path__(os.path.join(root, d), cs))
         break
-    return str(hash(''.join(hashes)))
+    return _reduce_hash(hashes)
+#    return str(hash(''.join(hashes)))
+
+
+def _reduce_hash(hashlist):
+    hash = hashlib.md5()
+    for hashvalue in sorted(hashlist):
+        hash.update(hashvalue.encode('utf-8'))
+    return hash.hexdigest()

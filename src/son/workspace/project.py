@@ -314,7 +314,17 @@ class Project:
                  .format(prj_filename))
 
         with open(prj_filename, 'r') as prj_file:
-            prj_config = yaml.load(prj_file)
+            try:
+                prj_config = yaml.load(prj_file)
+
+            except yaml.YAMLError as exc:
+                log.error("Error parsing descriptor file: {0}".format(exc))
+                return
+
+            if not prj_config:
+                log.error("Couldn't read descriptor file: '{0}'"
+                          .format(prj_file))
+                return
 
         if prj_config['version'] == Project.CONFIG_VERSION:
             return Project(workspace, prj_root, config=prj_config)

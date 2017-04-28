@@ -156,22 +156,22 @@ class Validator(object):
            caller != 'validate_project' and caller != 'validate_package':
             log.error("Cannot assert a correct configuration. Validation "
                       "scope couldn't be determined. Aborting")
-            sys.exit(1)
+            return
 
         # general rules - apply to all validations
         if self._integrity and not self._syntax:
             log.error("Cannot validate integrity without validating syntax "
                       "first. Aborting.")
-            sys.exit(1)
+            return
 
         if self._topology and not self._integrity:
             log.error("Cannot validate topology without validating integrity "
                       "first. Aborting.")
-            sys.exit(1)
+            return
 
         if not self._syntax:
             log.error("Nothing to validate. Aborting.")
-            sys.exit(1)
+            return
 
         if caller == 'validate_package':
             pass
@@ -192,6 +192,8 @@ class Validator(object):
         elif caller == 'validate_function':
             pass
 
+        return True
+
     def validate_package(self, package):
         """
         Validate a SONATA package.
@@ -200,7 +202,8 @@ class Validator(object):
         :param package: SONATA package filename
         :return: True if all validations were successful, False otherwise
         """
-        self._assert_configuration()
+        if not self._assert_configuration():
+            return
 
         log.info("Validating package '{0}'".format(os.path.abspath(package)))
 
@@ -245,7 +248,8 @@ class Validator(object):
         :param project: SONATA project
         :return: True if all validations were successful, False otherwise
         """
-        self._assert_configuration()
+        if not self._assert_configuration():
+            return
 
         # consider cases when project is a path
         if type(project) is not Project and os.path.isdir(project):
@@ -281,7 +285,8 @@ class Validator(object):
         :param nsd_file: service descriptor filename
         :return: True if all validations were successful, False otherwise
         """
-        self._assert_configuration()
+        if not self._assert_configuration():
+            return
 
         log.info("Validating service '{0}'".format(nsd_file))
         log.info("... syntax: {0}, integrity: {1}, topology: {2}"
@@ -315,7 +320,8 @@ class Validator(object):
                           a directory to search for VNFDs
         :return: True if all validations were successful, False otherwise
         """
-        self._assert_configuration()
+        if not self._assert_configuration():
+            return
 
         # validate multiple VNFs
         if os.path.isdir(vnfd_path):

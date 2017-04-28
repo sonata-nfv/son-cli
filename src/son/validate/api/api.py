@@ -7,8 +7,8 @@ import urllib.request as urllib2
 import urllib.parse as urlparse
 import shutil
 import time
-from flask import Flask, request
 from son.package.md5 import generate_hash
+from flask import Flask, request
 from flask_cache import Cache
 from werkzeug.utils import secure_filename
 from son.validate.validate import Validator, print_result
@@ -40,15 +40,18 @@ class ValidateWatcher(FileSystemEventHandler):
         #self.observer.join()
 
     def on_modified(self, event):
-        if self.filename and not event.is_directory \
-                and event.src_path.endswith(self.filename):
+        print(self.filename)
+        print(event.src_path)
+        print(event)
+
+        if not event.is_directory and event.src_path.endswith(self.filename):
             self.observer.stop()
             self.callback(self.path)
         elif not self.filename and event.is_directory:
             self.observer.stop()
             self.callback(self.path)
         else:
-            log.error("Internal error: unknown watchdog event")
+            log.error("Internal error: unknown watcher event")
 
 
 def initialize(debug=False):
@@ -68,6 +71,7 @@ def install_watcher(watch_path, obj_type, syntax, integrity, topology):
               .format(obj_type, watch_path))
     if os.path.isdir(watch_path):
         ValidateWatcher(watch_path, _validate_object_from_watch)
+
     elif os.path.isfile(watch_path):
         filename = os.path.basename(watch_path)
         dirname = os.path.dirname(watch_path)
@@ -94,7 +98,7 @@ def load_watch_dirs(workspace):
         assert watch['type'] == 'project' or watch['type'] == 'package' or \
             watch['type'] == 'service' or watch['type'] == 'function'
 
-        install_watcher(watch_path, watch['type'], watch['type'],
+        install_watcher(watch_path, watch['type'], watch['syntax'],
                         watch['integrity'], watch['topology'])
 
         _validate_object(watch_path, watch['type'], watch['syntax'],
@@ -140,7 +144,7 @@ def add_artifact_root():
     return artifact_root
 
 
-def set_resource(key, obj_type=None, syntax=None, integrity=None, topology=None,
+def set_resource(key, obj_type, syntax, integrity, topology,
                  result=None, res_topology=None, res_fwgraph=None):
 
     assert obj_type or syntax or topology or integrity or \
@@ -151,14 +155,11 @@ def set_resource(key, obj_type=None, syntax=None, integrity=None, topology=None,
     if key not in resources.keys():
         resources[key] = dict()
 
-    if obj_type:
-        resources[key]['type'] = obj_type
-    if syntax:
-        resources[key]['syntax'] = syntax
-    if integrity:
-        resources[key]['integrity'] = integrity
-    if topology:
-        resources[key]['topology'] = topology
+    resources[key]['type'] = obj_type
+    resources[key]['syntax'] = syntax
+    resources[key]['integrity'] = integrity
+    resources[key]['topology'] = topology
+
     if result:
         resources[key]['result'] = result
     if res_topology:
@@ -176,6 +177,7 @@ def get_resource(key):
 
 
 def get_resource_key(path):
+
     return generate_hash(os.path.abspath(path))
 
 
@@ -227,11 +229,11 @@ def _validate_object_from_request(object_type):
     if not path:
         return render_errors(), 400
 
-    syntax = request.form['syntax'] \
+    syntax = eval(request.form['syntax']) \
         if 'syntax' in request.form else True
-    integrity = request.form['integrity'] \
+    integrity = eval(request.form['integrity']) \
         if 'integrity' in request.form else False
-    topology = request.form['topology'] \
+    topology = eval(request.form['topology']) \
         if 'topology' in request.form else False
 
     return _validate_object(path, object_type, syntax, integrity, topology)
@@ -251,11 +253,8 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
         return resource['result']
 
     validator = Validator()
-    print(cache.get('debug'))
     validator.configure(syntax, integrity, topology, debug=cache.get('debug'))
     val_function = getattr(validator, 'validate_' + obj_type)
-
-    print(coloredlogs.get_level())
 
     result = val_function(path)
     if not result:
@@ -263,8 +262,8 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
     print_result(validator, result)
     json_result = generate_result(validator)
     # todo: missing topology and fwgraphs
-    set_resource(key, obj_type=obj_type, result=json_result, syntax=syntax,
-                 integrity=integrity, topology=topology)
+    set_resource(key, obj_type, syntax, integrity, topology,
+                 result=json_result)
 
     return json_result
 
@@ -336,10 +335,11 @@ def get_local(path):
         set_artifact(filepath)
 
     elif os.path.isdir(path):
-        dirname = os.path.basename(os.path.dirname(path))
+        dirname = os.path.basename(os.path.abspath(path))
         filepath = os.path.join(artifact_root, dirname)
         log.debug("Copying local tree: '{0}'".format(filepath))
         shutil.copytree(path, filepath)
+        set_artifact(filepath)
         for root, dirs, files in os.walk(filepath):
             for d in dirs:
                 set_artifact(os.path.join(root, d))
