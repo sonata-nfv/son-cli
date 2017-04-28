@@ -51,7 +51,7 @@ class ProfileManager(object):
         self.generated_services = list()
         # arguments
         self.args = args
-        self.args.config = os.path.join(os.getcwd(), self.args.config)
+        self.args.ped = os.path.join(os.getcwd(), self.args.ped)
         self.work_dir = self.args.work_dir
         self.output_dir = self.args.output_dir
         # logging setup
@@ -65,7 +65,7 @@ class ProfileManager(object):
         :return:
         """
         # try to load PED file
-        self.ped = self._load_ped_file(self.args.config)
+        self.ped = self._load_ped_file(self.args.ped)
         self._validate_ped_file(self.ped)
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
@@ -205,11 +205,11 @@ def parse_args(manual_args=None):
         action="store_true")
 
     parser.add_argument(
-        "-c",
-        "--config",
+        "-p",
+        "--ped",
         help="PED file to be used for profiling run",
         required=True,
-        dest="config")
+        dest="ped")
 
     parser.add_argument(
         "--work-dir",
@@ -255,6 +255,15 @@ def parse_args(manual_args=None):
         required=False,
         default="sonata",
         dest="service_generator")
+
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Son Profile config file. Default is config.yml. Path has to either be absolute or relative to location of python script.",
+        required=False,
+        default="config.yml",
+        dest="config")
+
 
     if manual_args is not None:
         return parser.parse_args(manual_args)
