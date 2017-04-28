@@ -73,6 +73,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         generated_service_objs.update(self._generate_service_experiments(
             base_service_obj, service_experiments))
         # pack all generated services and write them to disk
+        LOG.info("Starting to pack {} service configurations ...".format(len(generated_service_objs)))
         return self._pack(working_path, generated_service_objs)
 
     def _extract(self, input_reference, working_path):
@@ -145,22 +146,20 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
             ))
         new_vnf_dict = new_nsd.get("network_functions")[0]
         new_vnf_dict.update(old_vnf_dict)
-        LOG.debug("Updated VNF section in '{}': {}".format(new_nsd.get("name"), new_vnf_dict))
+        LOG.debug("Updated VNF section in '{}': {}".format(service, new_vnf_dict))
         # 2. update virtual link section (get first three CPs from VNFD)
         # TODO remove order assumptions (current version is more a HACK!)
         vnfd = service.get_vnfd_by_uid(ec.experiment.function)
         new_link_list = new_nsd.get("virtual_links")
-        LOG.warning(new_link_list)
         cp_ids = [cp.get("id") for cp in vnfd.get("connection_points")]
         for i in range(0, min(len(new_link_list), len(cp_ids))):
             cpr = new_link_list[i]["connection_points_reference"]
             for j in range(0, len(cpr)):
                 if "test_vnf" in cpr[j]:
                     cpr[j] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
-        LOG.warning(new_link_list)
+        LOG.debug("Updated VLink section in '{}': {}".format(service, new_link_list))
         # 3. update forwarding path section
         # TODO remove order assumptions (current version is more a HACK!)
-        LOG.warning(new_nsd.get("forwarding_graphs"))
         for fg in new_nsd.get("forwarding_graphs"):
             fg.get("constituent_vnfs")[0] = new_vnf_dict.get("vnf_id")
             for nfp in fg.get("network_forwarding_paths"):
@@ -168,8 +167,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 for i in range(1, min(len(nfp_cp_list), len(cp_ids))):
                     if "test_vnf" in nfp_cp_list[i].get("connection_point_ref"):
                         nfp_cp_list[i]["connection_point_ref"] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
-        LOG.warning(new_nsd.get("forwarding_graphs"))
-                
+        LOG.debug("Updated forwarding graph section in '{}': {}".format(service, new_nsd.get("forwarding_graphs")))      
         # 4. replace NSD
         service.nsd = new_nsd
 
@@ -278,7 +276,10 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
-                # TODO INFO message
+                # INFO message
+                LOG.info(
+                    "Generated function experiment '{}': '{}' with run ID: {}".format(
+                        e.name, ns, ec.run_id))
         return r
 
     def _generate_service_experiments(self, base_service_obj, experiments):
@@ -293,7 +294,10 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
-                # TODO INFO message
+                # INFO message
+                LOG.info(
+                    "Generated service experiment '{}': '{}' with run ID: {}".format(
+                        e.name, ns, ec.run_id))
         return r
 
     def _pack(self, output_path, service_objs):
