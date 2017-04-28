@@ -10,10 +10,8 @@ class EventLogger(object):
         self._name = name
         self._log = logging.getLogger(name)
         self._events = dict()
+        self.init_events()
 
-        # initialize events logger
-        for l in ['error', 'warning', 'none']:
-            self._events[l] = []
 
         # load events config
         configpath = pkg_resources.resource_filename(
@@ -28,6 +26,15 @@ class EventLogger(object):
     @property
     def warnings(self):
         return self._events['warning']
+
+    def reset(self):
+        self._events.clear()
+        self.init_events()
+
+    def init_events(self):
+        # initialize events logger
+        for l in ['error', 'warning', 'none']:
+            self._events[l] = []
 
     def log(self, msg, event):
         level = self._eventdict[event]
@@ -61,17 +68,3 @@ def get_logger(name):
     if not name:
         return
     return EventLogger.manager.get_logger(name)
-
-
-if __name__ == "__main__":
-
-    evtlog_ola = get_logger('ola')
-    evtlog_ola.log("invalid package format", 'evt_package_invalid_format')
-
-    evtlog_mundo = get_logger('mundo')
-    evtlog_mundo.log("invalid md5 in package", 'evt_package_invalid_md5')
-
-
-    print(evtlog_ola.errors)
-
-

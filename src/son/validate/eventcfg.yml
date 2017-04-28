@@ -7,7 +7,7 @@
 
 ### PROJECT
 
-# Project - invalid service file descriptor
+# Project - invalid project file descriptor
 evt_project_service_invalid: error
 
 # Project - multiple service descriptors found

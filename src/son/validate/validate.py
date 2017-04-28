@@ -84,9 +84,8 @@ class Validator(object):
         # syntax validation
         self._schema_validator = SchemaValidator(self._workspace)
 
-        # wrapper to count number of errors and warnings
-        log.error = CountCalls(log.error)
-        log.warning = CountCalls(log.warning)
+        # reset event logger
+        evtlog.reset()
 
     @property
     def errors(self):
@@ -134,6 +133,7 @@ class Validator(object):
         if dpath is not None:
             self._dpath = dpath
         if debug:
+            print("yay")
             coloredlogs.install(level='debug')
 
     def _assert_configuration(self):
@@ -1007,8 +1007,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        validator.validate_project(project)
-        print_result(validator)
+        result = validator.validate_project(project)
+        print_result(validator, result)
 
     elif args.nsd:
         validator = Validator()
@@ -1018,8 +1018,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        validator.validate_service(args.nsd)
-        print_result(validator)
+        result = validator.validate_service(args.nsd)
+        print_result(validator, result)
 
     elif args.vnfd:
         validator = Validator()
@@ -1029,8 +1029,8 @@ def main():
                             topology=args.topology,
                             debug=args.debug)
 
-        validator.validate_function(args.vnfd)
-        print_result(validator)
+        result = validator.validate_function(args.vnfd)
+        print_result(validator, result)
 
     else:
         log.error("Invalid arguments.")
