@@ -29,6 +29,7 @@ import requests
 import logging
 # import yaml
 import sys
+from Crypto.PublicKey import RSA
 from son.access.config.config import GK_ADDRESS, GK_PORT
 # from json import loads
 
@@ -77,7 +78,7 @@ class Push(object):
     GK_URI_INST = "/requests?"
 
     # def __init__(self, base_url, auth=('', '')):
-    def __init__(self, base_url, auth_token=None):
+    def __init__(self, base_url, auth_token=None, pb_key=None, pr_key=None, cert=None):
 
         # Assign parameters
         self._base_url = base_url
@@ -176,7 +177,7 @@ class Push(object):
 
         return response
 
-    def upload_package(self, package_file_name):
+    def upload_package(self, access_token, package_file_name, sign=False):
         """
         Upload package to platform
 
@@ -188,6 +189,9 @@ class Push(object):
         :param package_file_name: filename including full
                                   path of the package
                                   to be uploaded
+
+        :param sign: Sets to True or False if the package is signed
+                     before pushing it to the Platform
 
         :returns: text response message of the server or
                   error message
@@ -205,6 +209,11 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
+        # TODO: Implement Package Signing feature here before sending POST Package request
+        if sign:
+            # Package signing process goes here
+            raise NotImplementedError
+
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 payload = {'package': pkg_file}
@@ -221,28 +230,80 @@ class Push(object):
             return "Service package upload failed. " + str(e)
 
         # DEPRECATED --> SP Gatekepeer API does not support data with this POST flow
-        """
-        file_name = package_file_name.split('/')
-        headers = self._headers
-        headers['Content-Type'] = 'application/zip'
-        headers['Content-Disposition'] = 'attachment; filename=' + str(file_name[-1])
-        print("HEADERS", headers)
-        print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
 
-        try:
-            with open(package_file_name, 'rb') as pkg_file:
-                r = requests.post(url, headers=headers, files={'package': pkg_file})
-                if r.status_code == 201:
-                    msg = "Upload succeeded"
-                elif r.status_code == 409:
-                    msg = "Package already exists"
-                else:
-                    msg = "Upload error"
-                return "%s (%d): %r" % (msg, r.status_code, r.text)
+        # file_name = package_file_name.split('/')
+        # headers = self._headers
+        # headers['Content-Type'] = 'application/zip'
+        # headers['Content-Disposition'] = 'attachment; filename=' + str(file_name[-1])
+        # print("HEADERS", headers)
+        # print(mcolors.OKGREEN + "Uploading package " + package_file_name + " to " + url + "\n", mcolors.ENDC)
 
-        except Exception as e:
-            return "Service package upload failed. " + str(e)
+        # try:
+        #    with open(package_file_name, 'rb') as pkg_file:
+        #        r = requests.post(url, headers=headers, files={'package': pkg_file})
+        #        if r.status_code == 201:
+        #            msg = "Upload succeeded"
+        #        elif r.status_code == 409:
+        #            msg = "Package already exists"
+        #        else:
+        #            msg = "Upload error"
+        #        return "%s (%d): %r" % (msg, r.status_code, r.text)
+
+        # except Exception as e:
+        #    return "Service package upload failed. " + str(e)
+
+    # TODO: TO BE IMPLEMENTED
+    def package_sign(self, package_file):
         """
+        Signs a package with User's Private Key
+        :param package_file: Package file to be signed
+        :returns: Signed package (Hash)
+        """
+        # Load User's stored keys from settings custom location
+        ## If keys are not provided, generate a new key-pair
+        ## Call self.generate.keys
+        # Load user's stored certificate from settings custom location
+        # keypair = keypair or self.generate_keypair()
+        ## If certicate is not provided, pass
+        # Sign package
+        # return signed package, public key, certificate(optional)
+
+        # TODO: TO BE IMPLEMENTED
+    def generate_keypair(self, save_keys_path):
+        """
+        Generates User's Private Key and Public Key
+        :param save_keys_path: Path to the location where keys will be saved
+        :returns: Private key, Public Key
+        """
+
+        from Crypto.PublicKey import RSA
+
+        # KeyPair = NamedTuple('KeyPair', [('public', str), ('private', str)])
+        algorithm = 'RS256'
+
+        key = RSA.generate(2048)
+        public=key.publickey().exportKey('PEM').decode('ascii')
+        private=key.exportKey('PEM').decode('ascii')
+
+    # def generate_token(self, payload: dict) -> str:
+    #    """
+    #    Generates User's Private Key and Public Key
+    #    :param save_keys_path: Path to the location where keys will be saved
+    #    :returns: Private key, Public Key
+    #    """
+    #    # payload.update(dict(iat=datetime.utcnow()))
+    #    # return jwt.encode(payload, key=self.keypair.private, algorithm=self.algorithm).decode('ascii')
+
+    def unsign_package(self, signed_package: str, **kwargs) -> dict:
+        """
+        Generates User's Private Key and Public Key
+        :param save_keys_path: Path to the location where keys will be saved
+        :returns: Private key, Public Key
+        """
+        # try:
+        #    return jwt.decode(token, self.keypair.public, algorithms=[self.algorithm], **kwargs)
+        # except jwt.exceptions.InvalidTokenError as e:
+        #    raise InvalidAuthenticationToken
 
     # TODO: Enable instantiation
     def instantiate_service(self, service_uuid=""):
