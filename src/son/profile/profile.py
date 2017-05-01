@@ -34,7 +34,7 @@ from termcolor import colored
 from tabulate import tabulate
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.helper import read_yaml
-from son.monitor.profiler import Emu_Profiler
+from son.monitor.profiler import Emu_Profiler as Passive_Emu_Profiler
 
 LOG = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class ProfileManager(object):
         self.generated_services = list()
         # arguments
         self.args = args
-        self.args.config = os.path.join(os.getcwd(), self.args.config)
+        self.args.ped = os.path.join(os.getcwd(), self.args.ped)
         self.work_dir = self.args.work_dir
         self.output_dir = self.args.output_dir
         # logging setup
@@ -65,11 +65,17 @@ class ProfileManager(object):
         :return:
         """
         # try to load PED file
-        self.ped = self._load_ped_file(self.args.config)
+        self.ped = self._load_ped_file(self.args.ped)
         self._validate_ped_file(self.ped)
         # load and populate experiment specifications
         self.service_experiments, self.function_experiments = self._generate_experiment_specifications(self.ped)
 
+        if self.args.mode=="passive":
+            self._passive_execution()
+        elif self.args.mode=="active":
+            self._active_execution()
+
+    def _passive_execution(self):
         # execute profiling run on pre-deployed service
         # only service experiments are executed
         if not self.args.no_execution :
@@ -80,7 +86,7 @@ class ProfileManager(object):
                 configuration_commands = dict() # experiment.configuration_space_dict (TODO imec: needs to be adapted to new experiment.py)
                 resource_list = [] # experiment.resource_space_list (TODO imec: needs to be adapted to new experiment.py)
                 timeout = experiment.time_limit
-                profiler = Emu_Profiler(input_msd_path=input_msd_path,
+                profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,
                                         configuration_commands=configuration_commands,
@@ -92,6 +98,7 @@ class ProfileManager(object):
                                         vnforder_list=experiment.vnforder_list)
                 profiler.start_experiment()
 
+    def _active_execution(self):
         # generate service configuration using the specified generator module
         if not self.args.no_generation:
             # select and instantiate configuration generator
@@ -205,11 +212,11 @@ def parse_args(manual_args=None):
         action="store_true")
 
     parser.add_argument(
-        "-c",
-        "--config",
+        "-p",
+        "--ped",
         help="PED file to be used for profiling run",
         required=True,
-        dest="config")
+        dest="ped")
 
     parser.add_argument(
         "--work-dir",
@@ -255,6 +262,23 @@ def parse_args(manual_args=None):
         required=False,
         default="sonata",
         dest="service_generator")
+
+    parser.add_argument(
+        "--mode",
+        help="Choose between active and passive execution. Default is passive",
+        required=False,
+        choices=["active", "passive"],
+        default="passive",
+        dest="mode")
+
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Son Profile config file. Default is config.yml. Path has to either be absolute or relative to location of python script.",
+        required=False,
+        default="config.yml",
+        dest="config")
+
 
     if manual_args is not None:
         return parser.parse_args(manual_args)
