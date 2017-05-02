@@ -78,15 +78,14 @@ class ProfileManager(object):
     def _passive_execution(self):
         # execute profiling run on pre-deployed service
         # only service experiments are executed
-        if not self.args.no_execution :
-            for experiment in self.service_experiments:
-                input_msd_path = experiment.input_metrics
-                output_msd_path = experiment.output_metrics
-                input_commands = experiment.command_space_list
-                configuration_commands = dict() # experiment.configuration_space_dict (TODO imec: needs to be adapted to new experiment.py)
-                resource_list = [] # experiment.resource_space_list (TODO imec: needs to be adapted to new experiment.py)
-                timeout = experiment.time_limit
-                profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
+        for experiment in self.service_experiments:
+            input_msd_path = experiment.input_metrics
+            output_msd_path = experiment.output_metrics
+            input_commands = experiment.command_space_list
+            configuration_commands = dict() # experiment.configuration_space_dict (TODO imec: needs to be adapted to new experiment.py)
+            resource_list = [] # experiment.resource_space_list (TODO imec: needs to be adapted to new experiment.py)
+            timeout = experiment.time_limit
+            profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
                                         input_commands=input_commands,
                                         configuration_commands=configuration_commands,
@@ -96,7 +95,7 @@ class ProfileManager(object):
                                         no_display=self.args.no_display,
                                         resource_configuration=resource_list,
                                         vnforder_list=experiment.vnforder_list)
-                profiler.start_experiment()
+            profiler.start_experiment()
 
     def _active_execution(self):
         # generate service configuration using the specified generator module
