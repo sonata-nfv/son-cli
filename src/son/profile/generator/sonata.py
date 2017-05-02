@@ -147,6 +147,13 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         new_vnf_dict = new_nsd.get("network_functions")[0]
         new_vnf_dict.update(old_vnf_dict)
         LOG.debug("Updated VNF section in '{}': {}".format(service, new_vnf_dict))
+        # 1.5 remove obsolete VNFDs
+        old_list = service.vnfd_list.copy()
+        service.vnfd_list = list()
+        for vnfd in old_list:
+            if vnfd.get("name") == new_vnf_dict.get("vnf_name"):
+                service.vnfd_list.append(vnfd)
+        LOG.debug("Updated VNFD list in '{}': {}".format(service, service.vnfd_list))
         # 2. update virtual link section (get first three CPs from VNFD)
         # TODO remove order assumptions (current version is more a HACK!)
         vnfd = service.get_vnfd_by_uid(ec.experiment.function)
