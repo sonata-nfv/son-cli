@@ -34,7 +34,7 @@ class EventLogger(object):
     def init_events(self):
         # initialize events logger
         for l in ['error', 'warning', 'none']:
-            self._events[l] = []
+            self._events[l] = dict()
 
     def log(self, msg, event):
         level = self._eventdict[event]
@@ -46,7 +46,10 @@ class EventLogger(object):
         elif level == 'none':
             pass
 
-        self._events[level].append(event)
+        if event not in self._events[level]:
+            self._events[level][event] = list()
+
+        self._events[level][event].append(msg)
 
 
 class LoggerManager(object):

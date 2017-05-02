@@ -109,6 +109,22 @@ class Validator(object):
         """
         return len(self.warnings)
 
+    @property
+    def storage(self):
+        """
+        Provides access to the stored resources during validation process.
+        :return: 
+        """
+        return self._storage
+
+    @property
+    def dpath(self):
+        return self._dpath
+
+    @dpath.setter
+    def dpath(self, value):
+        self._dpath = value
+
     def configure(self, syntax=None, integrity=None, topology=None,
                   dpath=None, dext=None, debug=None):
         """
@@ -183,11 +199,11 @@ class Validator(object):
             # check SERVICE validation parameters
             if (self._integrity or self._topology) and not \
                (self._dpath and self._dext):
-                log.critical("Invalid validation parameters. To validate the "
-                             "integrity or topology of a service both "
-                             "'--dpath' and '--dext' parameters must be "
-                             "specified.")
-                sys.exit(1)
+                log.error("Invalid validation parameters. To validate the "
+                          "integrity or topology of a service both "
+                          "'--dpath' and '--dext' parameters must be "
+                          "specified.")
+                return
 
         elif caller == 'validate_function':
             pass
@@ -209,7 +225,6 @@ class Validator(object):
 
         # check if package is packed in the correct format
         if not zipfile.is_zipfile(package):
-
             evtlog.log("Invalid SONATA package '{}'".format(package),
                        'evt_package_format_invalid')
             return
@@ -274,6 +289,8 @@ class Validator(object):
         # load all project descriptors present at source directory
         log.debug("Loading project service")
         nsd_file = Validator._load_project_service_file(project)
+        if not nsd_file:
+            return
 
         return self.validate_service(nsd_file)
 
@@ -363,34 +380,39 @@ class Validator(object):
         # validate directory 'META-INF'
         meta_dir = os.path.join(package_dir, 'META-INF')
         if not os.path.isdir(meta_dir):
-            log.error("A directory named 'META-INF' must exist, "
-                      "located at the root of the package")
+            evtlog.log("A directory named 'META-INF' must exist, "
+                       "located at the root of the package",
+                       'evt_package_struct_invalid')
             return
 
         if len(os.listdir(meta_dir)) > 1:
-            log.error("The 'META-INF' directory must only contain the file "
-                      "'MANIFEST.MF'")
+            evtlog.log("The 'META-INF' directory must only contain the file "
+                       "'MANIFEST.MF'",
+                       'evt_package_struct_invalid')
             return
 
         if not os.path.exists(os.path.join(meta_dir, 'MANIFEST.MF')):
-            log.error("A file named 'MANIFEST.MF' must exist in directory "
-                      "'META-INF'")
+            evtlog.log("A file named 'MANIFEST.MF' must exist in directory "
+                       "'META-INF'",
+                       'evt_package_struct_invalid')
             return
 
         # validate directory 'service_descriptors'
         services_dir = os.path.join(package_dir, 'service_descriptors')
         if os.path.isdir(services_dir):
             if len(os.listdir(services_dir)) == 0:
-                log.error("The 'service_descriptors' directory must contain at"
-                          " least one service descriptor file")
+                evtlog.log("The 'service_descriptors' directory must contain "
+                           "at least one service descriptor file",
+                           'evt_package_struct_invalid')
                 return
 
         # validate directory 'function_descriptors'
         functions_dir = os.path.join(package_dir, 'function_descriptors')
         if os.path.isdir(functions_dir):
             if len(os.listdir(functions_dir)) == 0:
-                log.error("The 'function_descriptors' directory must contain "
-                          "at least one function descriptor file")
+                evtlog.log("The 'function_descriptors' directory must contain "
+                           "at least one function descriptor file",
+                           'evt_package_struct_invalid')
                 return
 
         return True
@@ -406,8 +428,8 @@ class Validator(object):
                  .format(package.id))
         if not self._schema_validator.validate(
               package.content, SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
-            evtlog.log("Invalid syntax in MANIFEST of package: '{0}'"
-                       .format(package.id),
+            evtlog.log("Invalid syntax in MANIFEST of package '{0}': {1}"
+                       .format(package.id, self._schema_validator.error_msg),
                        'evt_pd_stx_invalid')
             return
         return True
@@ -421,7 +443,8 @@ class Validator(object):
         log.info("Validating syntax of service '{0}'".format(service.id))
         if not self._schema_validator.validate(
               service.content, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-            evtlog.log("Invalid syntax in service: '{0}'".format(service.id),
+            evtlog.log("Invalid syntax in service '{0}': {1}"
+                       .format(service.id, self._schema_validator.error_msg),
                        'evt_nsd_stx_invalid')
             return
         return True
@@ -435,7 +458,8 @@ class Validator(object):
         log.info("Validating syntax of function '{0}'".format(function.id))
         if not self._schema_validator.validate(
               function.content, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-            evtlog.log("Invalid syntax in function '{0}'".format(function.id),
+            evtlog.log("Invalid syntax in function '{0}': {1}"
+                       .format(function.id, self._schema_validator.error_msg),
                        'evt_vnfd_stx_invalid')
             return
         return True
@@ -464,8 +488,8 @@ class Validator(object):
             manif_md5 = package.md5(strip_root(f))
             if manif_md5 and gen_md5 != manif_md5:
                 evtlog.log("MD5 hash of file '{0}' is not equal to the "
-                           "defined in package descriptor:\nGen MD5:\t{1}\n"
-                           "MANIF MD5:\t{2}"
+                           "defined in package descriptor. Gen MD5: {1}. "
+                           "MANIF MD5: {2}"
                            .format(f, gen_md5, manif_md5),
                            'evt_pd_itg_invalid_md5')
 
@@ -732,6 +756,9 @@ class Validator(object):
         log.debug("Loading functions of the service.")
 
         # get VNFD file list from provided dpath
+        if not self._dpath:
+            return
+
         vnfd_files = list_files(self._dpath, self._dext)
         log.debug("Found {0} descriptors in dpath='{2}': {1}"
                   .format(len(vnfd_files), vnfd_files, self._dpath))
@@ -747,9 +774,10 @@ class Validator(object):
 
         functions = service.content['network_functions']
         if functions and not path_vnfs:
-            log.error("Service references VNFs but none could be found in "
-                      "'{0}'. Please specify another '--dpath'"
-                      .format(self._dpath))
+            evtlog.log("Service references VNFs but none could be found in "
+                       "'{0}'. Please specify another '--dpath'"
+                       .format(self._dpath),
+                       'evt_nsd_itg_function_unavailable')
             return
 
         # store function descriptors referenced in the service
@@ -758,8 +786,9 @@ class Validator(object):
                                       function['vnf_name'],
                                       function['vnf_version'])
             if fid not in path_vnfs.keys():
-                log.error("Referenced function descriptor id='{0}' couldn't "
-                          "be loaded".format(fid))
+                evtlog.log("Referenced function descriptor id='{0}' couldn't "
+                           "be loaded".format(fid),
+                           'evt_nsd_itg_function_unavailable')
                 return
 
             vnf_id = function['vnf_id']
@@ -845,6 +874,10 @@ class Validator(object):
             nx.write_graphml(g, os.path.join(graphsdir,
                                              "{0}-lvl{1}-br.graphml"
                                              .format(service.id, lvl)))
+
+        g = service.build_topology_graph(level=3, bridges=True)
+        service.complete_graph = nx.generate_graphml(g, encoding='utf-8',
+                                                     prettyprint=True)
 
 
 def print_result(validator, result):

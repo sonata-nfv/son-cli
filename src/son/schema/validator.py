@@ -64,6 +64,8 @@ class SchemaValidator(object):
         # Keep a library of loaded schemas to avoid re-loading
         self._schemas_library = dict()
 
+        self._error_msg = ''
+
     def config_schema_locations(self):
         self._schemas = {
             self.SCHEMA_PACKAGE_DESCRIPTOR: {
@@ -85,6 +87,14 @@ class SchemaValidator(object):
                 'function-descriptor/vnfd-schema.yml'
             }
         }
+
+    @property
+    def error_msg(self):
+        return self._error_msg
+
+    @error_msg.setter
+    def error_msg(self, value):
+        self._error_msg = value
 
     def get_remote_schema(self, descriptor):
         """
@@ -185,11 +195,13 @@ class SchemaValidator(object):
         except ValidationError as e:
             log.error("Failed to validate Descriptor against schema '{}'"
                       .format(schema_id))
+            self.error_msg = e.message
             log.error(e.message)
             return
 
         except SchemaError as e:
             log.error("Invalid Schema '{}'".format(schema_id))
+            self.error_msg = e.message
             log.debug(e)
             return
 

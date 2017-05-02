@@ -243,7 +243,21 @@ def _validate_object_from_request(object_type):
     return _validate_object(path, object_type, syntax, integrity, topology)
 
 
+def validate_parameters(obj_type, syntax, integrity, topology):
+    assert obj_type == 'project' or obj_type == 'package' or \
+           obj_type == 'service' or obj_type == 'function'
+
+    if obj_type == 'service' and (integrity or topology):
+        return "Invalid parameters: cannot validate integrity and/or " \
+               "topology of a standalone service"
+
+
 def _validate_object(path, obj_type, syntax, integrity, topology):
+    # protect against incorrect parameters
+    perrors = validate_parameters(obj_type, syntax, integrity, topology)
+    if perrors:
+        return perrors, 400
+
     key = get_resource_key(path)
     log.info("Validating {0} '{1}' --> MD5 hash: {2}"
              .format(obj_type, path, key))
@@ -258,17 +272,17 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
 
     validator = Validator()
     validator.configure(syntax, integrity, topology, debug=cache.get('debug'))
+    # remove default dpath
+    validator.dpath = None
     val_function = getattr(validator, 'validate_' + obj_type)
 
     result = val_function(path)
-    if not result:
-        return
     print_result(validator, result)
-    json_result = generate_result(key, validator)
-    net_topology = validator.
+    json_result = gen_report_result(key, validator)
+    net_topology = gen_report_net_topology(validator)
     # todo: missing topology and fwgraphs
     set_resource(key, obj_type, syntax, integrity, topology,
-                 result=json_result)
+                 result=json_result, net_topology=net_topology)
 
     return json_result
 
@@ -326,7 +340,7 @@ def report_result(resource_id):
     return get_resource(resource_id)['result']
 
 
-@app.route('/report/topology/<uuid:resource_id>', methods=['GET'])
+@app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
     if not resource_exits(resource_id) or \
             'net_topology' not in get_resource(resource_id).keys():
@@ -334,7 +348,7 @@ def report_topology(resource_id):
     return get_resource(resource_id)['net_topology']
 
 
-@app.route('/report/fwgraph/<uuid:resource_id>', methods=['GET'])
+@app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
     if not resource_exits(resource_id) or \
             'net_fwgraph' not in get_resource(resource_id).keys():
@@ -342,7 +356,7 @@ def report_fwgraph(resource_id):
     return get_resource(resource_id)['net_fwgraph']
 
 
-def generate_result(resource_id, validator):
+def gen_report_result(resource_id, validator):
     report = dict()
     report['resource_id'] = resource_id
     report['error_count'] = validator.error_count
@@ -353,7 +367,28 @@ def generate_result(resource_id, validator):
     if validator.warning_count:
         report['warnings'] = validator.warnings
     return json.dumps(report, sort_keys=True,
-                      indent=4, separators=(',', ': ')).encode('ascii')
+                      indent=4, separators=(',', ': ')).encode('utf-8')
+
+
+def gen_report_net_topology(validator):
+    report = list()
+    for sid, service in validator.storage.services.items():
+        graph_repr = ''
+        if not service.complete_graph:
+            return
+        for line in service.complete_graph:
+            if not line:
+                continue
+            graph_repr += line
+        report.append(graph_repr)
+
+    return json.dumps(report)
+
+
+def gen_report_net_fwgraph(validator):
+    report = dict()
+    for sid, service in validator.storage.services.items():
+        pass
 
 
 def get_local(path):

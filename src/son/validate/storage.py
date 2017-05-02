@@ -285,6 +285,7 @@ class Descriptor(Node):
         self._filename = None
         self.filename = descriptor_file
         super().__init__(self.id)
+        self._complete_graph = None
         self._graph = None
         self._links = {}
         self._bridges = {}
@@ -383,6 +384,14 @@ class Descriptor(Node):
         :return:
         """
         self._graph = value
+
+    @property
+    def complete_graph(self):
+        return self._complete_graph
+
+    @complete_graph.setter
+    def complete_graph(self, value):
+        self._complete_graph = value
 
     def load_interfaces(self):
         """

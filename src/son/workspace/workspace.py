@@ -188,8 +188,18 @@ class Workspace:
                       .format(ws_filename))
             return None
 
-        ws_file = open(ws_filename)
-        ws_config = yaml.load(ws_file)
+        ws_file = open(ws_filename, 'r')
+        try:
+            ws_config = yaml.load(ws_file)
+
+        except yaml.YAMLError as exc:
+            log.error("Error parsing descriptor file '{0}': {1}"
+                      .format(ws_filename, exc))
+            return
+        if not ws_config:
+            log.error("Couldn't read descriptor file: '{0}'"
+                      .format(ws_filename))
+            return
 
         if not ws_config['version'] == Workspace.CONFIG_VERSION:
 
