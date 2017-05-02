@@ -388,6 +388,47 @@ The Prometheus query language can be used.
 son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 ```
 
+### son-profile
+
+The son-profile tool can be used to profile a network service by deploying it on the emulaotr and seinding test traffic through it.
+
+
+```sh
+usage: son-profile [-h] [-v] -p PED [--work-dir WORK_DIR]
+                   [--output-dir OUTPUT_DIR] [--no-generation]
+                   [--no-execution] [--no-display]
+                   [--generator SERVICE_GENERATOR] [--mode {active,passive}]
+                   [-c CONFIG]
+
+Manage and control VNF and service profiling experiments.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         Increases logging level to debug.
+  -p PED, --ped PED     PED file to be used for profiling run
+  --work-dir WORK_DIR   Dictionary for generated artifacts, e.g., profiling
+                        packages. Will use a temporary folder as default.
+  --output-dir OUTPUT_DIR
+                        Folder to collect measurements. Default: Current
+                        directory.
+  --no-generation       Skip profiling package generation step.
+  --no-execution        Skip profiling execution step.
+  --no-display          Disable realtime output of profiling results
+  --generator SERVICE_GENERATOR
+                        Service configuration generator to be used. Default:
+                        'sonata'
+  --mode {active,passive}
+                        Choose between active and passive execution. Default
+                        is passive
+  -c CONFIG, --config CONFIG
+                        Son Profile config file. Default is config.yml. Path
+                        has to either be absolute or relative to location of
+                        python script.
+
+``
+
+TODO: More detailed instructions for son-profile will be available soon (next major release is planned for end of June)!
+
 ## License
 The son-cli is published under Apache 2.0 license. Please see the LICENSE file for more details.
 
