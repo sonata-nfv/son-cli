@@ -425,7 +425,7 @@ optional arguments:
                         has to either be absolute or relative to location of
                         python script.
 
-``
+```
 
 TODO: More detailed instructions for son-profile will be available soon (next major release is planned for end of June)!
 
