@@ -145,10 +145,10 @@ def add_artifact_root():
 
 
 def set_resource(key, obj_type, syntax, integrity, topology,
-                 result=None, res_topology=None, res_fwgraph=None):
+                 result=None, net_topology=None, net_fwgraph=None):
 
     assert obj_type or syntax or topology or integrity or \
-           result or res_topology or res_fwgraph
+           result or net_topology or net_fwgraph
 
     log.debug("Caching resource '{0}'".format(key))
     resources = cache.get('resources')
@@ -162,16 +162,20 @@ def set_resource(key, obj_type, syntax, integrity, topology,
 
     if result:
         resources[key]['result'] = result
-    if res_topology:
-        resources[key]['res_topology'] = res_topology
-    if res_fwgraph:
-        resources[key]['res_fwgraph'] = res_fwgraph
+    if net_topology:
+        resources[key]['net_topology'] = net_topology
+    if net_fwgraph:
+        resources[key]['net_fwgraph'] = net_fwgraph
 
     cache.set('resources', resources)
 
 
+def resource_exits(key):
+    return key in cache.get('resources').keys()
+
+
 def get_resource(key):
-    if key not in cache.get('resources').keys():
+    if not resource_exits(key):
         return
     return cache.get('resources')[key]
 
@@ -260,7 +264,8 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
     if not result:
         return
     print_result(validator, result)
-    json_result = generate_result(validator)
+    json_result = generate_result(key, validator)
+    net_topology = validator.
     # todo: missing topology and fwgraphs
     set_resource(key, obj_type, syntax, integrity, topology,
                  result=json_result)
@@ -313,8 +318,33 @@ def validate_function():
     return _validate_object_from_request('function')
 
 
-def generate_result(validator):
+@app.route('/report/result/<string:resource_id>', methods=['GET'])
+def report_result(resource_id):
+    if not resource_exits(resource_id) or \
+            'result' not in get_resource(resource_id).keys():
+        return '', 404
+    return get_resource(resource_id)['result']
+
+
+@app.route('/report/topology/<uuid:resource_id>', methods=['GET'])
+def report_topology(resource_id):
+    if not resource_exits(resource_id) or \
+            'net_topology' not in get_resource(resource_id).keys():
+        return '', 404
+    return get_resource(resource_id)['net_topology']
+
+
+@app.route('/report/fwgraph/<uuid:resource_id>', methods=['GET'])
+def report_fwgraph(resource_id):
+    if not resource_exits(resource_id) or \
+            'net_fwgraph' not in get_resource(resource_id).keys():
+        return '', 404
+    return get_resource(resource_id)['net_fwgraph']
+
+
+def generate_result(resource_id, validator):
     report = dict()
+    report['resource_id'] = resource_id
     report['error_count'] = validator.error_count
     report['warning_count'] = validator.warning_count
 
