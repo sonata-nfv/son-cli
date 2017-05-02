@@ -78,15 +78,14 @@ class Push(object):
     GK_URI_INST = "/requests?"
 
     # def __init__(self, base_url, auth=('', '')):
-    def __init__(self, base_url, auth_token=None, pb_key=None, pr_key=None, cert=None):
+    def __init__(self, base_url, pb_key=None, pr_key=None, cert=None):
 
         # Assign parameters
         self._base_url = base_url
         # self._auth = auth   # Bearer token
         self._headers = {'Content-Type': 'application/json'}
-        if auth_token:
-            self._headers["Authorization"] = "Bearer %s" % auth_token
         # {'Content-Type': 'application/x-yaml'}
+        self._keys = {'public_key': pb_key, 'private_key': pr_key, 'certificate': cert}
 
         # Ensure parameters are valid
         assert validators.url(self._base_url),\
@@ -177,7 +176,7 @@ class Push(object):
 
         return response
 
-    def upload_package(self, access_token, package_file_name, sign=False):
+    def upload_package(self, access_token, package_file_name, public_key=None, private_key=None):
         """
         Upload package to platform
 
@@ -192,6 +191,9 @@ class Push(object):
 
         :param sign: Sets to True or False if the package is signed
                      before pushing it to the Platform
+
+        :param public_key:
+        :param private_key:
 
         :returns: text response message of the server or
                   error message
@@ -210,14 +212,24 @@ class Push(object):
             return url, "is not a valid url."
 
         # TODO: Implement Package Signing feature here before sending POST Package request
-        if sign:
+        if public_key and private_key:
+            self._keys['public_key'] = public_key
+            self._keys['private_key'] = private_key
             # Package signing process goes here
+            # self._keys['public_key']
+            # self._keys['private_key']
+            # self._keys['certificate']
             raise NotImplementedError
 
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 payload = {'package': pkg_file}
-                r = requests.post(url, files=payload)
+                if access_token:
+                    headers = {'Authorization': "Bearer %s" % access_token}
+                else:
+                    headers = {}
+
+                r = requests.post(url, headers=headers, files=payload)
                 if r.status_code == 201:
                     msg = "Upload succeeded"
                 elif r.status_code == 409:
@@ -268,23 +280,6 @@ class Push(object):
         # Sign package
         # return signed package, public key, certificate(optional)
 
-        # TODO: TO BE IMPLEMENTED
-    def generate_keypair(self, save_keys_path):
-        """
-        Generates User's Private Key and Public Key
-        :param save_keys_path: Path to the location where keys will be saved
-        :returns: Private key, Public Key
-        """
-
-        from Crypto.PublicKey import RSA
-
-        # KeyPair = NamedTuple('KeyPair', [('public', str), ('private', str)])
-        algorithm = 'RS256'
-
-        key = RSA.generate(2048)
-        public=key.publickey().exportKey('PEM').decode('ascii')
-        private=key.exportKey('PEM').decode('ascii')
-
     # def generate_token(self, payload: dict) -> str:
     #    """
     #    Generates User's Private Key and Public Key
@@ -294,10 +289,12 @@ class Push(object):
     #    # payload.update(dict(iat=datetime.utcnow()))
     #    # return jwt.encode(payload, key=self.keypair.private, algorithm=self.algorithm).decode('ascii')
 
+    # TODO: VERIFICATON WILL BE IMPLEMENTED IN A LATER VERSION
     def unsign_package(self, signed_package: str, **kwargs) -> dict:
         """
-        Generates User's Private Key and Public Key
-        :param save_keys_path: Path to the location where keys will be saved
+        Verifies a signed received package Hash
+        :param signed_package: Path to the location where keys will be saved
+        :param public_key: Path to the location where public key is stored in order to verify the signature
         :returns: Private key, Public Key
         """
         # try:
@@ -370,15 +367,16 @@ def main():
     if not platform_url:
         print("Platform url is required in config file")
 
-    access_token = None
-    try:
-        with open('config/token.txt', 'rb') as token_file:
-            access_token = token_file.read()
-            access_token = access_token[1:-1]
-    except:
-        pass
+    # access_token = None
+    # try:
+    #     with open('config/token.txt', 'rb') as token_file:
+    #         access_token = token_file.read()
+    #         access_token = access_token[1:-1]
+    # except:
+    #     pass
 
-    push_client = Push(base_url=platform_url, auth_token=access_token)
+    push_client = Push(base_url=platform_url)
+    # push_client = Push(base_url=platform_url, auth_token=access_token)
     # push_client = Push(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.upload_package:

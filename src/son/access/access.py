@@ -139,19 +139,59 @@ class AccessClient:
         except:
             self.access_token = None
 
+        try:
+            # retrieve keypair from workspace
+            platform_dir = os.path.join(self.workspace.ws_root,
+                                        self.workspace.dirs[
+                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            pub_path = os.path.join(platform_dir,
+                                      self.platform['signature']['pub_key'])
+            prv_path = os.path.join(platform_dir,
+                                      self.platform['signature']['prv_key'])
+
+            if os.path.isfile(pub_path):
+                with open(pub_path, 'rb') as pub_key_file:
+                    self.dev_public_key = pub_key_file.read()
+            if os.path.isfile(prv_path):
+                with open(prv_path, 'rb') as prv_key_file:
+                    self.dev_private_key = prv_key_file.read()
+
+        except:
+            self.dev_public_key = None
+            self.dev_private_key = None
+
+        # retrieve certificate from workspace
+        try:
+            platform_dir = os.path.join(self.workspace.ws_root,
+                                    self.workspace.dirs[
+                                        workspace.CONFIG_STR_PLATFORMS_DIR])
+            cert_path = os.path.join(platform_dir,
+                                      self.platform['signature']['cert'])
+            if os.path.isfile(cert_path):
+                with open(cert_path, 'rb') as cert_key_file:
+                    self.dev_certificate = cert_key_file.read()
+
+        except:
+            self.dev_certificate = None
+
+        try:
+            # retrieve token from workspace
+            self.platform_dir = os.path.join(self.workspace.ws_root,
+                                        self.workspace.dirs[
+                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+        except:
+            self.platform_dir = os.path.join(self.workspace.ws_root)
+
         # Create a push and pull client for available Service Platforms
         self.pull = dict()
         self.push = dict()
         for p_id, platform in self.workspace.service_platforms.items():
-            self.pull[p_id] = Pull(platform['url'], auth_token=self.access_token)
-            self.push[p_id] = Push(platform['url'], auth_token=self.access_token, pb_key=self.dev_public_key,
+            self.pull[p_id] = Pull(platform['url'])
+            self.push[p_id] = Push(platform['url'], pb_key=self.dev_public_key,
                                    pr_key=self.dev_private_key, cert=self.dev_certificate)
 
         self.log_level = log_level
         coloredlogs.install(level=log_level)
-        # self.JWT_SECRET = 'secret'
-        # self.JWT_ALGORITHM = 'HS256'
-        # self.JWT_EXP_DELTA_SECONDS = 20
 
         # TODO: Deprecated?
         try:
@@ -286,7 +326,7 @@ class AccessClient:
     #    """
     #    pass
 
-    # TODO: Token validation is done client-side using the Platform Public Key
+    # Token validation is done client-side using the Platform Public Key
     def check_token_status(self):
         """
         Simple request to check if session has expired (TBD)
@@ -343,6 +383,40 @@ class AccessClient:
             log.error("Service Platform Public Key not found. Authentication is disabled.")
             return None
 
+        # TODO: TO BE IMPLEMENTED
+    def generate_keypair(self, platform_dir):
+        """
+        Generates User's Private Key and Public Key
+        :param platform_dir: Path to the location where keys will be saved
+        :returns: Private key, Public Key
+        """
+        # KeyPair = NamedTuple('KeyPair', [('public', str), ('private', str)])
+        algorithm = 'RS256'
+
+        key = RSA.generate(2048)
+        public = key.publickey().exportKey('PEM').decode('ascii')
+        private = key.exportKey('PEM').decode('ascii')
+
+        # print("public=", public)
+        # print("private=", private)
+
+        self.dev_public_key = public
+        self.dev_private_key = private
+
+        # TODO: Save the keypair somewhere
+        try:
+
+            platform_path = os.path.join(platform_dir, self.platform)
+            with open(platform_path + "/public_key", mode="w+") as pb_file:
+                pb_file.write(self.dev_public_key)
+            with open(platform_path + "/private_key", mode="w+") as pr_file:
+                pr_file.write(self.dev_private_key)
+
+            # TODO: Save Public Key in Service Platform User Management database
+
+        except:
+            return
+
     def push_package(self, path, sign=False):
         """
         Call push feature to upload a package to the SP Catalogue
@@ -359,9 +433,18 @@ class AccessClient:
         if not result:
             print("Access session expired, log-in again")
             return
-        else:
+
+        elif sign:
+            if not (self.dev_public_key and self.dev_private_key):
+                # TODO: GENERATE PAIRKEY
+                self.generate_keypair(self.platform_dir)
+            # TODO: CALL SIGN METHOD
             # Push son-package to the Service Platform
             print(self.default_push.upload_package(self.access_token, path, sign))
+
+        else:
+            # Push son-package to the Service Platform
+            print(self.default_push.upload_package(self.access_token, path, False))
 
     def deploy_service(self, service_id):
         """
