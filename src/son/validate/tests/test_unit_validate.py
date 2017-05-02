@@ -73,7 +73,7 @@ class UnitValidateTests(unittest.TestCase):
                                 'sonata-demo-invalid-struct-1.son')
         validator = Validator(workspace=self._workspace)
         validator.validate_package(pkg_path)
-        self.assertEqual(val.log.error.counter, 1)
+        self.assertEqual(val.log.error.counter, 2)
 
         # invalid struct #2
         self.reset_counters()

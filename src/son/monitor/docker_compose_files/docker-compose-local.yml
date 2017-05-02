@@ -10,7 +10,7 @@ services:
     volumes:
      - /tmp/son-monitor/prometheus:/etc/prometheus
     ports:
-     - "9090:9090"
+     - 9090:9090
     command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
 
   grafana:

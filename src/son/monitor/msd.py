@@ -27,12 +27,14 @@ partner consortium (www.sonata-nfv.eu).
 """
 
 from son.monitor.utils import *
-from son.monitor.prometheus import query_Prometheus, compute2vnfquery, network2vnfquery, test2vnfquery, metric2flowquery
+from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery, network2vnfquery, test2vnfquery, metric2flowquery, Metric
+
 from son.monitor.grafana_lib import Grafana
 
 import logging
-logging.basicConfig(level=logging.INFO)
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger('msd')
+LOG.setLevel(level=logging.DEBUG)
+LOG.addHandler(logging.StreamHandler())
 
 COOKIE_START = 100
 MONITOR_FLOW_PRIORITY = 100
@@ -44,17 +46,17 @@ metric2flow_metric = {
     "tx_byte_count": "tx_bytes",
     "rx_packet_rate": "rx_packets",
     "tx_packet_rate": "tx_packets",
-    "rx_byte_rate": "tx_bytes",
+    "rx_byte_rate": "rx_bytes",
     "tx_byte_rate": "tx_bytes"
 }
 
 class msd():
 
-    def __init__(self, msd_file, vim):
+    def __init__(self, msd_path, vim, title=None):
 
         # Parse the msd file
-        LOG.info('parsing msd: {0}'.format(msd_file))
-        self.msd_dict = load_yaml(msd_file)
+        LOG.info('parsing msd: {0}'.format(msd_path))
+        self.msd_dict = load_yaml(msd_path)
 
         # the VIM class where the monitoring is installed (son-emu manager)
         self.vim = vim
@@ -63,24 +65,27 @@ class msd():
         self.grafana = Grafana()
 
         # get msd file parameters
-        self.dashboard = self.msd_dict.get('dashboard')
+        if title is None:
+            title = self.msd_dict.get('dashboard')
+        self.dashboard = title
         self.version = self.msd_dict.get('version')
 
         # get msd VNF metrics to monitor
-        self.vnf_metrics = self.msd_dict.get('vnf_metrics')
+        self.vnf_metrics = self.msd_dict.get('vnf_metrics', [])
         # get msd NSD links to monitor
-        self.nsd_links = self.msd_dict.get('nsd_links')
+        self.nsd_links = self.msd_dict.get('nsd_links', [])
 
         # cookie integer, unique per monitred flow
         self.cookie_counter = COOKIE_START
 
-    def start(self):
+    def start(self, title=None, overwrite=True):
+        if title is None:
+            title = self.dashboard
         # init the dashboard
-        self.grafana.init_dashboard(title=self.dashboard)
+        self.grafana.init_dashboard(title=title, overwrite=overwrite)
 
-        # install and export metrics from the MSD file
-        self.set_vnf_metrics('start')
-        self.set_nsdlink_metrics('start')
+        metrics = self.get_metrics()
+        self.start_grafana(metrics)
 
     def stop(self):
         # clear the dashboard
@@ -90,27 +95,60 @@ class msd():
         self.set_vnf_metrics('stop')
         self.set_nsdlink_metrics('stop')
 
+    # install and return all metrics from the msd (without installing Grafana)
+    def get_metrics(self):
+        vnf_metrics_dict = self.set_vnf_metrics('start')
+        link_metrics_dict = self.set_nsdlink_metrics('start')
+        # merge the 2 dicts
+        all_metrics = dict(vnf_metrics_dict, **link_metrics_dict)
+        return all_metrics
 
-    def set_vnf_metrics(self, action):
+    # install and return all metrics from the msd as a list (without installing Grafana)
+    def get_metrics_list(self):
+        vnf_metrics_dict = self.set_vnf_metrics('start')
+        link_metrics_dict = self.set_nsdlink_metrics('start')
+        # merge the 2 dicts
+        all_metrics = dict(vnf_metrics_dict, **link_metrics_dict)
+        flat_metric_list = []
+        for metric_list in all_metrics.values():
+            flat_metric_list += metric_list
+
+        # return list of class Metric
+        return flat_metric_list
+
+    def start_grafana(self, metrics):
+        for metric_group in metrics:
+            title = metric_group
+            metric_list = metrics[metric_group]
+
+            # need list of dicts for Grafana lib
+            graph_list = [metric.__dict__ for metric in metric_list]
+
+            # check metric_type in first metric of the list
+            if 'count' in metric_list[0].metric_type:
+                self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard,
+                                       graph_type='bars')
+            else:
+                self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard)
+
+    def set_vnf_metrics(self, action=None):
+        all_metrics = {}
         for metric_group in self.vnf_metrics:
-            graph_list = []
             title = metric_group['description']
-            graph_list = self.vnfmetric_classifier(metric_group, action)
-            if action == 'start':
-                if 'count' in metric_group['metric_type']:
-                    self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard,
-                                           graph_type='bars')
-                else:
-                    self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard)
+            metric_list = self.vnfmetric_classifier(metric_group, action)
 
+            # group all metrics in dict
+            all_metrics[title] = metric_list
 
-    # execute the correct function tto start/stop the metric_type
+        return all_metrics
+
+    # execute the correct function to start/stop the metric_type
     def vnfmetric_classifier(self, metric_group, action):
         compute_metric_dict = {'start': self.start_compute_metric}
-        compute_metrics = ['cpu', 'mem']
+        compute_metrics = ['cpu', 'mem', 'host_cpu']
 
         testvnf_metric_dict = {'start': self.start_testvnf_metric}
-        testvnf_metrics = ['packet_loss', 'jitter']
+        testvnf_metrics = ['packet_loss', 'jitter', 'throughput']
 
         network_metric_dict = {'start': self.start_network_metric, 'stop': self.stop_network_metric}
         network_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
@@ -119,35 +157,35 @@ class msd():
         metric_type = metric_group['metric_type']
         LOG.info('metric_type:{0}'.format(metric_type))
 
-        graph_list = []
+        metric_list = []
         for vnf_id in metric_group.get('vnf_ids', []):
-            graph_dict = {}
+            metric = None
 
             # Monitor metrics exported by Test-VNFs
             if metric_type in testvnf_metrics:
                 function = testvnf_metric_dict.get(action)
                 if function:
-                    graph_dict = function(metric_group, vnf_id)
+                    metric = function(metric_group, vnf_id)
 
             # monitor compute stats (exported by cAdvisor in son-emu)
             elif metric_type in compute_metrics:
                 function = compute_metric_dict.get(action)
                 if function:
-                    graph_dict = function(metric_group, vnf_id)
+                    metric = function(metric_group, vnf_id)
 
             # monitor network stats (exported by Ryu/cAdvisor in son-emu)
             elif metric_type in network_metrics:
                 function = network_metric_dict.get(action)
                 if function:
-                    graph_dict = function(metric_group, vnf_id)
+                    metric = function(metric_group, vnf_id)
 
             else:
                 logging.info("No query found for metric type: {0}".format(metric_type))
                 continue
 
-            graph_list.append(graph_dict)
+            metric_list.append(metric)
 
-        return graph_list
+        return metric_list
 
 
     def start_testvnf_metric(self, metric_group, vnf_id):
@@ -158,9 +196,11 @@ class msd():
 
         metric_type = metric_group['metric_type']
         # set correct Prometheus query
-        query =test2vnfquery[metric_type].format(vnf_id['vnf'])
-        graph_dict = dict(desc=desc, metric=query)
-        return graph_dict
+        query = test2vnfquery[metric_type].query_template.format(vnf_id['vnf'])
+        unit = test2vnfquery[metric_type].unit
+        name = '@'.join([metric_type, vnf_id['vnf']])
+        metric = Metric(metric_name=name, desc=desc, query=query, metric_type=metric_type, unit=unit)
+        return metric
 
     def start_compute_metric(self, metric_group, vnf_id):
         # make default description
@@ -170,9 +210,11 @@ class msd():
 
         metric_type = metric_group['metric_type']
         # set correct Prometheus query
-        query = compute2vnfquery[metric_type].format(vnf_id['vnf'])
-        graph_dict = dict(desc=desc, metric=query)
-        return graph_dict
+        query = compute2vnfquery[metric_type].query_template.format(vnf_id['vnf'])
+        unit = compute2vnfquery[metric_type].unit
+        name = '@'.join([metric_type, vnf_id['vnf']])
+        metric = Metric(metric_name=name, desc=desc, query=query, metric_type=metric_type, unit=unit)
+        return metric
 
     # network metrics gathered by the network interface counters
     def start_network_metric(self, metric_group, vnf_id):
@@ -184,15 +226,17 @@ class msd():
 
         # metrics of cadvisor al already exported by default
         if not '_cadv' in metric_type:
-            self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
-
-        query = network2vnfquery[metric_type2].format(vnf_name, vnf_interface)
+            r = self.vim.monitor_interface(action='start', vnf_name=vnf_name + ':' + vnf_interface, metric=flow_metric)
+            LOG.info('start metric ret:{0}'.format(r))
+        query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
         # make default description
         desc = vnf_id.get("description")
         if not desc:
             desc = vnf_id['vnf'] + ':' + vnf_id['direction']
-        graph_dict = dict(desc=desc, metric=query)
-        return graph_dict
+        unit = network2vnfquery[metric_type2].unit
+        name = '@'.join([metric_type2, vnf_id['vnf']])
+        metric = Metric(metric_name=name, desc=desc, query=query, metric_type=metric_type2, unit=unit)
+        return metric
 
     def stop_network_metric(self, metric_group, vnf_id):
         metric_type = metric_group['metric_type']
@@ -202,19 +246,21 @@ class msd():
         flow_metric = metric2flow_metric[metric_type2]
         # metrics of cadvisor al already exported by default
         if not '_cadv' in metric_type:
-            self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+            r = self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+            LOG.info('stop metric ret:{0}'.format(r))
         return
 
-    def set_nsdlink_metrics(self, action):
+    def set_nsdlink_metrics(self, action=None):
+        all_metrics = {}
+
         for metric_group in self.nsd_links:
             title = metric_group['description']
-            graph_list = self.nsdlink_classifier(metric_group, action)
-            if action == 'start':
-                if 'count' in metric_group['metric_type']:
-                    self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard,
-                                           graph_type='bars')
-                else:
-                    self.grafana.add_panel(metric_list=graph_list, title=title, dashboard_name=self.dashboard)
+            metric_list = self.nsdlink_classifier(metric_group, action)
+
+            # group all metrics in dict
+            all_metrics[title] = metric_list
+
+        return all_metrics
 
     # execute the correct function tto start/stop the metric_type
     def nsdlink_classifier(self, metric_group, action):
@@ -222,30 +268,24 @@ class msd():
         nsdlink_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
                            'packet_rate_cadv', 'byte_rate_cadv', 'packet_count_cadv', 'byte_count_cadv']
 
-        graph_list = []
+        metric_list = []
 
         metric_type = metric_group['metric_type']
         LOG.info('metric_type:{0}'.format(metric_type))
 
-        #cookie = self.cookie_counter
         for nsdlink_id in metric_group.get('link_ids', []):
-            graph_dict = {}
-
             # monitor network stats (exported by Ryu/cAdvisor in son-emu)
             if metric_type in nsdlink_metrics:
                 function = nsdlink_metric_dict.get(action)
                 if function:
-                    graph_dict = function(metric_group, nsdlink_id)
-                    # increment cookie when a match flow is installed
-                    #if nsdlink_id.get('match'): cookie += 1
+                    metric = function(metric_group, nsdlink_id)
+                    metric_list.append(metric)
 
                 else:
                     logging.info("No query found for metric type: {0}".format(metric_type))
                     continue
 
-            graph_list.append(graph_dict)
-
-        return graph_list
+        return metric_list
 
     # install flow_metrics for a specified chain
     def start_nsdlink_metric(self, metric_group, nsdlink_id):
@@ -274,9 +314,13 @@ class msd():
             flow_metric = metric2flow_metric[metric_type2]
             # metrics of cadvisor al already exported by default
             if not '_cadv' in metric_type:
-                self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
-            query = network2vnfquery[metric_type2].format(vnf_name, vnf_interface)
-            graph_dict = dict(desc=desc, metric=query)
+                r = self.vim.monitor_interface('start', vnf_name + ':' + vnf_interface, flow_metric)
+                LOG.info('start link metric ret:{0}'.format(r))
+            query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
+            unit = network2vnfquery[metric_type2].unit
+            name = '{0}@{1}:{2}'.format(metric_type2, vnf_name, vnf_interface)
+            metric = Metric(metric_name=name, desc=desc, query=query, metric_type=metric_type2, unit=unit)
+
 
         # if a match is given, install a flow specific counter
         else:
@@ -285,16 +329,20 @@ class msd():
             destination = nsdlink_id['destination']
             match = nsdlink_id['match']
             # install the flow and export the metric
-            self.vim.flow_total('start', source, destination, flow_metric, self.cookie_counter, match=match,
+            r = self.vim.flow_total('start', source, destination, flow_metric, self.cookie_counter, match=match,
                             bidirectional=False, priority=MONITOR_FLOW_PRIORITY)
-            query = metric2flowquery[metric_type2].format(self.cookie_counter, vnf_name, vnf_interface)
-            graph_dict = dict(desc=desc, metric=query)
+            LOG.info('start link metric ret:{0}'.format(r))
+            query = metric2flowquery[metric_type2].query_template.format(self.cookie_counter, vnf_name, vnf_interface)
+            unit = network2vnfquery[metric_type2].unit
+            name = '{0}@{1}:{2}:{3}'.format(metric_type2, vnf_name, vnf_interface, self.cookie_counter)
+            metric = Metric(metric_name=name, desc=desc, query=query, metric_type=metric_type2, unit=unit)
             self.cookie_counter += 1
 
-        return graph_dict
+        return metric
 
     # delete flow_metrics for a specified chain
     def stop_nsdlink_metric(self, metric_group, nsdlink_id):
+
         # install the link metrics
         title = metric_group['description']
         metric_type = metric_group['metric_type']
@@ -315,7 +363,8 @@ class msd():
             flow_metric = metric2flow_metric[metric_type2]
             # metrics of cadvisor al already exported by default
             if not '_cadv' in metric_type:
-                self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+                r = self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
+                LOG.info('stop link metric ret:{0}'.format(r))
 
         # if a match is given, uninstall a flow specific counter
         else:
@@ -324,6 +373,7 @@ class msd():
             destination = nsdlink_id['destination']
             match = nsdlink_id['match']
             # install the flow and export the metric
-            self.vim.flow_total('stop', source, destination, flow_metric, self.cookie_counter, match=match,
+            r = self.vim.flow_total('stop', source, destination, flow_metric, self.cookie_counter, match=match,
                                 bidirectional=False, priority=MONITOR_FLOW_PRIORITY)
+            LOG.info('stop link metric ret:{0}'.format(r))
             self.cookie_counter += 1

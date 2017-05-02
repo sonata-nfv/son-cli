@@ -27,8 +27,10 @@
 import unittest
 import pkg_resources
 import os
-from urllib.error import HTTPError
+from requests import RequestException
+from requests.exceptions import InvalidURL, HTTPError, MissingSchema
 from son.schema.validator import load_local_schema, load_remote_schema
+
 
 
 class IntLoadSchemaTests(unittest.TestCase):
@@ -65,14 +67,14 @@ class IntLoadSchemaTests(unittest.TestCase):
         """
         self.assertRaises(HTTPError,
                           load_remote_schema,
-                          "http://somerandomurl.com/artifact.yml")
+                          "https://raw.githubusercontent.com/sonata-nfv/son-schema/v30/function-descriptor/vnfd-schema.yml")
 
     def test_load_invalid_remote_template_invalid(self):
         """
         Test if it raises an error with an invalid
         schema URL.
         """
-        self.assertRaises(ValueError,
+        self.assertRaises(MissingSchema,
                           load_remote_schema,
                           "some.incorrect/..url")
 

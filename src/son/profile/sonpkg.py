@@ -132,7 +132,8 @@ class SonataServicePackage(object):
         :return: package path
         """
         start_time = time.time()
-        pkg_destination_path = os.path.join(output_path, self.pkg_name())
+        # be sure the target directory exists
+        ensure_dir(output_path)
         # obtain workspace
         # TODO have workspace dir as command line argument
         workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
@@ -145,7 +146,7 @@ class SonataServicePackage(object):
             LOG.error("Packager couldn't load service project: %r. Abort." % self.pkg_service_path)
             exit(1)
         # initialize and run packager
-        pck = Packager(workspace, project, dst_path=pkg_destination_path)
+        pck = Packager(workspace, project, dst_path=output_path)
         pck.generate_package(os.path.join(output_path, self.pkg_name()))
         self.pkg_package_path = os.path.join(output_path, self.pkg_name()) + ".son"
         self.pkg_file_size = os.path.getsize(self.pkg_package_path)
@@ -159,13 +160,15 @@ class SonataServicePackage(object):
         :return: dictionary with project.yml information
         """
         d = dict()
-        d["catalogues"] = "[personal]"
-        d["publish_to"] = "[personal]"
-        d["description"] = self.manifest.get("description")
-        d["maintainer"] = self.manifest.get("maintainer")
-        d["name"] = self.manifest.get("name")
-        d["vendor"] = self.manifest.get("vendor")
-        d["version"] = self.manifest.get("version")
+        d["descriptor_extension"] = "yml"
+        d["version"] = "0.5"
+        p = dict()
+        p["description"] = self.manifest.get("description")
+        p["maintainer"] = self.manifest.get("maintainer")
+        p["name"] = self.manifest.get("name")
+        p["vendor"] = self.manifest.get("vendor")
+        p["version"] = self.manifest.get("version")
+        d["package"] = p
         return d
 
     def pkg_name(self):

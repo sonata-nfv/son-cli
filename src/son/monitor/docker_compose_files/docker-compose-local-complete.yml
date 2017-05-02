@@ -1,0 +1,46 @@
+version: '2'
+
+
+services:
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    # get the prometheus config file
+    volumes:
+     - /tmp/son-monitor/prometheus:/etc/prometheus
+    ports:
+     - "9090:9090"
+    command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
+    links:
+     - pushgateway
+     - cadvisor
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - /tmp/son-monitor/grafana:/var/lib/grafana
+    ports:
+      - 3000:3000
+    links:
+      - prometheus
+
+  pushgateway:
+    image: prom/pushgateway
+    container_name: pushgateway
+    ports:
+     - "9091:9091"
+
+  cadvisor:
+   image: google/cadvisor
+   container_name: cadvisor
+   volumes:
+    - "/:/rootfs:ro"
+    - "/var/run:/var/run:rw"
+    - "/sys:/sys:ro"
+    - "/var/lib/docker/:/var/lib/docker:ro"
+   ports:
+    - "8090:8080"
+
+

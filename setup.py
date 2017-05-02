@@ -53,13 +53,15 @@ setup(
         include_package_data=True,
         package_data= {
             'son': ['schema/tests/son-schema/*', 'workspace/samples/*',
-                    'monitor/docker/*', 'monitor/grafana/*',
-                    'monitor/prometheus/*', 'monitor/*.exp']
+                    'monitor/docker_compose_files/*', 'monitor/grafana/*',
+                    'monitor/prometheus/*', 'monitor/*.exp',
+                    'validate/eventcfg.yml']
         },
+        # in jenkins, the last package in the list is installed first
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
-                          'Flask'],
+                          'Flask', 'docker==2.0.2', 'scipy', 'numpy', 'Crypto'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
@@ -68,6 +70,7 @@ setup(
                 'son-monitor=son.monitor.monitor:main',
                 'son-profile=son.profile.profile:main',
                 'son-validate=son.validate.validate:main',
+                'son-validate-api=son.validate.api:main',
                 'son-access=son.access.access:main'
             ],
         },

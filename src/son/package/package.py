@@ -151,6 +151,10 @@ class Packager(object):
         else:
             general_description = self.package_gds()
 
+        if not general_description:
+            log.error("Failed to package General Description Section.")
+            return
+
         # Compile all sections in package descriptor
         self._package_descriptor = general_description
 
@@ -181,7 +185,8 @@ class Packager(object):
         file located on the root of every project.
         """
         # List of mandatory fields to be included in the GDS
-        gds_fields = ['vendor', 'name', 'version', 'maintainer', 'description']
+        gds_fields = ['vendor', 'name', 'version',
+                      'maintainer', 'description']
         gds = dict()
         gds['descriptor_version'] = self._version
         gds['schema'] = self._schema_validator.get_remote_schema(
@@ -191,18 +196,22 @@ class Packager(object):
         if prj_descriptor:
             gds['entry_service_template'] = self._entry_service_template
 
+            if not 'package' in prj_descriptor.keys():
+                log.error("Please define 'package' section in {}"
+                          .format(Project.__descriptor_name__))
+                return
+
             errors = []
             for field in gds_fields:
-                if field not in prj_descriptor.keys():
+                if field not in prj_descriptor['package'].keys():
                     errors.append(field)
                 else:
-                    gds[field] = prj_descriptor[field]
+                    gds[field] = prj_descriptor['package'][field]
 
             if errors:
-                print('Please define {} on {}'
-                      .format(', '.join(errors), Project.__descriptor_name__),
-                      file=sys.stderr)
-                return False
+                log.error('Please define {} in the package section of {}'
+                          .format(', '.join(errors), Project.__descriptor_name__))
+                return
         else:
             #TODO: what properties to set in a custom package? TBD...
             gds['vendor'] = 'custom'

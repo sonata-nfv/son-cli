@@ -1,0 +1,55 @@
+version: '2'
+
+# volume created by sdk docker-compose file
+# mounted by son-cli and prometheus to share the config file
+volumes:
+  son_monitor_prometheus:
+    external:
+      name: sonatasdk_son_monitor_prometheus
+  son_monitor_grafana:
+    external:
+      name: sonatasdk_son_monitor_grafana
+
+services:
+
+  pushgateway:
+    image: prom/pushgateway
+    container_name: pushgateway
+    ports:
+     - "9091:9091"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    # get the prometheus config file
+    volumes:
+     - son_monitor_prometheus:/etc/prometheus
+    ports:
+     - "9090:9090"
+    command: [-config.file=/etc/prometheus/prometheus_sdk.yml]
+    links:
+     - pushgateway
+     - cadvisor
+
+  cadvisor:
+   image: google/cadvisor
+   container_name: cadvisor
+   volumes:
+    - "/:/rootfs:ro"
+    - "/var/run:/var/run:rw"
+    - "/sys:/sys:ro"
+    - "/var/lib/docker/:/var/lib/docker:ro"
+   ports:
+    - "8090:8080"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - son_monitor_grafana:/var/lib/grafana
+    ports:
+      - 3000:3000
+    links:
+      - prometheus
+
+

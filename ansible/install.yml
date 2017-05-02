@@ -4,20 +4,16 @@
     - name: updates apt
       apt: update_cache=yes
 
-    - name: install python 3.4
+    - name: install son-cli dependencies
       apt: pkg={{item}} state=installed
       with_items:
         - python3.4
+        - python3-pycparser
+        - build-essential
+        - python3-dev
+        - python3-pip
         - libyaml-dev
-
-    - name: install pip 3.x
-      apt: pkg=python3-pip state=installed
-
-    - shell: uname -s
-      register: var1
-
-    - shell: uname -m
-      register: var2
+        - curl
 
     - name: install son-monitor dependecies
       apt: pkg={{item}} state=installed
@@ -25,11 +21,29 @@
         - libffi-dev
         - libssl-dev
         - tcpdump
+        - gfortran
+        - libopenblas-dev
+        - liblapack-dev
 
-    - name: download docker-compose
-      get_url: url=https://github.com/docker/compose/releases/download/1.6.2/docker-compose-{{ var1.stdout }}-{{ var2.stdout }} dest=/usr/local/bin/docker-compose
+    - name: ensure docker repo key (son-monitor dependency)
+      shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
 
-    - name: install docker-compose
+    - name: install docker (son-monitor dependency)
+      shell: curl -fsSL https://get.docker.com/ | sh
+
+    - name: download docker-compose (son-monitor dependency)
+      shell: curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+    - name: install docker-compose (son-monitor dependency)
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
+
+    - name: install numpy (son-monitor dependency)
+      pip: name=numpy state=latest executable=pip3
+
+    - name: install scipy (son-monitor dependency)
+      pip: name=scipy state=latest executable=pip3
+
+    - name: install docker python api (son-monitor dependency)
+      pip: name=docker version=2.0.2 executable=pip3

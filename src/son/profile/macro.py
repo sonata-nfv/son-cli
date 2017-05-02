@@ -43,7 +43,15 @@ def rewrite_parameter_macros_to_lists(d):
     """
     for k, v in d.items():
         if is_macro(v):
-            d[k] = macro_to_list(v)
+            p = re.compile("\${.*}")
+            match = p.search(v)
+            if match:
+                macro = match.group(0)
+                list = macro_to_list(macro)
+                new_list = []
+                for value in list:
+                    new_list.append(v.replace(macro, str(value)))
+                d[k] = new_list
     return d
 
 
@@ -84,7 +92,12 @@ def loop_macro_to_list(m):
     r = list()
     m = m.strip("${}")
     m = re.split('to|step', m)
-    m = [float(i) for i in m]
+    # detect if the values should be float or int
+    cls = float
+    if not '.' in str(m):
+        cls = int
+
+    m = [cls(i) for i in m]
     step = DEFAULT_STEP
     if len(m) > 2:
         step = m[2]
@@ -102,7 +115,11 @@ def list_macro_to_list(m):
     """
     m = m.strip("${}")
     m = re.split(',', m)
-    m = [float(i) for i in m]
+    # detect if the values should be float or int
+    cls = float
+    if not '.' in str(m):
+        cls = int
+    m = [cls(i) for i in m]
     return m
 
 

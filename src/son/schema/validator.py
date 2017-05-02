@@ -30,14 +30,17 @@ import validators
 import os
 import yaml
 import jsonschema
-import urllib
-from urllib.request import URLError
+
+# using urllib sometimes results in connection reset errors when trying to download remote schema
+# using requests instead
+import requests
+from requests.exceptions import RequestException
+
 from jsonschema import SchemaError
 from jsonschema import ValidationError
 from son.workspace.workspace import Workspace
 
 log = logging.getLogger(__name__)
-
 
 class SchemaValidator(object):
 
@@ -143,10 +146,10 @@ class SchemaValidator(object):
 
                 return self._schemas_library[template]
 
-            except URLError:
+            except RequestException as e:
                 log.warning("Could not load schema '{}' from remote "
-                            "location '{}'"
-                            .format(template, schema_addr))
+                            "location '{}', error: {}"
+                            .format(template, schema_addr, e))
         else:
             log.warning("Invalid schema URL '{}'".format(schema_addr))
 
@@ -185,7 +188,7 @@ class SchemaValidator(object):
         except ValidationError as e:
             log.error("Failed to validate Descriptor against schema '{}'"
                       .format(schema_id))
-            log.debug(e.message)
+            log.error(e.message)
             return
 
         except SchemaError as e:
@@ -274,8 +277,9 @@ def load_remote_schema(template_url):
     :param template_url: The URL of the required schema
     :return: The loaded schema as a dictionary
     """
-    response = urllib.request.urlopen(template_url)
-    tf = response.read().decode(response.headers.get_content_charset())
+    response = requests.get(template_url)
+    response.raise_for_status()
+    tf = response.text
     schema = yaml.load(tf)
     assert isinstance(schema, dict)
     return schema
