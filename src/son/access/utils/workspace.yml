@@ -1,0 +1,15 @@
+catalogues_dir: catalogues
+configuration_dir: configuration
+default_descriptor_extension: yml
+default_service_platform: sp1
+log_level: info
+name: ws1
+platforms_dir: platforms
+schemas_local_master: ~/.son-schema
+schemas_remote_master: https://raw.githubusercontent.com/sonata-nfv/son-schema/master/
+service_platforms:
+  sp1:
+    credentials: {password: '1234', token_file: token.txt, username: user01}
+    signature: {cert: null, prv_key: prv_key.pem, pub_key: pub_key.pem}
+    url: http://sp.int3.sonata-nfv.eu:32001
+version: '0.3'
