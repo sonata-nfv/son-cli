@@ -1,4 +1,4 @@
-#  Copyright (c) 2015 SONATA-NFV, Paderborn University
+#  Copyright (c) 2017 SONATA-NFV, Paderborn University
 # ALL RIGHTS RESERVED.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Neither the name of the SONATA-NFV, UBIWHERE
+# Neither the name of the SONATA-NFV, Paderborn University, UBIWHERE
 # nor the names of its contributors may be used to endorse or promote
 # products derived from this software without specific prior written
 # permission.
@@ -38,85 +38,12 @@ TEST_SON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misc/s
 TEST_WORK_DIR = tempfile.mkdtemp()
 
 
-
-class UnitProfileTestsOld(unittest.TestCase):
-    @unittest.skip("old")
-    def test_input_package_unzipping(self):
-        """
-        Loads test PED file and tries to extract the linked *.son package.
-        Checks if the basic package structure is available in the work_dir after extraction.
-        :return:
-        """
-        args = parse_args(["-c", TEST_PED_FILE, "-v"])
-        p = ProfileManager(args)
-        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
-        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "META-INF")))
-        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "META-INF/MANIFEST.MF")))
-        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "function_descriptors")))
-        self.assertTrue(os.path.exists(os.path.join(p.son_pkg_input_dir, "service_descriptors")))
-    @unittest.skip("old")
-    def test_input_package_content_loading(self):
-        """
-        Loads contents of test package and checks if the SonataServicePackage object is
-        correctly created.
-        :return:
-        """
-        args = parse_args(["-c", TEST_PED_FILE, "-v"])
-        p = ProfileManager(args)
-        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
-        pkg = SonataServicePackage.load(p.son_pkg_input_dir)
-        self.assertEqual(pkg.manifest.get("name"), "sonata-fw-vtc-service")
-        self.assertEqual(pkg.nsd.get("name"), "sonata-fw-vtc-service")
-        self.assertEqual(len(pkg.vnfd_list), 2)
-    @unittest.skip("old")
-    def test_experiment_specification_population(self):
-        """
-        Generates experiment specifications from PED file.
-        Checks if the generated data structure are populated like expected.
-        :return:
-        """
-        args = parse_args(["-c", TEST_PED_FILE, "-v"])
-        p = ProfileManager(args)
-        service_experiments, function_experiments = p._generate_experiment_specifications(
-            p._load_ped_file(p.args.config))
-        self.assertEqual(len(service_experiments), 1)
-        self.assertEqual(len(function_experiments), 2)
-        for se in service_experiments:
-            self.assertGreaterEqual(len(se.run_configurations), 1)
-        for fe in function_experiments:
-            self.assertGreaterEqual(len(fe.run_configurations), 1)
-    @unittest.skip("old")
-    def test_output_service_generation(self):
-        """
-        Checks if service project files are created.
-        :return:
-        """
-        args = parse_args(["-c", TEST_PED_FILE, "-v"])
-        p = ProfileManager(args)
-        extract_son_package(p._load_ped_file(p.args.config), p.son_pkg_input_dir)
-        p.son_pkg_input = SonataServicePackage.load(p.son_pkg_input_dir)
-        p.service_experiments, p.function_experiments = p._generate_experiment_specifications(
-            p._load_ped_file(p.args.config))
-        p.generate_experiment_services()
-        self.assertTrue(os.path.exists(
-            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000")))
-        self.assertTrue(os.path.exists(
-            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/project.yml")))
-        self.assertTrue(os.path.exists(
-            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/nsd/sonata-fw-vtc-service.yml")))
-        self.assertTrue(os.path.exists(
-            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/vnf/fw-vnf/fw-vnf.yml")))
-        self.assertTrue(os.path.exists(
-            os.path.join(p.son_pkg_service_dir, "func_fw_throughput_00000/sources/vnf/vtc-vnf/vtc-vnf.yml")))
-    @unittest.skip("old")
-    def test_output_service_packaging(self):
-        # TODO implement real test
-        self.assertTrue(True)
-
-
 class UnitProfileTests(unittest.TestCase):
 
     def test_load_and_validate_ped(self):
+        """
+        Test reading and validation of test PED file.
+        """
         args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
         p = ProfileManager(args)
         # laod
@@ -129,6 +56,10 @@ class UnitProfileTests(unittest.TestCase):
         self.assertEqual(len(ped), 10)
 
     def test_generate_experiment_specifications(self):
+        """
+        Test the generation of the experiment specifications
+        based on the test PED file.
+        """
         args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
         p = ProfileManager(args)
         ped = p._load_ped_file(p.args.ped)
@@ -178,6 +109,10 @@ class UnitProfileTests(unittest.TestCase):
 class UnitSonataGeneratorTests(unittest.TestCase):
 
     def test_load_and_extract(self):
+        """
+        Test extraction and loading of test *.son package and the contained
+        service.
+        """
         args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
         # init generator
         sg = SonataServiceConfigurationGenerator(args)
@@ -192,6 +127,13 @@ class UnitSonataGeneratorTests(unittest.TestCase):
         self.assertFalse(os.path.exists(str(s.metadata.get("package_disk_path"))))
         
     def test_generate_function_experiments(self):
+        """
+        Test function experiment generation:
+        - generated services
+        - test NSD embedding
+        - added measurement points
+        - applied resource limits
+        """
         # preparation
         args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
         p = ProfileManager(args)
@@ -261,10 +203,96 @@ class UnitSonataGeneratorTests(unittest.TestCase):
             self.assertIsInstance(rl.get("storage").get("size"), int)        
 
     def test_generate_service_experiments(self):
-        pass
+        """
+        Test service experiment generation:
+        - generated services
+        - added measurement points
+        - applied resource limits
+        """
+        # preparation
+        args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
+        p = ProfileManager(args)
+        ped = p._load_ped_file(p.args.ped)
+        ses, fes = p._generate_experiment_specifications(ped)
+        # init generator
+        sg = SonataServiceConfigurationGenerator(args)
+        base_service = sg._load(TEST_SON_FILE, TEST_WORK_DIR)
+        # generate experiments
+        gen = sg._generate_service_experiments(base_service, ses)
+        # test generated data structures
+        ## 1. test number of generated services, and result structure
+        self.assertEqual(len(gen), 16)
+        for k, v in gen.items():
+            self.assertGreaterEqual(k, 0)
+            self.assertGreaterEqual(v.metadata.get("run_id"), 0)
+        ## 2. test added measurement points
+        for k, v in gen.items():
+            self.assertIsNotNone(v.nsd)
+            # check if MPs in function list
+            has_input = False
+            has_output = False
+            for vnf in v.nsd.get("network_functions"):
+                if vnf.get("vnf_name") == "mp.input":
+                    has_input = True
+                if vnf.get("vnf_name") == "mp.output":
+                    has_output = True
+            self.assertTrue(has_input)
+            self.assertTrue(has_output)
+            # check virtual links
+            has_input = False
+            has_output = False
+            for vl in v.nsd.get("virtual_links"):
+                cprs = vl.get("connection_points_reference")   
+                for c in cprs:
+                    if "mp.input:data" in c:
+                        has_input = True
+                    if "mp.output:data" in c:
+                        has_output = True
+            self.assertTrue(has_input)
+            self.assertTrue(has_output)
+            # check forwarding graph
+            for fg in v.nsd.get("forwarding_graphs"):
+                self.assertIn("mp.input", fg.get("constituent_vnfs"))
+                self.assertIn("mp.output", fg.get("constituent_vnfs"))
+        ## 3. test resource limits
+        for vnfd in v.vnfd_list:
+            rl = vnfd.get("virtual_deployment_units")[0].get("resource_requirements")
+            self.assertIsNotNone(rl)
+            self.assertIn("cpu", rl)
+            self.assertIn("memory", rl)
+            self.assertIn("storage", rl)
+            self.assertIn("cpu_bw", rl.get("cpu"))
+            self.assertIn("vcpus", rl.get("cpu"))
+            self.assertIn("size", rl.get("memory"))
+            self.assertIn("size", rl.get("storage"))
+            self.assertIsInstance(rl.get("cpu").get("cpu_bw"), float)
+            self.assertIsInstance(rl.get("cpu").get("vcpus"), int)
+            self.assertIsInstance(rl.get("memory").get("size"), int)
+            self.assertIsInstance(rl.get("storage").get("size"), int)       
 
     def test_write_and_pack(self):
-        pass
+        """
+        Test write-out and packaging of generated services.
+        Checks if the *.son files are actually written
+        to disk.
+        """
+        # preparation
+        args = parse_args(["-p", TEST_PED_FILE, "-v", "--mode", "active"])
+        p = ProfileManager(args)
+        ped = p._load_ped_file(p.args.ped)
+        ses, fes = p._generate_experiment_specifications(ped)
+        # init generator
+        sg = SonataServiceConfigurationGenerator(args)
+        base_service = sg._load(TEST_SON_FILE, TEST_WORK_DIR)
+        # generate experiments
+        gen = dict()
+        gen.update(sg._generate_function_experiments(base_service, fes))
+        gen.update(sg._generate_service_experiments(base_service, ses))
+        # do packaging
+        res = sg._pack(TEST_WORK_DIR, gen)
+        # test if *.son files are generated
+        for k, v in res.items():
+            self.assertTrue(os.path.exists(v), msg="No generated package found.")
 
 
 class UnitHelperTests(unittest.TestCase):
