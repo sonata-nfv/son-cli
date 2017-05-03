@@ -176,7 +176,7 @@ class Push(object):
 
         return response
 
-    def upload_package(self, access_token, package_file_name, public_key=None, private_key=None):
+    def upload_package(self, access_token, package_file_name, signature=None):
         """
         Upload package to platform
 
@@ -211,16 +211,6 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
-        # TODO: Implement Package Signing feature here before sending POST Package request
-        if public_key and private_key:
-            self._keys['public_key'] = public_key
-            self._keys['private_key'] = private_key
-            # Package signing process goes here
-            # self._keys['public_key']
-            # self._keys['private_key']
-            # self._keys['certificate']
-            raise NotImplementedError
-
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 payload = {'package': pkg_file}
@@ -228,7 +218,10 @@ class Push(object):
                     headers = {'Authorization': "Bearer %s" % access_token}
                 else:
                     headers = {}
-
+                if signature:
+                    # Including signature header in case it's passed as param
+                    if signature:
+                         headers['signature'] = signature
                 r = requests.post(url, headers=headers, files=payload)
                 if r.status_code == 201:
                     msg = "Upload succeeded"
