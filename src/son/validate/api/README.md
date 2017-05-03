@@ -36,6 +36,7 @@ The service API accepts the following requests:
         Requires integrity validation.
         * `topology`: True | False (default: False)
         Requires topology validation.
+    * Returns dictionary of validation results as described further in `/report/result/` including the `resource_id` associated with the validation
 * `/report` [GET]: provides a dictionary of available validated objects
     * Returns dictionary in the format:
         ```yaml
@@ -47,13 +48,14 @@ The service API accepts the following requests:
 * `/report/result/<resource_id>` [GET]: provides validation results of <resource_id>
     * Returns dictionary in the format:
         ```yaml
+        resource_id: <validation resource_id>
         error_count: <number of errors>
         warning_count: <number of warnings>
-        errors:  # only if error_count not zero
+        errors:  # only present if error_count not zero
             "object_id":  # object to whom the error is associated
                 <event_code>:  # event code as configured in eventcfg.yaml (see further for details)
                     [msg1, msg2]  # list of messages associated with event
-        warnings:  # only if warning_count not zero
+        warnings:  # only present if warning_count not zero
             "object_id":  # object to whom the warning is associated
                 <event_code>:  # event code as configured in eventcfg.yaml (see further for details)
                     [msg1, msg2]  # list of messages associated with event
