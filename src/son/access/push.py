@@ -177,7 +177,7 @@ class Push(object):
 
         return response
 
-    def upload_package(self, access_token, package_file_name, public_key=None, private_key=None):
+    def upload_package(self, access_token, package_file_name, signature=None):
         """
         Upload package to platform
 
@@ -212,27 +212,6 @@ class Push(object):
         if not validators.url(url):
             return url, "is not a valid url."
 
-        # IN PROGRESS: Implement Package Signing feature here before sending POST Package request
-        #     (herein some commented code using Flask's request object to verify the
-        #       package's signature against the public_key)
-        # # package_content = request.files['package'].read()
-        # # package_hash = SHA.new(package_content).digest()
-        # # public_key_obj = RSA.importKey(public_key)
-        # # signature_tuple = (int(request.headers['signature']),)
-        # # assert public_key_obj.verify(package_hash, signature_tuple)
-        signature = None
-        if public_key and private_key:
-            self._keys['public_key'] = public_key
-            self._keys['private_key'] = private_key
-            public_key_obj = RSA.importKey(self._keys['public_key'])
-            private_key_obj = RSA.importKey(self._keys['private_key'])
-            with open(package_file_name, 'rb') as fhandle:
-                 package_content = fhandle.read()
-            # File read as binary, it's not necessary to encode 'utf-8' to hash
-            package_hash = SHA.new(package_content).digest()
-            # Signature is a tuple containing an integer as first entry
-            signature = private_key_obj.sign(package_hash, '')
-
         try:
             with open(package_file_name, 'rb') as pkg_file:
                 payload = {'package': pkg_file}
@@ -241,8 +220,9 @@ class Push(object):
                 else:
                     headers = {}
                 if signature:
-                    # RSA signature is a tuple containing an 'int'
-                    headers['signature'] = str(signature[0])
+                    # Including signature header in case it's passed as param
+                    if signature:
+                         headers['signature'] = signature
                 r = requests.post(url, headers=headers, files=payload)
                 if r.status_code == 201:
                     msg = "Upload succeeded"

@@ -68,6 +68,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from base64 import b64encode
 from base64 import b64decode
 from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA
 from son.workspace.workspace import Workspace
 from son.access.helpers.helpers import json_response
 from son.access.models.models import User
@@ -250,7 +251,8 @@ class AccessClient:
         :return: JWT Access Token is returned from the GK server
         """
 
-        url = self.platform['url'] + self.GK_API_VERSION + self.GK_URI_LOGIN
+        default_sp = self.workspace.default_service_platform
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
 
         if not username:
             username = self.platform['credentials']['username']
@@ -294,7 +296,8 @@ class AccessClient:
         Send request to /logout interface to end user session
         :return: HTTP Code 204
         """
-        url = self.platform['url'] + self.GK_API_VERSION + self.GK_URI_LOGOUT
+        default_sp = self.workspace.default_service_platform
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
 
         if self.access_token is None:
             token_file = self.platform['credentials']['token_file']
@@ -367,7 +370,8 @@ class AccessClient:
         Simple request to request the Platform Public Key
         :return: Public Key, HTTP code 200
         """
-        url = self.platform['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
+        default_sp = self.workspace.default_service_platform
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
 
         try:
             response = requests.get(url, verify=False)
@@ -438,13 +442,37 @@ class AccessClient:
             if not (self.dev_public_key and self.dev_private_key):
                 # TODO: GENERATE PAIRKEY
                 self.generate_keypair(self.platform_dir)
-            # TODO: CALL SIGN METHOD
+            # IN PROGRESS: CALL SIGN METHOD
             # Push son-package to the Service Platform
+            sign = self.sign_package(path)
             print(self.default_push.upload_package(self.access_token, path, sign))
 
         else:
             # Push son-package to the Service Platform
-            print(self.default_push.upload_package(self.access_token, path, False))
+            print(self.default_push.upload_package(self.access_token, path))
+
+    def sign_package(self, path, private_key=None):
+        """
+        Sign package feature using SHA1 hash and RSA keypair
+        :param path: location of the package to submit
+        :param private_key: optional private_key used in signature (default None)
+        :return: string containing an int representation of the package's signature
+        """
+        if private_key:
+            # Private key used to test
+            private_key_obj = RSA.importKey(private_key)
+        else:
+            private_key_obj = RSA.importKey(self.dev_private_key)
+        try:
+            with open(path, 'rb') as fhandle:
+                package_content = fhandle.read()
+        except IOError as err:
+            print("I/O error: {0}".format(err))
+        # File read as binary, it's not necessary to encode 'utf-8' to hash
+        package_hash = SHA.new(package_content).digest()
+        # Signature is a tuple containing an integer as first entry
+        signature = private_key_obj.sign(package_hash, '')
+        return str(signature[0])
 
     def deploy_service(self, service_id):
         """
