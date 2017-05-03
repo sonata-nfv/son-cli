@@ -82,8 +82,8 @@ class ProfileManager(object):
             input_msd_path = experiment.input_metrics
             output_msd_path = experiment.output_metrics
             input_commands = experiment.command_space_list
-            configuration_commands = dict() # experiment.configuration_space_dict (TODO imec: needs to be adapted to new experiment.py)
-            resource_list = [] # experiment.resource_space_list (TODO imec: needs to be adapted to new experiment.py)
+            configuration_commands = experiment.configuration_space_list   # TODO check changed format
+            resource_list = experiment.configuration_space_list  # TODO check changed format
             timeout = experiment.time_limit
             profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
