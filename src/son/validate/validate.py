@@ -875,9 +875,13 @@ class Validator(object):
                                              "{0}-lvl{1}-br.graphml"
                                              .format(service.id, lvl)))
 
-        g = service.build_topology_graph(level=3, bridges=True)
+        g = service.build_topology_graph(level=3, bridges=True,
+                                         vdu_inner_connections=False)
         service.complete_graph = nx.generate_graphml(g, encoding='utf-8',
                                                      prettyprint=True)
+        nx.write_graphml(g, os.path.join(graphsdir,
+                                         "{0}-lvl3-complete.graphml"
+                                         .format(service.id)))
 
 
 def print_result(validator, result):

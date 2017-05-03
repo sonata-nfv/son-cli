@@ -664,6 +664,8 @@ class Packager(object):
                     # Add image URL to artifact dependencies
                     self._add_artifact_dependency(
                         name=vnfd['name'] + '-' + vdu['id'] + '-vm_image',
+                        vendor=vnfd['vendor'],
+                        version=vnfd['version'],
                         url=vdu['vm_image'],
                         md5='02236f2ae558018ed14b5222ef1bd9f1')
                     # TODO: remote url must provide md5? This is dummy!
@@ -860,8 +862,8 @@ class Packager(object):
 
         self._package_resolvers.append(pr_entry)
 
-    def _add_artifact_dependency(self, name, url, md5, username='username',
-                                 password='password'):
+    def _add_artifact_dependency(self, name, vendor, version, url, md5,
+                                 username='username', password='password'):
 
         log.debug("Adding artifact dependency entry '{}'".format(name))
 
@@ -874,6 +876,8 @@ class Packager(object):
                 return
 
         ad_entry = {'name': name,
+                    'vendor': vendor,
+                    'version': version,
                     'url': url,
                     'md5': md5,
                     'credentials': {

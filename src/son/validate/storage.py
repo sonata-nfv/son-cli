@@ -620,7 +620,8 @@ class Service(Descriptor):
         self._functions[function.id] = function
         self._vnf_id_map[vnf_id] = function.id
 
-    def build_topology_graph(self, level=1, bridges=False):
+    def build_topology_graph(self, level=1, bridges=False,
+                             vdu_inner_connections=True):
         """
         Build the network topology graph of the service.
         :param level: indicates the granulariy of the graph
@@ -693,11 +694,13 @@ class Service(Descriptor):
             if level <= 2:
                 function.graph = function.build_topology_graph(parent_id=self.id,
                                                                bridges=bridges,
-                                                               level=0)
+                                                               level=0,
+                                                               vdu_inner_connections=vdu_inner_connections)
             else:
                 function.graph = function.build_topology_graph(parent_id=self.id,
                                                                bridges=bridges,
-                                                               level=1)
+                                                               level=1,
+                                                               vdu_inner_connections=vdu_inner_connections)
             if level == 0:
                 for node in function.graph.nodes():
                     pn = prefix + ':' + node
@@ -976,7 +979,8 @@ class Function(Descriptor):
 
         return True
 
-    def build_topology_graph(self, bridges=False, parent_id='', level=0):
+    def build_topology_graph(self, bridges=False, parent_id='', level=0,
+                             vdu_inner_connections=True):
         """
         Build the network topology graph of the function.
         :param bridges: indicates if bridges should be included in the graph
@@ -1059,34 +1063,35 @@ class Function(Descriptor):
             edge_attrs['label'] = link.id
             graph.add_edge(iface_u, iface_v, attr_dict=edge_attrs)
 
-        # link vdu interfaces if level 1
-        if level == 1:
-            for uid, unit in self.units.items():
-                edge_attrs = def_edge_attrs.copy()
-                join_ifaces = []
-                for iface in unit.interfaces:
-                    # patch for faulty descriptors regarding sep ':'
-                    s_iface = iface.split(':')
-                    if len(s_iface) > 1:
-                        join_ifaces.append(iface)
-                    else:
-                        join_ifaces.append(uid + ':' + iface)
+        if vdu_inner_connections:
+            # link vdu interfaces if level 1
+            if level == 1:
+                for uid, unit in self.units.items():
+                    edge_attrs = def_edge_attrs.copy()
+                    join_ifaces = []
+                    for iface in unit.interfaces:
+                        # patch for faulty descriptors regarding sep ':'
+                        s_iface = iface.split(':')
+                        if len(s_iface) > 1:
+                            join_ifaces.append(iface)
+                        else:
+                            join_ifaces.append(uid + ':' + iface)
 
-                for u_iface in join_ifaces:
-                    for v_iface in join_ifaces:
-                        if u_iface == v_iface:
-                            continue
-                        if graph.has_edge(u_iface, v_iface):
-                            continue
-                        if not bridges and (
-                                u_iface in self.bridge_interfaces or
-                                v_iface in self.bridge_interfaces):
-                            continue
-                        edge_attrs['level'] = 2
-                        edge_attrs['label'] = 'VDU_IN'
-                        edge_attrs['type'] = 'vdu_in'
+                    for u_iface in join_ifaces:
+                        for v_iface in join_ifaces:
+                            if u_iface == v_iface:
+                                continue
+                            if graph.has_edge(u_iface, v_iface):
+                                continue
+                            if not bridges and (
+                                    u_iface in self.bridge_interfaces or
+                                    v_iface in self.bridge_interfaces):
+                                continue
+                            edge_attrs['level'] = 2
+                            edge_attrs['label'] = 'VDU_IN'
+                            edge_attrs['type'] = 'vdu_in'
 
-                        graph.add_edge(u_iface, v_iface)
+                            graph.add_edge(u_iface, v_iface)
 
         # build bridge topology graph
         if bridges:
