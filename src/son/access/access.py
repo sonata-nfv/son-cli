@@ -261,8 +261,9 @@ class AccessClient:
             password = self.platform['credentials']['password']
 
         # Construct the POST login request
-        encoded_password = b64encode(str(username) + ':' + str(password))
-        headers = {'Authorization': 'Basic %s' % encoded_password}
+        credentials = (str(username) + ':' + str(password)).encode('utf-8')
+        encoded_creds = b64encode(credentials)
+        headers = {'Authorization': 'Basic %s' % (encoded_creds.decode('utf-8'))}
 
         response = requests.post(url, headers=headers, verify=False)
         if not response.status_code in (200, 201):
