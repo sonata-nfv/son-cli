@@ -30,7 +30,6 @@ import logging
 # import yaml
 import sys
 from Crypto.PublicKey import RSA
-from Crypto.Hash import SHA
 from son.access.config.config import GK_ADDRESS, GK_PORT
 # from json import loads
 
