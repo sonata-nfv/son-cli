@@ -16,7 +16,6 @@ from son.workspace.workspace import Workspace
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -28,7 +27,6 @@ req_errors = []
 
 
 class ValidateWatcher(FileSystemEventHandler):
-
     def __init__(self, path, callback, filename=None):
         self.path = path
         self.filename = filename
@@ -37,21 +35,25 @@ class ValidateWatcher(FileSystemEventHandler):
         self.observer.schedule(self, self.path,
                                recursive=False if self.filename else True)
         self.observer.start()
-        #self.observer.join()
+        # self.observer.join()
 
     def on_modified(self, event):
         print(self.filename)
         print(event.src_path)
         print(event)
 
-        if not event.is_directory and event.src_path.endswith(self.filename):
-            self.observer.stop()
-            self.callback(self.path)
-        elif not self.filename and event.is_directory:
-            self.observer.stop()
-            self.callback(self.path)
-        else:
-            log.error("Internal error: unknown watcher event")
+        self.observer.stop()
+        self.callback(self.path)
+
+        # if not event.is_directory and self.filename and \
+        #         event.src_path.endswith(self.filename):
+        #     self.observer.stop()
+        #     self.callback(self.path)
+        # elif not self.filename and event.is_directory:
+        #     self.observer.stop()
+        #     self.callback(self.path)
+        # else:
+        #     log.error("Internal error: unknown watcher event")
 
 
 def initialize(debug=False):
@@ -60,6 +62,7 @@ def initialize(debug=False):
     cache.add('debug', debug)
     cache.add('artifacts', list())
     cache.add('resources', dict())
+    cache.add('latest', dict())
     cache.add('watches', dict())
 
     os.makedirs(app.config['ARTIFACTS_DIR'], exist_ok=True)
@@ -96,7 +99,7 @@ def load_watch_dirs(workspace):
         log.debug("Loading validator watcher: {0}".format(watch_path))
 
         assert watch['type'] == 'project' or watch['type'] == 'package' or \
-            watch['type'] == 'service' or watch['type'] == 'function'
+               watch['type'] == 'service' or watch['type'] == 'function'
 
         install_watcher(watch_path, watch['type'], watch['syntax'],
                         watch['integrity'], watch['topology'])
@@ -144,9 +147,17 @@ def add_artifact_root():
     return artifact_root
 
 
-def set_resource(key, obj_type, syntax, integrity, topology,
-                 result=None, net_topology=None, net_fwgraph=None):
+def update_latest(path, key):
+    log.debug("Updating latest validated resource for {0}: {1}"
+              .format(path, key))
+    latest = cache.get('latest')
+    latest[path] = key
+    cache.set('latest', latest)
 
+    print(cache.get('latest'))
+
+def set_resource(key, path, obj_type, syntax, integrity, topology,
+                 result=None, net_topology=None, net_fwgraph=None):
     assert obj_type or syntax or topology or integrity or \
            result or net_topology or net_fwgraph
 
@@ -155,6 +166,7 @@ def set_resource(key, obj_type, syntax, integrity, topology,
     if key not in resources.keys():
         resources[key] = dict()
 
+    resources[key]['path'] = path
     resources[key]['type'] = obj_type
     resources[key]['syntax'] = syntax
     resources[key]['integrity'] = integrity
@@ -181,7 +193,6 @@ def get_resource(key):
 
 
 def get_resource_key(path):
-
     return generate_hash(os.path.abspath(path))
 
 
@@ -264,10 +275,11 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
 
     resource = get_resource(key)
     if resource and resource['type'] == obj_type and \
-            resource['syntax'] == syntax and \
-            resource['integrity'] == integrity and \
-            resource['topology'] == topology:
+                    resource['syntax'] == syntax and \
+                    resource['integrity'] == integrity and \
+                    resource['topology'] == topology:
         log.info("Returning cached result for '{0}'".format(key))
+        update_latest(path, key)
         return resource['result']
 
     validator = Validator()
@@ -281,8 +293,9 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
     json_result = gen_report_result(key, validator)
     net_topology = gen_report_net_topology(validator)
     # todo: missing topology and fwgraphs
-    set_resource(key, obj_type, syntax, integrity, topology,
+    set_resource(key, path, obj_type, syntax, integrity, topology,
                  result=json_result, net_topology=net_topology)
+    update_latest(path, key)
 
     return json_result
 
@@ -332,10 +345,28 @@ def validate_function():
     return _validate_object_from_request('function')
 
 
+@app.route('/resources', methods=['GET'])
+def resources():
+    """ retrieve list of available resources in cache """
+    return gen_resources()
+
+
+@app.route('/watches', methods=['GET'])
+def watches():
+    """ retrieve list of watched resources """
+    return gen_watches()
+
+
+@app.route('/report', methods=['GET'])
+def report():
+    """ retrieve latest validated resources"""
+    return gen_report()
+
+
 @app.route('/report/result/<string:resource_id>', methods=['GET'])
 def report_result(resource_id):
     if not resource_exits(resource_id) or \
-            'result' not in get_resource(resource_id).keys():
+                    'result' not in get_resource(resource_id).keys():
         return '', 404
     return get_resource(resource_id)['result']
 
@@ -343,7 +374,7 @@ def report_result(resource_id):
 @app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
     if not resource_exits(resource_id) or \
-            'net_topology' not in get_resource(resource_id).keys():
+                    'net_topology' not in get_resource(resource_id).keys():
         return '', 404
     return get_resource(resource_id)['net_topology']
 
@@ -351,9 +382,77 @@ def report_topology(resource_id):
 @app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
     if not resource_exits(resource_id) or \
-            'net_fwgraph' not in get_resource(resource_id).keys():
+                    'net_fwgraph' not in get_resource(resource_id).keys():
         return '', 404
     return get_resource(resource_id)['net_fwgraph']
+
+
+def gen_watches():
+    # retrieve dictionary of watched resources, in the format:
+    # path: { type | flags }
+    report = dict()
+    watches = cache.get('watches')
+    for path, watch in watches.items():
+        report[path] = dict()
+        report[path]['type'] = watch['type']
+        report[path]['flags'] = get_flags(watch['syntax'],
+                                          watch['integrity'],
+                                          watch['topology'])
+
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
+
+
+def gen_resources():
+    # retrieve dictionary of cached resources, in the format:
+    # resource_id: { type | path | flags (SIT) }
+
+    report = dict()
+    resources = cache.get('resources')
+
+    for resource_id, resource in resources.items():
+        report[resource_id] = dict()
+        report[resource_id]['type'] = resource['type']
+        report[resource_id]['path'] = resource['path']
+        report[resource_id]['flags'] = get_flags(resource['syntax'],
+                                                 resource['integrity'],
+                                                 resource['topology'])
+
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
+
+
+def gen_report():
+    # retrieve dictionary of latest validated resources, in the format:
+    # resource_id: { type | path | flags (SIT) }
+    report = dict()
+    resources = cache.get('resources')
+    latest = cache.get('latest')
+
+    for path, key in latest.items():
+        resource = resources[key]
+        if path != resource['path']:
+            log.error("Internal error: latest resource path '{0}' does not "
+                      "match cached resource path '{1}"
+                      .format(path, resource['path']))
+            continue
+        report[key] = dict()
+        report[key]['type'] = resource['type']
+        report[key]['path'] = resource['path']
+        report[key]['flags'] = get_flags(resource['syntax'],
+                                         resource['integrity'],
+                                         resource['topology'])
+
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
+
+
+def get_flags(syntax, integrity, topology):
+    return (
+        ('S' if syntax else '') +
+        ('I' if integrity else '') +
+        ('T' if topology else '')
+    )
 
 
 def gen_report_result(resource_id, validator):
@@ -453,7 +552,7 @@ def remove_artifacts():
     for artifact in cache.get('artifacts')[::-1]:
         try:
             os.remove(artifact) if os.path.isfile(artifact) \
-                                 else os.rmdir(artifact)
+                else os.rmdir(artifact)
             log.debug("DELETED '{}'".format(artifact))
         except OSError:
             log.debug("FAILED '{}".format(artifact))
@@ -461,7 +560,6 @@ def remove_artifacts():
 
 
 def main():
-
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -500,7 +598,7 @@ def main():
              "Validation objects defined in the workspace configuration will "
              "be monitored and automatically validated. "
              "If not specified will assume '{}'"
-             .format(Workspace.DEFAULT_WORKSPACE_DIR),
+            .format(Workspace.DEFAULT_WORKSPACE_DIR),
         default=Workspace.DEFAULT_WORKSPACE_DIR,
         required=False
     )

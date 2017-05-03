@@ -186,6 +186,7 @@ class Node:
         if interface in self.interfaces:
             evtlog.log("The interface id='{0}' is already stored in node "
                        "id='{1}'".format(interface, self.id),
+                       self.id,
                        'evt_duplicate_cpoint')
             return
         log.debug("Node id='{0}': adding connection point '{1}'"
@@ -817,6 +818,7 @@ class Service(Descriptor):
         if 'forwarding_graphs' not in self.content:
             evtlog.log("No forwarding graphs available in service id='{0}'"
                        .format(self.id),
+                       self.id,
                        'evt_nsd_top_fwgraph_unavailable')
             return
 
@@ -831,6 +833,7 @@ class Service(Descriptor):
                         evtlog.log("Connection point '{0}' of forwarding path "
                                    "'{1}' is not defined"
                                    .format(iface, fpath['fp_id']),
+                                   self.id,
                                    'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
                     if pos in path_dict:
@@ -838,6 +841,7 @@ class Service(Descriptor):
                                    "in forwarding path id='{1}'. Ignoring "
                                    "connection point: '{2}'"
                                    .format(pos, fpath['fp_id'], path_dict[pos]),
+                                   self.id,
                                    'evt_nsd_top_fwgraph_position_duplicate')
                     path_dict[pos] = iface
                 d = OrderedDict(sorted(path_dict.items(),

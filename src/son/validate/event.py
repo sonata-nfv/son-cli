@@ -36,7 +36,7 @@ class EventLogger(object):
         for l in ['error', 'warning', 'none']:
             self._events[l] = dict()
 
-    def log(self, msg, event):
+    def log(self, msg, id, event):
         level = self._eventdict[event]
 
         if level == 'error':
@@ -46,10 +46,12 @@ class EventLogger(object):
         elif level == 'none':
             pass
 
-        if event not in self._events[level]:
-            self._events[level][event] = list()
+        if id not in self._events[level]:
+            node = self._events[level][id] = dict()
+            if event not in node:
+                node[event] = list()
 
-        self._events[level][event].append(msg)
+        self._events[level][id][event].append(msg)
 
 
 class LoggerManager(object):
