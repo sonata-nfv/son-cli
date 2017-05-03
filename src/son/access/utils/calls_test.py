@@ -98,11 +98,12 @@ def user_login(username, password):
 
     # Construct the POST login request
     creds = (str(username) + ':' + str(password)).encode("utf-8")
-    print(str(username) + ':' + str(password))
+    # print(str(username) + ':' + str(password))
     print(creds)
     encoded_password = b64encode(creds)
-    print(b64decode(encoded_password))
-    headers = {'Authorization': 'Basic %s' % encoded_password}
+    print(encoded_password)
+    print(encoded_password.decode("utf-8"))
+    headers = {'Authorization': 'Basic %s' % (encoded_password.decode("utf-8"))}
 
     url = "http://sp.int3.sonata-nfv.eu:5600/api/v1/login/user"
 
@@ -135,13 +136,13 @@ def get_platform_public_key():
     return key
 
 
-def check_token(key):
+def check_token(key, access_token):
     import jwt
     """
     Simple request to check if session has expired (TBD)
     :return: Token status
     """
-    access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJPelpfa1VoUzAwNlF0SFVKTWtPWUxtV2NRaFNyTlgwV0p1aFNVMTZHR1NFIn0.eyJqdGkiOiJjYTU0MjM0NC1hMTgxLTRkYmEtOWU5Yi1mOGM5ZjMwOWY2NDkiLCJleHAiOjE0OTIwMDc2NjIsIm5iZiI6MCwiaWF0IjoxNDkyMDA3MzYyLCJpc3MiOiJodHRwOi8vc29uLWtleWNsb2FrOjU2MDEvYXV0aC9yZWFsbXMvc29uYXRhIiwiYXVkIjoiYWRhcHRlciIsInN1YiI6IjllNzMwZWJlLTk3MzgtNGY1ZC05OTNiLTEzYjlmOGJjOTFlZiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFkYXB0ZXIiLCJhdXRoX3RpbWUiOjAsInNlc3Npb25fc3RhdGUiOiIwMzU3YmNiYS03ZjFiLTRjNzYtOTBjZi1hOTA2MjViNDIxZTMiLCJhY3IiOiIxIiwiY2xpZW50X3Nlc3Npb24iOiJkNGNmZWFhNS1iMDE3LTRlYmQtOTA3MS0xMGNhZTIxNzMxYzAiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdDo4MDgxIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZXZlbG9wZXIiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sIm5hbWUiOiJVc2VyIFNhbXBsZSIsInByZWZlcnJlZF91c2VybmFtZSI6InVzZXIwMSIsImdpdmVuX25hbWUiOiJVc2VyIiwiZmFtaWx5X25hbWUiOiJTYW1wbGUiLCJlbWFpbCI6InVzZXIuc2FtcGxlQGVtYWlsLmNvbSJ9.Q_vh4QenmJjf1MFPHSWsLQFsU6u0VB37YUMC8tN7prqFRSHe8EztYXhfixh1pxkqb8doaxTcR2DWC4orhzWc-3srFwbAHI5y_ZiZ54gFQBwUW3mAEhSsLkD-MJTqLJ9hexHYj0I2zpSGBsWdbMCeg0AVUnWt7BGTfJ8CUQo5GJWyWnusJ95WFr9XgZ5QR_bxJLqYzoh1QnLxN1kXEYGeTYuL36Miaf5KOzY2FiQyKnj4arSEScJFQQy2FVjxSD3yOXTBl6pcMPvdKOGIIdcPw1Maf0dATTcT1dprX-HEonaE0nduCXYquCedB_fJr21WHRMs62ZagL7cEgU7eXoowA'
+    # access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJPelpfa1VoUzAwNlF0SFVKTWtPWUxtV2NRaFNyTlgwV0p1aFNVMTZHR1NFIn0.eyJqdGkiOiJjYTU0MjM0NC1hMTgxLTRkYmEtOWU5Yi1mOGM5ZjMwOWY2NDkiLCJleHAiOjE0OTIwMDc2NjIsIm5iZiI6MCwiaWF0IjoxNDkyMDA3MzYyLCJpc3MiOiJodHRwOi8vc29uLWtleWNsb2FrOjU2MDEvYXV0aC9yZWFsbXMvc29uYXRhIiwiYXVkIjoiYWRhcHRlciIsInN1YiI6IjllNzMwZWJlLTk3MzgtNGY1ZC05OTNiLTEzYjlmOGJjOTFlZiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFkYXB0ZXIiLCJhdXRoX3RpbWUiOjAsInNlc3Npb25fc3RhdGUiOiIwMzU3YmNiYS03ZjFiLTRjNzYtOTBjZi1hOTA2MjViNDIxZTMiLCJhY3IiOiIxIiwiY2xpZW50X3Nlc3Npb24iOiJkNGNmZWFhNS1iMDE3LTRlYmQtOTA3MS0xMGNhZTIxNzMxYzAiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdDo4MDgxIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZXZlbG9wZXIiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sIm5hbWUiOiJVc2VyIFNhbXBsZSIsInByZWZlcnJlZF91c2VybmFtZSI6InVzZXIwMSIsImdpdmVuX25hbWUiOiJVc2VyIiwiZmFtaWx5X25hbWUiOiJTYW1wbGUiLCJlbWFpbCI6InVzZXIuc2FtcGxlQGVtYWlsLmNvbSJ9.Q_vh4QenmJjf1MFPHSWsLQFsU6u0VB37YUMC8tN7prqFRSHe8EztYXhfixh1pxkqb8doaxTcR2DWC4orhzWc-3srFwbAHI5y_ZiZ54gFQBwUW3mAEhSsLkD-MJTqLJ9hexHYj0I2zpSGBsWdbMCeg0AVUnWt7BGTfJ8CUQo5GJWyWnusJ95WFr9XgZ5QR_bxJLqYzoh1QnLxN1kXEYGeTYuL36Miaf5KOzY2FiQyKnj4arSEScJFQQy2FVjxSD3yOXTBl6pcMPvdKOGIIdcPw1Maf0dATTcT1dprX-HEonaE0nduCXYquCedB_fJr21WHRMs62ZagL7cEgU7eXoowA'
     try:
         contents = jwt.decode(access_token, key, True, algorithms='RS256', audience='adapter')  # options={'verify_aud': False})
         print('contents', contents)
@@ -152,7 +153,7 @@ def check_token(key):
 
 
 # generate_keypair()
-# token = user_login('user04', '1234')
+# token = user_login('user01', '1234')
 # print(token)
 # key = get_platform_public_key()
-# check_token(key)
+# check_token(key, token)
