@@ -77,7 +77,7 @@ class Emulator:
             raise Exception("Need at least one emulator to be specified in the target platforms descriptor.")
 
         # all nodes are available at the start
-        self.available_nodes = self.emulator_nodes.keys()
+        self.available_nodes = list(self.emulator_nodes.keys())
         LOG.info("%r nodes found."%len(self.emulator_nodes))
         LOG.debug("List of emulator nodes: %r"%self.emulator_nodes.keys())
 
