@@ -10,6 +10,7 @@ import time
 from son.package.md5 import generate_hash
 from flask import Flask, request
 from flask_cache import Cache
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from son.validate.validate import Validator, print_result
 from son.workspace.workspace import Workspace
@@ -19,6 +20,7 @@ from watchdog.events import FileSystemEventHandler
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 app.config.from_pyfile('settings.py')
 cache = Cache(app, config={'CACHE_TYPE': 'redis'})
 
@@ -111,6 +113,10 @@ def load_watch_dirs(workspace):
 def set_watch(path, obj_type, syntax, integrity, topology):
     log.debug("Caching watch '{0}".format(path))
     watches = cache.get('watches')
+
+    if not watches:
+        watches = dict()
+
     if not watch_exists(path):
         watches[path] = dict()
 
@@ -123,6 +129,8 @@ def set_watch(path, obj_type, syntax, integrity, topology):
 
 
 def watch_exists(path):
+    if not cache.get('watches'):
+        return False
     return path in cache.get('watches').keys()
 
 
@@ -136,7 +144,7 @@ def set_artifact(artifact_path):
     log.debug("Caching artifact '{0}'".format(artifact_path))
     artifacts = cache.get('artifacts')
     if not artifacts:
-        return
+        artifacts = list()
     artifacts.append(artifact_path)
     cache.set('artifacts', artifacts)
 
@@ -153,10 +161,11 @@ def update_latest(path, key):
     log.debug("Updating latest validated resource for {0}: {1}"
               .format(path, key))
     latest = cache.get('latest')
+    if not latest:
+        latest = dict()
+
     latest[path] = key
     cache.set('latest', latest)
-
-    print(cache.get('latest'))
 
 
 def set_resource(key, path, obj_type, syntax, integrity, topology,
@@ -166,6 +175,10 @@ def set_resource(key, path, obj_type, syntax, integrity, topology,
 
     log.debug("Caching resource '{0}'".format(key))
     resources = cache.get('resources')
+
+    if not resources:
+        resources = dict()
+
     if key not in resources.keys():
         resources[key] = dict()
 
@@ -186,6 +199,8 @@ def set_resource(key, path, obj_type, syntax, integrity, topology,
 
 
 def resource_exits(key):
+    if not cache.get('resources'):
+        return False
     return key in cache.get('resources').keys()
 
 
@@ -289,7 +304,8 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
         return resource['result']
 
     validator = Validator()
-    validator.configure(syntax, integrity, topology, debug=cache.get('debug'))
+
+    validator.configure(syntax, integrity, topology, debug=app.config['DEBUG'])
     # remove default dpath
     validator.dpath = None
     val_function = getattr(validator, 'validate_' + obj_type)
@@ -395,15 +411,17 @@ def report_fwgraph(resource_id):
 
 def gen_watches():
     # retrieve dictionary of watched resources, in the format:
-    # path: { type | flags }
+    # path: { type | syntax | integrity | topology }
     report = dict()
     watches = cache.get('watches')
+    if not watches:
+        return ''
     for path, watch in watches.items():
         report[path] = dict()
         report[path]['type'] = watch['type']
-        report[path]['flags'] = get_flags(watch['syntax'],
-                                          watch['integrity'],
-                                          watch['topology'])
+        report[path]['syntax'] = watch['syntax']
+        report[path]['integrity'] = watch['integrity']
+        report[path]['topology'] = watch['topology']
 
     return json.dumps(report, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
@@ -411,18 +429,19 @@ def gen_watches():
 
 def gen_resources():
     # retrieve dictionary of cached resources, in the format:
-    # resource_id: { type | path | flags (SIT) }
-
+    # resource_id: { type | path | syntax | integrity | topology }
     report = dict()
     resources = cache.get('resources')
+    if not resources:
+        return ''
 
     for resource_id, resource in resources.items():
         report[resource_id] = dict()
         report[resource_id]['type'] = resource['type']
         report[resource_id]['path'] = resource['path']
-        report[resource_id]['flags'] = get_flags(resource['syntax'],
-                                                 resource['integrity'],
-                                                 resource['topology'])
+        report[resource_id]['syntax'] = resource['syntax']
+        report[resource_id]['integrity'] = resource['integrity']
+        report[resource_id]['topology'] = resource['topology']
 
     return json.dumps(report, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
@@ -430,10 +449,13 @@ def gen_resources():
 
 def gen_report():
     # retrieve dictionary of latest validated resources, in the format:
-    # resource_id: { type | path | flags (SIT) }
+    # resource_id: { type | path | syntax | integrity | topology }
     report = dict()
     resources = cache.get('resources')
     latest = cache.get('latest')
+
+    if not resources or not latest:
+        return ''
 
     for path, key in latest.items():
         resource = resources[key]
@@ -445,20 +467,12 @@ def gen_report():
         report[key] = dict()
         report[key]['type'] = resource['type']
         report[key]['path'] = resource['path']
-        report[key]['flags'] = get_flags(resource['syntax'],
-                                         resource['integrity'],
-                                         resource['topology'])
+        report[key]['syntax'] = resource['syntax']
+        report[key]['integrity'] = resource['integrity']
+        report[key]['topology'] = resource['topology']
 
     return json.dumps(report, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
-
-
-def get_flags(syntax, integrity, topology):
-    return (
-        ('S' if syntax else '') +
-        ('I' if integrity else '') +
-        ('T' if topology else '')
-    )
 
 
 def gen_report_result(resource_id, validator):
@@ -555,7 +569,10 @@ def remove_file(filepath):
 @atexit.register
 def remove_artifacts():
     log.info("Removing artifacts")
-    for artifact in cache.get('artifacts')[::-1]:
+    artifacts = cache.get('artifacts')
+    if not artifacts:
+        return
+    for artifact in artifacts[::-1]:
         try:
             os.remove(artifact) if os.path.isfile(artifact) \
                 else os.rmdir(artifact)
@@ -619,6 +636,7 @@ def main():
     args = parser.parse_args()
 
     coloredlogs.install(level='debug' if args.debug else 'info')
+    app.config['DEBUG'] = True if args.debug else False
 
     initialize(debug=args.debug)
 

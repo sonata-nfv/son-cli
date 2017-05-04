@@ -29,6 +29,7 @@ import os
 
 
 def generate_hash(f, cs=128):
+    print("... generating hash of '{0}'".format(f))
     return __generate_hash__(f, cs) \
         if os.path.isfile(f) \
         else __generate_hash_path__(f, cs)
@@ -43,6 +44,7 @@ def __generate_hash__(f, cs=128):
 
 
 def __generate_hash_path__(p, cs=128):
+    print("... >>>> hash path <<<<")
     hashes = []
     for root, dirs, files in os.walk(p):
         for f in sorted(files):  # guarantee same order to obtain same hash

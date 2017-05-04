@@ -365,7 +365,7 @@ class Packager(object):
         pce_sd = dict()
         pce_sd["content-type"] = "application/sonata.service_descriptor"
         pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
-        pce_sd["md5"] = generate_hash(nsd)
+        pce_sd["md5"] = generate_hash(sd)
         pce.append(pce_sd)
 
         # Specify the NSD as THE entry service template of package descriptor
