@@ -197,6 +197,7 @@ def set_resource(key, path, obj_type, syntax, integrity, topology,
         resources[key]['net_fwgraph'] = net_fwgraph
 
     cache.set('resources', resources)
+    update_latest(path, key)
 
 
 def resource_exits(key):
@@ -222,7 +223,7 @@ def process_request():
         keypath = request.form['path']
         path = get_local(request.form['path'])
         if not path:
-            return
+            return None, None
 
     elif source == 'url' and 'path' in request.form:
         keypath = request.form['path']
@@ -234,7 +235,7 @@ def process_request():
 
     else:
         req_errors.append('Invalid source, path or file parameters')
-        return
+        return None, None
 
     return keypath, path
 
@@ -302,7 +303,7 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
                     resource['integrity'] == integrity and \
                     resource['topology'] == topology:
         log.info("Returning cached result for '{0}'".format(key))
-        update_latest(keypath, key)
+        set_resource(key, keypath, obj_type, syntax, integrity, topology)
         return resource['result']
 
     validator = Validator()
@@ -319,7 +320,6 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
     # todo: missing topology and fwgraphs
     set_resource(key, keypath, obj_type, syntax, integrity, topology,
                  result=json_result, net_topology=net_topology)
-    update_latest(keypath, key)
 
     return json_result
 
@@ -502,6 +502,11 @@ def gen_report_net_topology(validator):
                 continue
             graph_repr += line
         report.append(graph_repr)
+
+    # TODO: temp patch for returning only the topology of the first service
+    if len(report) > 0:
+        report = report[0]
+        return report
 
     return json.dumps(report)
 
