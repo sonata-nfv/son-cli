@@ -68,7 +68,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from base64 import b64encode
 from base64 import b64decode
 from Crypto.PublicKey import RSA
-from Crypto.Hash import SHA
+from Crypto.Hash import SHA256
 from son.workspace.workspace import Workspace
 from son.access.helpers.helpers import json_response
 from son.access.models.models import User
@@ -454,7 +454,7 @@ class AccessClient:
 
     def sign_package(self, path, private_key=None):
         """
-        Sign package feature using SHA1 hash and RSA keypair
+        Sign package feature using SHA256 hash and RSA keypair
         :param path: location of the package to submit
         :param private_key: optional private_key used in signature (default None)
         :return: string containing an int representation of the package's signature
@@ -470,7 +470,7 @@ class AccessClient:
         except IOError as err:
             print("I/O error: {0}".format(err))
         # File read as binary, it's not necessary to encode 'utf-8' to hash
-        package_hash = SHA.new(package_content).digest()
+        package_hash = SHA256.new(package_content).digest()
         # Signature is a tuple containing an integer as first entry
         signature = private_key_obj.sign(package_hash, '')
         return str(signature[0])
