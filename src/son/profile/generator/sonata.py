@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Neither the name of the SONATA-NFV, UBIWHERE
+# Neither the name of the SONATA-NFV, Paderborn University, UBIWHERE
 # nor the names of its contributors may be used to endorse or promote
 # products derived from this software without specific prior written
 # permission.
@@ -73,6 +73,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         generated_service_objs.update(self._generate_service_experiments(
             base_service_obj, service_experiments))
         # pack all generated services and write them to disk
+        LOG.info("Starting to pack {} service configurations ...".format(len(generated_service_objs)))
         return self._pack(working_path, generated_service_objs)
 
     def _extract(self, input_reference, working_path):
@@ -118,6 +119,64 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
             n.metadata["run_id"]
         ))
         return n
+
+    def _embed_function_into_experiment_nsd(
+            self, service, ec,
+            template="template/sonata_nsd_function_experiment.yml"):
+        """
+        Generates a NSD that contains the single VNF of the given
+        function experiment and embeds the specified function into it.
+        The new NSD overwrites the existing NSD in service.
+        This unifies the follow up procedures for measurement point
+        inclusion etc.
+        The NSD template for this can be found in the template/ folder.
+        """
+        template_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), template)
+        new_nsd = read_yaml(template_path)
+        # 1. update VNF section
+        old_vnf_dict = None
+        for vnf in service.nsd.get("network_functions"):
+            if str(vnf.get("vnf_name")) in ec.experiment.function:
+                old_vnf_dict = vnf
+        if old_vnf_dict is None:
+            LOG.error("Couldn't find function '{}' in service '{}'".format(
+                ec.experiment.function,
+                service
+            ))
+        new_vnf_dict = new_nsd.get("network_functions")[0]
+        new_vnf_dict.update(old_vnf_dict)
+        LOG.debug("Updated VNF section in '{}': {}".format(service, new_vnf_dict))
+        # 1.5 remove obsolete VNFDs
+        old_list = service.vnfd_list.copy()
+        service.vnfd_list = list()
+        for vnfd in old_list:
+            if vnfd.get("name") == new_vnf_dict.get("vnf_name"):
+                service.vnfd_list.append(vnfd)
+        LOG.debug("Updated VNFD list in '{}': {}".format(service, service.vnfd_list))
+        # 2. update virtual link section (get first three CPs from VNFD)
+        # TODO remove order assumptions (current version is more a HACK!)
+        vnfd = service.get_vnfd_by_uid(ec.experiment.function)
+        new_link_list = new_nsd.get("virtual_links")
+        cp_ids = [cp.get("id") for cp in vnfd.get("connection_points")]
+        for i in range(0, min(len(new_link_list), len(cp_ids))):
+            cpr = new_link_list[i]["connection_points_reference"]
+            for j in range(0, len(cpr)):
+                if "test_vnf" in cpr[j]:
+                    cpr[j] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
+        LOG.debug("Updated VLink section in '{}': {}".format(service, new_link_list))
+        # 3. update forwarding path section
+        # TODO remove order assumptions (current version is more a HACK!)
+        for fg in new_nsd.get("forwarding_graphs"):
+            fg.get("constituent_vnfs")[0] = new_vnf_dict.get("vnf_id")
+            for nfp in fg.get("network_forwarding_paths"):
+                nfp_cp_list = nfp.get("connection_points")
+                for i in range(1, min(len(nfp_cp_list), len(cp_ids))):
+                    if "test_vnf" in nfp_cp_list[i].get("connection_point_ref"):
+                        nfp_cp_list[i]["connection_point_ref"] = "{}:{}".format(new_vnf_dict.get("vnf_id"), cp_ids[i])
+        LOG.debug("Updated forwarding graph section in '{}': {}".format(service, new_nsd.get("forwarding_graphs")))      
+        # 4. replace NSD
+        service.nsd = new_nsd
 
     def _add_measurement_points(self, service, ec):
         """
@@ -210,13 +269,20 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         LOG.debug("Applied resource limitations to service '{}'".format(service))
 
     def _generate_function_experiments(self, base_service_obj, experiments):
+        """
+        Generate function experiments according to given experiment descriptions.
+        Generated experiments are based on the given network service.
+        A single function is extracted and embedded into a test service descriptor
+        to test the function in isolation.
+        return: dict<run_id, service_obj>
+        """
         r = dict()
         for e in experiments:
             for ec in e.experiment_configurations:
                 # generate new service obj from base_service_obj
                 ns = self._generate_from_base_service(base_service_obj, ec)
                 # embed function experiment into a test service
-                # TODO (folder template, add nsd with "placeholder")
+                self._embed_function_into_experiment_nsd(ns, ec)
                 # replace original nsd with test nsd
                 # add measurement points to service
                 self._add_measurement_points(ns, ec)
@@ -224,10 +290,18 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
-                # TODO INFO message
+                # INFO message
+                LOG.info(
+                    "Generated function experiment '{}': '{}' with run ID: {}".format(
+                        e.name, ns, ec.run_id))
         return r
 
     def _generate_service_experiments(self, base_service_obj, experiments):
+        """
+        Generate service experiments according to given experiment descriptions.
+        Generated experiments are based on the given network service.
+        return: dict<run_id, service_obj>
+        """
         r = dict()
         for e in experiments:
             for ec in e.experiment_configurations:
@@ -239,16 +313,19 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                 self._apply_resource_limitations(ns, ec)
                 # add service to result data structure
                 r[ec.run_id] = ns
-                # TODO INFO message
+                # INFO message
+                LOG.info(
+                    "Generated service experiment '{}': '{}' with run ID: {}".format(
+                        e.name, ns, ec.run_id))
         return r
 
-    def _pack(self, output_path, service_objs):
+    def _pack(self, output_path, service_objs, workspace_dir=Workspace.DEFAULT_WORKSPACE_DIR):
         """
         return: dict<run_id: package_path>
         """
         r = dict()
         for i, s in service_objs.items():
-            r[i] = s.pack(output_path, self.args.verbose)
+            r[i] = s.pack(output_path, self.args.verbose, workspace_dir=workspace_dir)
             self.generated_services[i] = s  # keep a pointer for statistics output
         LOG.info("Generated {} service packages in '{}'".format(len(r), output_path))
         return r
@@ -298,6 +375,11 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
 
 
 class SonataService(object):
+    """
+    Represents a SONATA network service project.
+    Contains NSD and multiple VNFDs and offers methods to store
+    the network service project and to package it.
+    """
 
     def __init__(self, manifest, nsd, vnfd_list, metadata):
         self.manifest = manifest
@@ -393,6 +475,11 @@ class SonataService(object):
         return copy.deepcopy(self)
 
     def _write(self, output_path):
+        """
+        Write this SONATA service project structure to disk. This includes
+        all descriptors etc. The generated files can be used as input to
+        the SONATA packaging tool.
+        """
         path = os.path.join(output_path, SON_GEN_SERVICES, self.pkg_name)
         # update package path to reflect new location
         self.metadata["project_disk_path"] = path
@@ -413,7 +500,7 @@ class SonataService(object):
         LOG.debug("Wrote: {} to {}".format(self, path))
         return path
     
-    def pack(self, output_path, verbose=False):
+    def pack(self, output_path, verbose=False, workspace_dir=Workspace.DEFAULT_WORKSPACE_DIR):
         """
         Creates a *.son file of this service object.
         First writes the normal project structure to disk (to be used with packaging tool)
@@ -427,9 +514,9 @@ class SonataService(object):
         ensure_dir(output_path)
         # obtain workspace
         # TODO have workspace dir as command line argument
-        workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
+        workspace = Workspace.__create_from_descriptor__(workspace_dir)
         if workspace is None:
-            LOG.error("Couldn't initialize workspace: %r. Abort." % Workspace.DEFAULT_WORKSPACE_DIR)
+            LOG.error("Couldn't initialize workspace: %r. Abort." % workspace_dir)
             exit(1)
         # force verbosity of external tools if required
         workspace.log_level = "DEBUG" if verbose else "INFO"

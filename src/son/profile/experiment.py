@@ -40,7 +40,9 @@ class Experiment(object):
         self.__dict__.update(definition)
         # attributes
         self.experiment_configurations = list()
+        # backward compatibility imec mode
         self.command_space_list = list()
+        self.configuration_space_list = list()
         self.vnforder_list = list()
         self.overload_vnf_list = list()
 
@@ -79,7 +81,8 @@ class Experiment(object):
         configuration_dict.update(self._get_mp_space_as_dict())
         LOG.debug("configuration space:{0}".format(configuration_dict))
         # explore entire parameter space by calculating the Cartesian product over the given dict
-        configuration_space_list = compute_cartesian_product(configuration_dict)
+        configuration_space_list = compute_cartesian_product(configuration_dict)  # imec backward compatibility
+        self.configuration_space_list = configuration_space_list
         # create a experiment configuration objects for each calculated configuration to test
         for c in configuration_space_list:
             rc = ExperimentConfiguration(self, c)
