@@ -104,8 +104,8 @@ def load_watch_dirs(workspace):
         install_watcher(watch_path, watch['type'], watch['syntax'],
                         watch['integrity'], watch['topology'])
 
-        _validate_object(watch_path, watch['type'], watch['syntax'],
-                         watch['topology'], watch['integrity'])
+        _validate_object(watch_path, watch_path, watch['type'],
+                         watch['syntax'], watch['topology'], watch['integrity'])
 
 
 def set_watch(path, obj_type, syntax, integrity, topology):
@@ -135,6 +135,8 @@ def get_watch(path):
 def set_artifact(artifact_path):
     log.debug("Caching artifact '{0}'".format(artifact_path))
     artifacts = cache.get('artifacts')
+    if not artifacts:
+        return
     artifacts.append(artifact_path)
     cache.set('artifacts', artifacts)
 
@@ -155,6 +157,7 @@ def update_latest(path, key):
     cache.set('latest', latest)
 
     print(cache.get('latest'))
+
 
 def set_resource(key, path, obj_type, syntax, integrity, topology,
                  result=None, net_topology=None, net_fwgraph=None):
@@ -224,7 +227,7 @@ def _validate_object_from_watch(path):
 
     watch = get_watch(path)
     log.debug("Validating {0} from watch: {1}".format(watch['type'], path))
-    result = _validate_object(path, watch['type'], watch['syntax'],
+    result = _validate_object(path, path, watch['type'], watch['syntax'],
                               watch['integrity'], watch['topology'])
 
     # re-schedule watcher
@@ -251,7 +254,10 @@ def _validate_object_from_request(object_type):
     topology = eval(request.form['topology']) \
         if 'topology' in request.form else False
 
-    return _validate_object(path, object_type, syntax, integrity, topology)
+    keypath = request.form['path']
+
+    return _validate_object(keypath, path, object_type,
+                            syntax, integrity, topology)
 
 
 def validate_parameters(obj_type, syntax, integrity, topology):
@@ -263,7 +269,7 @@ def validate_parameters(obj_type, syntax, integrity, topology):
                "topology of a standalone service"
 
 
-def _validate_object(path, obj_type, syntax, integrity, topology):
+def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
     # protect against incorrect parameters
     perrors = validate_parameters(obj_type, syntax, integrity, topology)
     if perrors:
@@ -279,7 +285,7 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
                     resource['integrity'] == integrity and \
                     resource['topology'] == topology:
         log.info("Returning cached result for '{0}'".format(key))
-        update_latest(path, key)
+        update_latest(keypath, key)
         return resource['result']
 
     validator = Validator()
@@ -293,9 +299,9 @@ def _validate_object(path, obj_type, syntax, integrity, topology):
     json_result = gen_report_result(key, validator)
     net_topology = gen_report_net_topology(validator)
     # todo: missing topology and fwgraphs
-    set_resource(key, path, obj_type, syntax, integrity, topology,
+    set_resource(key, keypath, obj_type, syntax, integrity, topology,
                  result=json_result, net_topology=net_topology)
-    update_latest(path, key)
+    update_latest(keypath, key)
 
     return json_result
 
@@ -316,13 +322,13 @@ def root():
 @app.route('/flush/resources', methods=['POST'])
 def flush_resources():
     cache.set('resources', dict())
-    return '', 200
+    return 'ok', 200
 
 
 @app.route('/flush/artifacts', methods=['POST'])
 def flush_artifacts():
     cache.set('artifacts', list())
-    return '', 200
+    return 'ok', 200
 
 
 @app.route('/validate/project', methods=['POST'])
