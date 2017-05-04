@@ -102,11 +102,11 @@ optional arguments:
 ```
 Please notice that specified arguments will override environement variables, if defined.
 
-### Run in stateless mode
+#### Run in stateless mode
 To execute son-validate as a local service simply run:
 `son-validate-api --mode stateless`
 
-### Run in local mode
+#### Run in local mode
 To execute son-validate as a local service simply run:
 `son-validate-api --mode local`
 
