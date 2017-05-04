@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 app.config.from_pyfile('settings.py')
-cache = Cache(app, config={'CACHE_TYPE': 'redis'})
+cache = Cache(app, config={'CACHE_TYPE': 'redis',
+                           'CACHE_DEFAULT_TIMEOUT': 0})
 
 # keep temporary request errors
 req_errors = []
@@ -218,21 +219,24 @@ def process_request():
     source = request.form['source']
 
     if source == 'local' and 'path' in request.form:
+        keypath = request.form['path']
         path = get_local(request.form['path'])
         if not path:
             return
 
     elif source == 'url' and 'path' in request.form:
+        keypath = request.form['path']
         path = get_url(request.form['path'])
 
     elif source == 'embedded' and 'file' in request.files:
+        keypath = secure_filename(request.files['file'].filename)
         path = get_file(request.files['file'])
 
     else:
         req_errors.append('Invalid source, path or file parameters')
         return
 
-    return path
+    return keypath, path
 
 
 def _validate_object_from_watch(path):
@@ -258,8 +262,8 @@ def _validate_object_from_request(object_type):
     assert object_type == 'project' or object_type == 'package' or \
            object_type == 'service' or object_type == 'function'
 
-    path = process_request()
-    if not path:
+    keypath, path = process_request()
+    if not keypath or not path:
         return render_errors(), 400
 
     syntax = eval(request.form['syntax']) \
@@ -268,8 +272,6 @@ def _validate_object_from_request(object_type):
         if 'integrity' in request.form else False
     topology = eval(request.form['topology']) \
         if 'topology' in request.form else False
-
-    keypath = request.form['path']
 
     return _validate_object(keypath, path, object_type,
                             syntax, integrity, topology)
@@ -415,7 +417,7 @@ def gen_watches():
     report = dict()
     watches = cache.get('watches')
     if not watches:
-        return ''
+        return '', 204
     for path, watch in watches.items():
         report[path] = dict()
         report[path]['type'] = watch['type']
@@ -433,7 +435,7 @@ def gen_resources():
     report = dict()
     resources = cache.get('resources')
     if not resources:
-        return ''
+        return '', 204
 
     for resource_id, resource in resources.items():
         report[resource_id] = dict()
@@ -455,7 +457,7 @@ def gen_report():
     latest = cache.get('latest')
 
     if not resources or not latest:
-        return ''
+        return '', 204
 
     for path, key in latest.items():
         resource = resources[key]
