@@ -220,8 +220,7 @@ class Push(object):
                     headers = {}
                 if signature:
                     # Including signature header in case it's passed as param
-                    if signature:
-                         headers['signature'] = signature
+                    headers['signature'] = signature
                 r = requests.post(url, headers=headers, files=payload)
                 if r.status_code == 201:
                     msg = "Upload succeeded"
