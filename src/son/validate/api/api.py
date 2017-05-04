@@ -591,9 +591,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=['service', 'local'],
-        default='service',
-        help="Specify the mode of operation. 'service' mode will run as "
+        choices=['stateless', 'local'],
+        default='stateless',
+        help="Specify the mode of operation. 'stateless' mode will run as "
              "a stateless service only. 'local' mode will run as a "
              "service and will also provide automatic monitoring and "
              "validation of local SDK projects, services, etc. that are "
