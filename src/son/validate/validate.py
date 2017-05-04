@@ -1078,7 +1078,7 @@ def main():
         validator.configure(syntax=args.syntax,
                             integrity=args.integrity,
                             topology=args.topology,
-                            debug=args.debug)
+                            debug=args.debug if args.debug else None)
 
         result = validator.validate_package(args.package_file)
         print_result(validator, result)
