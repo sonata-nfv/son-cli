@@ -30,6 +30,7 @@ import tempfile
 from son.profile.helper import compute_cartesian_product
 from son.profile.profile import ProfileManager, parse_args
 from son.profile.generator.sonata import SonataServiceConfigurationGenerator
+from son.workspace.workspace import Workspace
 
 
 # get path to our test files
@@ -107,6 +108,16 @@ class UnitProfileTests(unittest.TestCase):
 
 
 class UnitSonataGeneratorTests(unittest.TestCase):
+
+    def setUp(self):
+        """
+        Creates a fresh test workspace in a temp dir to ensure
+        we do not have conflicts with other CLI tests.
+        """
+        self.tmp_ws_dir = os.path.join(tempfile.mkdtemp(), "son-workspace")
+        ws = Workspace(self.tmp_ws_dir, ws_name="son-profile test workspace")
+        ws.create_dirs()
+        ws.create_files()
 
     def test_load_and_extract(self):
         """
@@ -289,7 +300,7 @@ class UnitSonataGeneratorTests(unittest.TestCase):
         gen.update(sg._generate_function_experiments(base_service, fes))
         gen.update(sg._generate_service_experiments(base_service, ses))
         # do packaging
-        res = sg._pack(TEST_WORK_DIR, gen)
+        res = sg._pack(TEST_WORK_DIR, gen, workspace_dir=self.tmp_ws_dir)
         # test if *.son files are generated
         for k, v in res.items():
             self.assertTrue(os.path.exists(v), msg="No generated package found.")

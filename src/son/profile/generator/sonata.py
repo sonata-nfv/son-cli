@@ -319,13 +319,13 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
                         e.name, ns, ec.run_id))
         return r
 
-    def _pack(self, output_path, service_objs):
+    def _pack(self, output_path, service_objs, workspace_dir=Workspace.DEFAULT_WORKSPACE_DIR):
         """
         return: dict<run_id: package_path>
         """
         r = dict()
         for i, s in service_objs.items():
-            r[i] = s.pack(output_path, self.args.verbose)
+            r[i] = s.pack(output_path, self.args.verbose, workspace_dir=workspace_dir)
             self.generated_services[i] = s  # keep a pointer for statistics output
         LOG.info("Generated {} service packages in '{}'".format(len(r), output_path))
         return r
@@ -500,7 +500,7 @@ class SonataService(object):
         LOG.debug("Wrote: {} to {}".format(self, path))
         return path
     
-    def pack(self, output_path, verbose=False):
+    def pack(self, output_path, verbose=False, workspace_dir=Workspace.DEFAULT_WORKSPACE_DIR):
         """
         Creates a *.son file of this service object.
         First writes the normal project structure to disk (to be used with packaging tool)
@@ -514,9 +514,9 @@ class SonataService(object):
         ensure_dir(output_path)
         # obtain workspace
         # TODO have workspace dir as command line argument
-        workspace = Workspace.__create_from_descriptor__(Workspace.DEFAULT_WORKSPACE_DIR)
+        workspace = Workspace.__create_from_descriptor__(workspace_dir)
         if workspace is None:
-            LOG.error("Couldn't initialize workspace: %r. Abort." % Workspace.DEFAULT_WORKSPACE_DIR)
+            LOG.error("Couldn't initialize workspace: %r. Abort." % workspace_dir)
             exit(1)
         # force verbosity of external tools if required
         workspace.log_level = "DEBUG" if verbose else "INFO"
