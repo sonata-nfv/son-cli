@@ -76,12 +76,23 @@ def push_tests():
 
 
 def generate_keypair():
+    import requests
+    import json
     from Crypto.PublicKey import RSA
     algorithm = 'RS256'
 
     key = RSA.generate(2048)
     public = key.publickey().exportKey('PEM').decode('ascii')
     private = key.exportKey('PEM').decode('ascii')
+
+    #simple_public = key.publickey().exportKey().splitlines()[1:-1]
+    simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
+    print('simple_public1=', simple_public)
+    simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
+
+    print('simple_public2=', simple_public)
+    #simple_public = (b'\n'.join(simple_public))
+    #print('simple_public2=', simple_public)
 
     print("public=", public)
     print("private=", private)
@@ -90,6 +101,16 @@ def generate_keypair():
             pr_file.write(private)
     with open("public_key", mode="w") as pb_file:
             pb_file.write(public)
+
+    # TODO: Save Public Key in Service Platform User Management database
+    url = "http://127.0.0.1:5001/api/v2/signature"
+    # headers =
+    body = json.dumps({'public_key': simple_public})
+    print("body=", body)
+
+    r = requests.put(url, headers={'Content-type': 'application/json'}, data=body)
+    if r.status_code == 201:
+        msg = "Upload succeeded"
 
 def user_login(username, password):
     import requests
@@ -153,7 +174,7 @@ def check_token(key, access_token):
 
 
 # generate_keypair()
-# token = user_login('user01', '1234')
+# token = user_login('user04', '1234')
 # print(token)
 # key = get_platform_public_key()
 # check_token(key, token)

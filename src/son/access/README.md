@@ -12,7 +12,14 @@ Dependencies:
 
 ## Configuration
 
-The configuration of son-access is kept in the developer workspace under the section 'service_platforms'. It is possible to configure access parameters to multiple Service Platforms using different credentials. This configuration section keeps the following parameters:
+The required configuration for son-access is found in the son-workspace generated configuration file, under the section 'service_platforms'. It is possible to configure access parameters to multiple Service Platforms using different credentials. This configuration section keeps the following parameters:
+```sh
+service_platforms:
+  sp1:
+    url: http://sp.int3.sonata-nfv.eu:32001
+    credentials: {password: '1234', token_file: token.txt, username: user01}
+    signature: {cert: null, prv_key: prv_key.pem, pub_key: pub_key.pem}
+```
 
 ```sh
 url = 'URL address to the platform'
@@ -20,10 +27,21 @@ url = 'URL address to the platform'
 This setting must contain the protocol, address and port number of the platform, e.g.: 'http://sp.int3.sonata-nfv.eu:30021'
 
 ```sh
+username = "user01" (optional)
+password = "1234" (optional)
 token_file = "token.txt"
 ```
-This setting stores the file name of the token. Token files are stored in the workspace folder 'platforms_dir'.
+This setting stores the user's credentials and the temporary file name of the access token.
+User's credentials are optional allowing users to type them when signing in to the Platform, or let son-access to automatically read the them from the configuration file.
+Token files are stored in the workspace folder 'platforms_dir'.
 
+```sh
+pub_key = "pub_key.pem" (optional)
+prv_key = "prv_key.pem" (optional)
+cert = "trust.crt" (optional)
+```
+This signature settings indicates the files names for the users public key, private key and certificate. These files are optional, as in case of signing needs, son-access will generate a private and public key for the user.
+Generated public and private keys will be stored in the users workspace directory, and the public key will be sent to the Platform User Management module.
 
 ## Usage
 ```sh
@@ -50,7 +68,7 @@ optional arguments:
   -p PLATFORM_ID, --platform PLATFORM_ID
                         Specify the ID of the Service Platform to use from
                         workspace configuration. If not specified will assume
-                        the IDin 'default_service_platform'
+                        the ID in 'default_service_platform'
   --debug               Set logging level to debug
 ```
 
@@ -85,16 +103,18 @@ optional arguments:
 
 ### Submit packages - `push`
 ```sh
-usage: son-access [..] push [-h] (--upload PACKAGE_PATH | --deploy SERVICE_ID)
+usage: son-access [..] push [-h] (--upload PACKAGE_PATH [--sign] | --deploy SERVICE_ID)
 
 Submit a son-package to the SP or deploy a service in the SP
 
 positional arguments:
-  --upload PACKAGE_PATH Specify package path to submit
-  --deploy SERVICE_ID   Specify service identifier to instantiate
+  --upload PACKAGE_PATH        Specify package path to submit
+  --upload PACKAGE_PATH --sign Specify package path to sign and submit
+  --deploy SERVICE_ID          Specify service identifier to instantiate
 
 optional arguments:
   -h, --help  show this help message and exit
+  --sign      Indicates if the package will be signed with user's private key
 ```
 
 ### Request resources - `pull`
@@ -133,7 +153,7 @@ optional arguments:
                         Configure username
   -p PASSWORD, --password PASSWORD
                         Configure password
-  --token TOKEN_FILE    Configure token filename
+  --token TOKEN_FILE    Configure token filename (deprecated)
   --default             Set Service Platform as default
 ```
 
@@ -143,6 +163,7 @@ Example on how to configure a new platform, authenticate a user, submit a packag
     son-access auth -u tester -p 1234
     son-access list services
     son-access push --upload samples/sonata-demo.son
+    son-access push --upload samples/sonata-demo.son --sign
     son-access -p sp1 push --upload samples/sonata-demo.son
     son-access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
     son-access pull services --id sonata.eu firewall-vnf 1.0
