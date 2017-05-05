@@ -27,7 +27,6 @@
 import logging
 from son.profile.macro import rewrite_parameter_macros_to_lists
 from son.profile.helper import compute_cartesian_product
-from son.profile.sonpkg import SonataServicePackage
 import operator
 from collections import OrderedDict
 
@@ -40,16 +39,12 @@ class Experiment(object):
         # populate object from YAML definition
         self.__dict__.update(definition)
         # attributes
-        self.run_configurations = list()
-        self.generated_services = list()
+        self.experiment_configurations = list()
+        # backward compatibility imec mode
         self.command_space_list = list()
+        self.configuration_space_list = list()
         self.vnforder_list = list()
-        self.resource_space_list = list()
-        self.configuration_space_dict = dict()
         self.overload_vnf_list = list()
-
-    def get(self, key, default=None):
-        return self.__dict__.get(key, default)
 
     def populate(self):
         """
@@ -58,59 +53,44 @@ class Experiment(object):
         to be tested.
         """
         # convert parameter macros from PED file to plain lists
-        for rl in self.get('resource_limitations', []):
+        for rl in self.resource_limitations:
             rewrite_parameter_macros_to_lists(rl)
         # convert measurment points from PED file to plain lists
-        for mp in self.get('measurement_points', []):
+        for mp in self.measurement_points:
             rewrite_parameter_macros_to_lists(mp)
 
-        # check for vnfs that need overload detection
+        ######## imec
+        # (dedicated to iMEC use case (ugly that we compute it twice, but I don't want to break things))
+        # check for vnfs that need overload detection (imec mode)
         if hasattr(self, 'overload_detection') :
             for vnf_name in self.overload_detection:
                 self.overload_vnf_list.append(vnf_name)
-
-        # get the configuration that needs to be executed in the vnf before the test run.
-        self.configuration_space_dict = self._get_configuration_space_as_dict()
-        #LOG.info("configuration space:{0}".format(self.command_space_list))
-
         # aggregate all commands to be used in the experiment to a flat dict for further processing
         command_dict, self.vnforder_list = self._get_command_space_as_dict()
         # explore entire command space by calculating the Cartesian product over the given dict
         self.command_space_list = compute_cartesian_product(command_dict)
-        #LOG.info("command space:{0}".format(self.command_space_list))
+        #LOG.info("command space:{0}".format(command_dict))
 
-        # aggregate all parameters to used in the experiment to a flat dict for further processing
-        resource_dict = self._get_resource_space_as_dict()
-        # print(parameter_dict)
+        ######## UPB
+        # generate a single flat dict containing all the parameter study lists defined in the PED
+        # this includes: header parameters (repetitions), measurement point commands (all), and
+        # function resource limitations
+        configuration_dict = dict()
+        configuration_dict.update(self._get_experiment_header_space_as_dict())
+        configuration_dict.update(self._get_function_resource_space_as_dict())
+        configuration_dict.update(self._get_mp_space_as_dict())
+        LOG.debug("configuration space:{0}".format(configuration_dict))
         # explore entire parameter space by calculating the Cartesian product over the given dict
-        self.resource_space_list = compute_cartesian_product(resource_dict)
+        configuration_space_list = compute_cartesian_product(configuration_dict)  # imec backward compatibility
+        self.configuration_space_list = configuration_space_list
+        # create a experiment configuration objects for each calculated configuration to test
+        for c in configuration_space_list:
+            rc = ExperimentConfiguration(self, c)
+            self.experiment_configurations.append(rc)
+        LOG.info("Populated experiment specification: {} with {} configurations to be executed.".format(
+            self.name,
+            len(self.experiment_configurations)))
 
-
-        # create a run configuration object for each calculated configuration to test
-        for i in range(0, len(self.resource_space_list)):
-            self.run_configurations.append(RunConfiguration(i, self.resource_space_list[i]))
-        LOG.info("Populated experiment specifications: %r with %d configurations to test." % (self.name, len(self.run_configurations)))
-
-    def _get_configuration_space_as_dict(self):
-        """
-        Create a dict that lists all commands that need to be executed per VNF
-        :return: dict
-        {"vnf_name1": [cmd1, cmd2, ...],
-         "vnf_nameN": [cmd, ...],
-        }
-        """
-        m = dict()
-        for mp in self.get('measurement_points', []):
-            vnf_name = mp.get("name")
-            vnf_cmds = mp.get("configuration")
-            # check if not empty
-            if not vnf_cmds:
-                return m
-            # make sure the cmds are in a list
-            if not isinstance(vnf_cmds, list):
-                vnf_cmds = [vnf_cmds]
-            m[vnf_name] = vnf_cmds
-        return m
 
     def _get_command_space_as_dict(self):
         """
@@ -123,13 +103,13 @@ class Experiment(object):
         cmds = dict()
         vnf_name2order = dict()
         vnforder_list = []
-        for mp in self.get('measurement_points', []):
+        for mp in self.measurement_points:
             vnf_name = mp.get("name")
             vnf_cmds = mp.get("cmd")
             cmd_order = mp.get("cmd_order")
             # check if not empty
             if not vnf_cmds:
-                continue
+                return (cmds, vnforder_list)
             # make sure the cmds are in a list
             if not isinstance(vnf_cmds, list):
                 vnf_cmds = [vnf_cmds]
@@ -145,119 +125,85 @@ class Experiment(object):
 
         return (cmds, vnforder_list)
 
-    def _get_resource_space_as_dict(self):
+    def _get_experiment_header_space_as_dict(self):
+        """
+        {"repetition" : [0, 1, ...]}
+        """
+        r = dict()
+        r["repetition"] = list(range(0, self.repetitions))
+        return r
+
+    def _get_function_resource_space_as_dict(self):
         """
         Create a flat dictionary with configuration lists to be tested for each configuration parameter.
         Output: dict
-        {"function1:parameter1" : [0.1, 0.2, ...],
-         "functionN:parameterN" : [0.1, ...],
-         "function1:parameter1" : [0.1],
-         "functionN:parameterN" : [0.1, 0.2, ...],
-         "repetition" : [1, 2, 3]}
+        {"resource_limitation:funname1:parameter1" : [0.1, 0.2, ...],
+         "resource_limitation:funname1:parameterN" : [0.1, ...],
+         "resource_limitation:funname2:parameter1" : [0.1],
+         "resource_limitation:funname2:parameterN" : [0.1, 0.2, ...],
+        ... }
         """
         r = dict()
-        for rl in self.get('resource_limitations', []):
+        for rl in self.resource_limitations:
             name = rl.get("function")
             for k, v in rl.items():
                 if k == "function":
                     continue
                 if not isinstance(v, list):
                     v = [v]
-                r["%s:%s" % (name, k)] = v
-        # add additional parameters (unrolled as lists!)
-        r["repetition"] = list(range(0, self.repetitions))
+                r["resource_limitation:%s:%s" % (name, k)] = v
         return r
 
-    def generate_sonata_services(self, son_pkg_input):
+    def _get_mp_space_as_dict(self):
         """
-        Create a SONATA service for each configuration to be tested.
-        :param son_pkg_input: base service to be used
-        :return: list of services
+        Create a flat dictionary with configuration lists to be tested for each configuration parameter.
+        Output: dict
+        {"measurement_point:mpname1:parameter1" : [0.1, 0.2, ...],
+         "measurement_point:mpname1:parameterN" : [0.1, ...],
+         "measurement_point:mpname2:parameter1" : [0.1],
+         "measurement_point:mpname2:parameterN" : [0.1, 0.2, ...],
+         ...}
         """
-        services = list()
-        for r in self.run_configurations:
-            s = son_pkg_input.copy()
-            s.annotate(self.name, r)
-            self.modify_nsd(s, r)
-            self.modify_vnfds(s, r)
-            services.append(s)
-        self.generated_services += services
-        return services
-
-    def modify_nsd(self, service, run_cfg):
-        """
-        Abstract: Needs to be overwritten.
-        :param service: service to be modified
-        :param run_cfg: run configuration to be applied
-        :return:
-        """
-        pass
-
-    def modify_vnfds(self, service, run_cfg):
-        """
-        TODO
-        :param service: the service with the VNFDs to be modified
-        :param run_cfg: the specific configuration to be applied
-        :return:
-        """
-        def get_cfg_by_fun(fun_id):
-            """
-            Hepler to get config for a specific function.
-            """
-            r = dict()
-            for k, v in run_cfg.configuration.items():
-                kk = k.split(":")
-                if kk[0] == fun_id:
-                    r[kk[1]] = v
-            return r
-
-        for vnfd in service.vnfd_list:
-            cfg = get_cfg_by_fun(service.get_id(vnfd))
-            if len(cfg) > 0:
-                # apply the resource limitations to the VNFD
-                self.apply_resourcelimits_to_vnfd(vnfd, cfg)
-
-    def apply_resourcelimits_to_vnfd(self, vnfd, cfg):
-        pass
+        r = dict()
+        for rl in self.measurement_points:
+            name = rl.get("name")
+            for k, v in rl.items():
+                if k == "name" or k == "connection_point":  # skip some fields
+                    continue
+                if not isinstance(v, list):
+                    v = [v]
+                r["measurement_point:%s:%s" % (name, k)] = v
+        return r
 
 
 class ServiceExperiment(Experiment):
 
     def __init__(self, definition):
         super().__init__(definition)
-        LOG.debug("Created service experiment: %r" % self.name)
-
-    def modify_nsd(self, service, run_cfg):
-        """
-        Add measurement point (MP) VNFs to service graph of original NSD.
-        :param service: service to be modified
-        :param run_cfg: run configuration to be applied
-        :return:
-        """
-        # TODO: implement
-        pass
+        LOG.debug("Created service experiment specification %r" % self.name)
 
 
 class FunctionExperiment(Experiment):
 
     def __init__(self, definition):
         super().__init__(definition)
-        LOG.debug("Created function experiment: %r" % self.name)
-
-    def modify_nsd(self, service, run_cfg):
-        """
-        Create a new NSD which is dedicated to test a single VNF and add measurement point (MP) VNFs to service graph.
-        :param service: service to be modified
-        :param run_cfg: run configuration to be applied
-        :return:
-        """
-        # TODO: implement
-        pass
+        LOG.debug("Created function experiment specification: %r" % self.name)
 
 
-class RunConfiguration(object):
+class ExperimentConfiguration(object):
+    """
+    Holds the configuration parameters for a single experiment run.
+    """
+    # have globally unique run_ids for simplicity
+    RUN_ID = 0
 
-    def __init__(self, run_id, configuration):
-        self.run_id = run_id
-        # TODO translate this to dict with simpler keys?
-        self.configuration = configuration
+    def __init__(self, experiment, p):
+        self.run_id = ExperimentConfiguration.RUN_ID
+        ExperimentConfiguration.RUN_ID += 1
+        self.name = experiment.name
+        self.experiment = experiment  # have backward point to ease navigation in generators
+        self.parameter = p
+        LOG.debug("Created: {}".format(self))
+
+    def __repr__(self):
+        return "ExperimentConfiguration({}_{})".format(self.name, self.run_id)

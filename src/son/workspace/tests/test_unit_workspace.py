@@ -44,8 +44,8 @@ class CreateWorkspaceTests(unittest.TestCase):
                        log_level='log_level')
 
         # Verify its properties
-        self.assertEqual(ws.ws_root, "workspace/root/dir")
-        self.assertEqual(ws.ws_name, "workspace_name")
+        self.assertEqual(ws.workspace_root, "workspace/root/dir")
+        self.assertEqual(ws.workspace_name, "workspace_name")
         self.assertEqual(ws.log_level, "log_level")
 
     @patch('os.makedirs')
@@ -98,7 +98,7 @@ class CreateWorkspaceTests(unittest.TestCase):
 
         # Create an invalid config descriptor for workspace
         conf_d = {
-            'version': Workspace.WORKSPACE_VERSION,
+            'version': Workspace.CONFIG_VERSION,
             'service_platforms':
                 {'sp1': {'url': 'http://sp.int3.sonata-nfv.eu:32001',
                          'credentials:':
@@ -112,7 +112,9 @@ class CreateWorkspaceTests(unittest.TestCase):
                                      'sonata-nfv/son-schema/master/',
             'platforms_dir': 'platforms',
             'catalogues_dir': 'catalogues',
-            'configuration_dir': 'configuration'
+            'configuration_dir': 'configuration',
+            'projects_dir': 'projects',
+            'validate_watch': '~/.son-workspace/projects'
         }
 
         # Feed this descriptor as a config file
@@ -157,10 +159,11 @@ class CreateWorkspaceTests(unittest.TestCase):
         m_yaml.dump.return_value = None
 
         # Call function
-        cfg_d = ws.create_ws_descriptor()
+        cfg_d = ws.write_ws_descriptor()
 
         # Assure that config file would be writen with the correct location
-        configfile = os.path.join(ws.ws_root, Workspace.__descriptor_name__)
+        configfile = os.path.join(ws.workspace_root,
+                                  Workspace.__descriptor_name__)
         self.assertEqual(m_open.call_args, mock.call(configfile, 'w'))
 
         # Make sure the workspace root dir and
@@ -172,7 +175,7 @@ class CreateWorkspaceTests(unittest.TestCase):
         m_yaml.load.return_value = cfg_d
 
         # Call function
-        new_ws = Workspace.__create_from_descriptor__(ws.ws_root)
+        new_ws = Workspace.__create_from_descriptor__(ws.workspace_root)
 
         # Assert returned workspace configuration is equal to the previous
         self.assertEqual(ws, new_ws)

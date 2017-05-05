@@ -53,11 +53,8 @@ class SchemaValidator(object):
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._workspace = workspace
-        self._schemas_local_master = \
-            workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER]
-
-        self._schemas_remote_master = \
-            workspace.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
+        self._schemas_local_master = workspace.schemas_local_master
+        self._schemas_remote_master = workspace.schemas_remote_master
 
         self._schemas = {}
 
@@ -66,6 +63,8 @@ class SchemaValidator(object):
 
         # Keep a library of loaded schemas to avoid re-loading
         self._schemas_library = dict()
+
+        self._error_msg = ''
 
     def config_schema_locations(self):
         self._schemas = {
@@ -88,6 +87,14 @@ class SchemaValidator(object):
                 'function-descriptor/vnfd-schema.yml'
             }
         }
+
+    @property
+    def error_msg(self):
+        return self._error_msg
+
+    @error_msg.setter
+    def error_msg(self, value):
+        self._error_msg = value
 
     def get_remote_schema(self, descriptor):
         """
@@ -188,11 +195,13 @@ class SchemaValidator(object):
         except ValidationError as e:
             log.error("Failed to validate Descriptor against schema '{}'"
                       .format(schema_id))
-            log.debug(e.message)
+            self.error_msg = e.message
+            log.error(e.message)
             return
 
         except SchemaError as e:
             log.error("Invalid Schema '{}'".format(schema_id))
+            self.error_msg = e.message
             log.debug(e)
             return
 

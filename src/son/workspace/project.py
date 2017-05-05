@@ -38,7 +38,8 @@ log = logging.getLogger(__name__)
 
 class Project:
 
-    PROJECT_VERSION = "0.4"
+    BACK_CONFIG_VERSION = "0.4"
+    CONFIG_VERSION = "0.5"
 
     __descriptor_name__ = 'project.yml'
 
@@ -46,8 +47,10 @@ class Project:
         coloredlogs.install(level=workspace.log_level)
         self._prj_root = prj_root
         self._workspace = workspace
-        self._descriptor_extension = workspace.default_descriptor_extension
-        self._prj_config = config
+        if config:
+            self._prj_config = config
+        else:
+            self.load_default_config()
 
     @property
     def project_root(self):
@@ -67,7 +70,21 @@ class Project:
 
     @property
     def descriptor_extension(self):
-        return self._descriptor_extension
+        return self.project_config['descriptor_extension']
+
+    def load_default_config(self):
+        self._prj_config = {
+            'version': self.CONFIG_VERSION,
+            'package': {
+                'name': 'sonata-project-sample',
+                'vendor': 'eu.sonata-nfv.package',
+                'version': '0.1',
+                'maintainer': 'Name, Company, Contact',
+                'description': 'Some description about this sample'
+            },
+            'descriptor_extension':
+                self._workspace.default_descriptor_extension
+        }
 
     def create_prj(self):
         log.info('Creating project at {}'.format(self._prj_root))
@@ -131,29 +148,32 @@ class Project:
         :return:
         """
         self._prj_config = {
-            'name': 'sonata-project-sample',
-            'vendor': 'eu.sonata-nfv.package',
-            'version': self.PROJECT_VERSION,
-            'maintainer': 'Name, Company, Contact',
-            'description': 'Some description about this sample',
-            'catalogues': ['personal'],
-            'publish_to': ['personal'],
-            'descriptor_extension': self._descriptor_extension
+            'version': self.CONFIG_VERSION,
+            'package':  {
+                'name': 'sonata-project-sample',
+                'vendor': 'eu.sonata-nfv.package',
+                'version': '0.1',
+                'maintainer': 'Name, Company, Contact',
+                'description': 'Some description about this sample'
+            },
+            'descriptor_extension':
+                self._workspace.default_descriptor_extension
         }
 
         prj_path = os.path.join(self._prj_root, Project.__descriptor_name__)
         with open(prj_path, 'w') as prj_file:
-            prj_file.write(yaml.dump(self._prj_config))
+            prj_file.write(yaml.dump(self._prj_config,
+                                     default_flow_style=False))
 
     def get_ns_descriptor(self):
         """
-        Obtain the file list of VNF descriptors
+        Obtain the file list of NS descriptors
         :return:
         """
         nsd_list = [os.path.join(self.nsd_root, file)
                     for file in os.listdir(self.nsd_root)
                     if os.path.isfile(os.path.join(self.nsd_root, file)) and
-                    file.endswith(self._descriptor_extension)]
+                    file.endswith(self.descriptor_extension)]
 
         if len(nsd_list) == 0:
             log.error("Project does not contain a NS Descriptor")
@@ -172,7 +192,7 @@ class Project:
         vnfd_list = []
         for root, dirs, files in os.walk(self.vnfd_root):
             for file in files:
-                if file.endswith(self._workspace.descriptor_extension):
+                if file.endswith(self.descriptor_extension):
                     vnfd_list.append(os.path.join(root, file))
         return vnfd_list
 
@@ -294,12 +314,49 @@ class Project:
                  .format(prj_filename))
 
         with open(prj_filename, 'r') as prj_file:
-            prj_config = yaml.load(prj_file)
+            try:
+                prj_config = yaml.load(prj_file)
 
-        if not prj_config['version'] == Project.PROJECT_VERSION:
-            log.error("Reading a project configuration "
-                      "with a different version {}"
-                      .format(prj_config['version']))
+            except yaml.YAMLError as exc:
+                log.error("Error parsing descriptor file: {0}".format(exc))
+                return
+
+            if not prj_config:
+                log.error("Couldn't read descriptor file: '{0}'"
+                          .format(prj_file))
+                return
+
+        if prj_config['version'] == Project.CONFIG_VERSION:
+            return Project(workspace, prj_root, config=prj_config)
+
+        # Protect against invalid versions
+        if prj_config['version'] < Project.BACK_CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is no longer "
+                      "supported (<{1})".format(prj_config['version'],
+                                                Project.CONFIG_VERSION))
             return
+        if prj_config['version'] > Project.CONFIG_VERSION:
+            log.error("Project configuration version '{0}' is ahead of the "
+                      "current supported version (={1})"
+                      .format(prj_config['version'], Project.CONFIG_VERSION))
+            return
+
+        # Make adjustments to support backwards compatibility
+        # 0.4
+        if prj_config['version'] == "0.4":
+
+            prj_config['package'] = {'name': prj_config['name'],
+                                     'vendor': prj_config['vendor'],
+                                     'version': '0.1',
+                                     'maintainer': prj_config['maintainer'],
+                                     'description': prj_config['description']
+                                     }
+            prj_config.pop('name')
+            prj_config.pop('vendor')
+            prj_config.pop('maintainer')
+            prj_config.pop('description')
+            log.warning("Loading project with an old configuration "
+                        "version ({0}). Modified project configuration: {1}"
+                        .format(prj_config['version'], prj_config))
 
         return Project(workspace, prj_root, config=prj_config)

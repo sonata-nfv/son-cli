@@ -14,7 +14,7 @@ description: "A sample VNF"
 ## The virtual deployment unit.
 ##
 virtual_deployment_units:
-  - id: "1"
+  - id: "vdu01"
     vm_image: "sample_docker"
     vm_image_format: "docker"
     resource_requirements:
@@ -28,11 +28,14 @@ virtual_deployment_units:
         size_unit: "GB"
     connection_points:
       - id: "vdu01:cp01"
-        type: "interface"
+        interface: "ipv4"
+        type: "internal"
       - id: "vdu01:cp02"
-        type: "interface"
+        interface: "ipv4"
+        type: "internal"
       - id: "vdu01:cp03"
-        type: "interface"
+        interface: "ipv4"
+        type: "internal"
 
 ##
 ## The virtual links that interconnect
@@ -43,26 +46,31 @@ virtual_links:
     connectivity_type: "E-LAN"
     connection_points_reference:
       - "vdu01:cp01"
-      - "vnf:mgmt"
+      - "mgmt"
+
   - id: "input"
     connectivity_type: "E-Line"
     connection_points_reference:
       - "vdu01:cp02"
-      - "vnf:input"
+      - "input"
+
   - id: "output"
     connectivity_type: "E-Line"
     connection_points_reference:
       - "vdu01:cp03"
-      - "vnf:output		"
+      - "output"
 
 ##
 ## The VNF connection points to the 
 ## outside world.
 ##
 connection_points:
-  - id: "vnf:mgmt"
-    type: "interface"
-  - id: "vnf:input"
-    type: "interface"
-  - id: "vnf:output"
-    type: "interface"
+  - id: "mgmt"
+    interface: "ipv4"
+    type: "management"
+  - id: "input"
+    interface: "ipv4"
+    type: "internal"
+  - id: "output"
+    interface: "ipv4"
+    type: "internal"

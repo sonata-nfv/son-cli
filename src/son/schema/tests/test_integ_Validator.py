@@ -67,7 +67,7 @@ class IntLoadSchemaTests(unittest.TestCase):
         """
         self.assertRaises(HTTPError,
                           load_remote_schema,
-                          "http://somerandomurl.com/artifact.yml")
+                          "https://raw.githubusercontent.com/sonata-nfv/son-schema/v30/function-descriptor/vnfd-schema.yml")
 
     def test_load_invalid_remote_template_invalid(self):
         """
