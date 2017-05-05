@@ -334,7 +334,7 @@ def render_errors():
 
 @app.route('/')
 def root():
-    pass
+    return '', 204
 
 
 @app.route('/flush/resources', methods=['POST'])
@@ -462,9 +462,6 @@ def gen_report():
     for path, key in latest.items():
         resource = resources[key]
         if path != resource['path']:
-            log.error("Internal error: latest resource path '{0}' does not "
-                      "match cached resource path '{1}"
-                      .format(path, resource['path']))
             continue
         report[key] = dict()
         report[key]['type'] = resource['type']
