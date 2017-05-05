@@ -62,7 +62,7 @@ setup(
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
                           'Flask', 'docker==2.0.2', 'scipy', 'numpy', 
-                          'Crypto', 'watchdog', 'Flask-Cors', 'flask_cache']
+                          'Crypto', 'watchdog', 'Flask-Cors', 'flask_cache'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
