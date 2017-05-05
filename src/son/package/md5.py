@@ -43,8 +43,18 @@ def __generate_hash__(f, cs=128):
 
 
 def __generate_hash_path__(p, cs=128):
+    hashes = []
+    for root, dirs, files in os.walk(p):
+        for f in sorted(files):  # guarantee same order to obtain same hash
+            hashes.append(__generate_hash__(os.path.join(root, f), cs))
+        for d in sorted(dirs):  # guarantee same order to obtain same hash
+            hashes.append(__generate_hash_path__(os.path.join(root, d), cs))
+        break
+    return _reduce_hash(hashes)
+
+
+def _reduce_hash(hashlist):
     hash = hashlib.md5()
-    for root, dir, files in os.walk(p):
-        for f in files:
-            hash.update(__generate_hash__(f, cs))
+    for hashvalue in sorted(hashlist):
+        hash.update(hashvalue.encode('utf-8'))
     return hash.hexdigest()

@@ -61,7 +61,8 @@ setup(
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
-                          'Flask', 'docker==2.0.2', 'scipy', 'numpy', 'Crypto'],
+                          'Flask', 'docker==2.0.2', 'scipy', 'numpy', 
+                          'Crypto', 'watchdog', 'Flask-Cors', 'flask_cache']
         zip_safe=False,
         entry_points={
             'console_scripts': [
@@ -70,7 +71,8 @@ setup(
                 'son-monitor=son.monitor.monitor:main',
                 'son-profile=son.profile.profile:main',
                 'son-validate=son.validate.validate:main',
-                'son-validate-api=son.validate.api:main',
+                'son-validate-api=son.validate.api.api:main',
+                'son-validate-watchdog=son.validate.api.watchdog:main',
                 'son-access=son.access.access:main'
             ],
         },
