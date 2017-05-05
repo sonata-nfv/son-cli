@@ -7,7 +7,7 @@ import yaml
 conf_d = {
  'name': 'ws1',
  'log_level': 'info',
- 'version': '0.3',
+ 'version': '0.03',
  'service_platforms':
      {'sp1': {'url': 'http://sp.int3.sonata-nfv.eu:32001',
               'credentials':
