@@ -52,8 +52,9 @@ optional arguments:
   --debug               Set logging level to debug
 """
 
-import sys
-sys.path.append('src/')
+# TODO: Remove!
+# import sys
+# sys.path.append('src/')
 
 import logging
 import requests
@@ -100,13 +101,14 @@ class AccessClient:
 
     # TODO: Connect to the real GateKeeper API URLs or read form configuration file
 
-    GK_API_VERSION = "/api/v1"
+    GK_API_VERSION = "/api/v2"    # "/api/v1"
     GK_API_BASE = "/"
     GK_URI_REG = "/register"    # Register is not allowed from the SDK Access
     GK_URI_LOGIN = "/login/user"
     GK_URI_LOGOUT = "/logout"
     GK_URI_PB_KEY = "/public-key"
-    GK_URI_UPDT_PB_KEY = "/signatures"
+    # GK_URI_UPDT_PB_KEY = "/signatures"
+    GK_URI_UPDT_PB_KEY = "/users"
 
     def __init__(self, workspace, platform_id=None, log_level='INFO'):
         """
@@ -343,16 +345,23 @@ class AccessClient:
         Simple request to check if session has expired (TBD)
         :return: Token status
         """
-        if self.access_token is None:
-            token_file = self.platform['credentials']['token_file']
-            token_path = os.path.join(
-                self.workspace.ws_root,
-                self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
-                token_file)
 
-            # Construct the POST login request
-            with open(token_path, "r") as _file:
-                self.access_token = _file.read
+        # print('access_token=', self.access_token)
+        # print('platform_key=', self.platform_public_key)
+
+        if self.access_token is None:
+            try:
+                token_file = self.platform['credentials']['token_file']
+                token_path = os.path.join(
+                    self.workspace.ws_root,
+                    self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+                    token_file)
+
+                # Construct the POST login request
+                with open(token_path, "r") as _file:
+                    self.access_token = _file.read
+            except:
+                return True
 
         if self.platform_public_key is None:
             return True
@@ -419,30 +428,53 @@ class AccessClient:
         self.dev_public_key = public
         self.dev_private_key = private
 
-        # TODO: Save the keypair somewhere
+        # Stores the keypair in the workspace configured platform dir
         try:
-
-            platform_path = os.path.join(platform_dir, self.platform)
-            with open(platform_path + "/public_key", mode="w+") as pb_file:
-                pb_file.write(self.dev_public_key)
-            with open(platform_path + "/private_key", mode="w+") as pr_file:
-                pr_file.write(self.dev_private_key)
-
             simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
             simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
 
-            url = self.GK_URI_UPDT_PB_KEY + '/' + self.username   # TODO: Connect to the real GK API url
+            default_sp = self.workspace.default_service_platform
+            url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + \
+                  self.GK_URI_UPDT_PB_KEY + '/' + self.username   # TODO: Connect to the real GK API url
+
+            headers = {'Content-type': 'application/json',
+                      'Authorization': 'Bearer %s' % (self.access_token.decode('utf-8'))}
+
             body = json.dumps({'public_key': simple_public})
 
-            r = requests.put(url, headers={'Content-type': 'application/json'}, data=body)
-            if r.status_code == 200:
-                msg = "Upload succeeded"
-            else:
+            print("url=", url)
+            print("body=", body)
+
+            r = requests.put(url, headers=headers, data=body)
+
+            print("r.status_code=", r.status_code)
+
+            if int(r.status_code) != 200:
                 log.error("Updating User's Public Key in remote Platform failed!")
-                return
+                return False
+
+            try:
+                pb_key_path = os.path.join(platform_dir,
+                                          self.platform['signature']['pub_key'])
+                prv_key_path = os.path.join(platform_dir,
+                                          self.platform['signature']['prv_key'])
+                # print("pb_key_path=", pb_key_path)
+                # print("prv_key_path=", prv_key_path)
+            except:
+                log.error("Error: User's Public and Private keys are not configured in the workspace!")
+                return False
+
+            with open(pb_key_path, mode="w+") as pb_file:
+                pb_file.write(self.dev_public_key)
+            with open(prv_key_path, mode="w+") as pr_file:
+                pr_file.write(self.dev_private_key)
+
+            log.info("User's Public and Private keys generated and saved successfully")
+            return True
+
         except:
             log.error("Error generating new keypair for the user")
-            return
+            return False
 
     def push_package(self, path, sign=False):
         """
@@ -451,9 +483,9 @@ class AccessClient:
         :param sign: setting to state if the package is going to be signed
         :return: HTTP code 201 or 40X
         """
-        # mode = "push"
-        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
-        # path = "samples/sonata-demo.son"
+
+        print("Pushing package")
+        print("SIGN=", sign)
 
         # TODO: Implement token expiry evaluation
         result = self.check_token_status()
@@ -462,9 +494,15 @@ class AccessClient:
             return
 
         elif sign:
+            if self.platform_public_key is None:
+                log.error("Error: Authentication is disabled. It is not possible to sign.")
+                return
+
             if not (self.dev_public_key and self.dev_private_key):
                 #  Generates keypair for the developer
-                self.generate_keypair(self.platform_dir)
+                result = self.generate_keypair(self.platform_dir)
+                if not result:
+                    return
             # IN PROGRESS: CALL SIGN METHOD
             # Push son-package to the Service Platform
             sign = self.sign_package(path)
