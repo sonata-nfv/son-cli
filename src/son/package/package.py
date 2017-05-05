@@ -316,7 +316,7 @@ class Packager(object):
         # Ensure that only one NS descriptor exists
         nsd_list = [file for file in os.listdir(base_path)
                     if os.path.isfile(os.path.join(base_path, file)) and
-                    file.endswith(self._workspace.descriptor_extension)]
+                    file.endswith(self._project.descriptor_extension)]
 
         check = len(nsd_list)
 
@@ -365,7 +365,7 @@ class Packager(object):
         pce_sd = dict()
         pce_sd["content-type"] = "application/sonata.service_descriptor"
         pce_sd["name"] = "/service_descriptors/{}".format(nsd_filename)
-        pce_sd["md5"] = generate_hash(nsd)
+        pce_sd["md5"] = generate_hash(sd)
         pce.append(pce_sd)
 
         # Specify the NSD as THE entry service template of package descriptor
@@ -425,7 +425,7 @@ class Packager(object):
 
             log.info("Packaging VNF descriptors from external source...")
             pcs_ext = self.generate_external_vnfds(os.path.join(
-                self._workspace.ws_root,
+                self._workspace.workspace_root,
                 self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR]),
                 unpack_vnfs)
 
@@ -523,7 +523,7 @@ class Packager(object):
             vnfd_f = open(os.path.join(catalogue_path,
                                        vnfd['name'] +
                                        "." +
-                                       self._workspace.descriptor_extension),
+                                       self._project.descriptor_extension),
                           'w')
 
             yaml.dump(vnfd, vnfd_f, default_flow_style=False)
@@ -585,7 +585,7 @@ class Packager(object):
         # Locate VNFD
         vnfd_list = [file for file in os.listdir(base_path)
                      if os.path.isfile(os.path.join(base_path, file)) and
-                     file.endswith(self._workspace.descriptor_extension)]
+                     file.endswith(self._project.descriptor_extension)]
 
         # Validate number of Yaml files
         check = len(vnfd_list)
@@ -594,7 +594,7 @@ class Packager(object):
                         "A descriptor with '{}' extension should be "
                         "in this path"
                         .format(base_path,
-                                self._workspace.descriptor_extension))
+                                self._project.descriptor_extension))
             return
 
         elif check > 1:
@@ -664,6 +664,8 @@ class Packager(object):
                     # Add image URL to artifact dependencies
                     self._add_artifact_dependency(
                         name=vnfd['name'] + '-' + vdu['id'] + '-vm_image',
+                        vendor=vnfd['vendor'],
+                        version=vnfd['version'],
                         url=vdu['vm_image'],
                         md5='02236f2ae558018ed14b5222ef1bd9f1')
                     # TODO: remote url must provide md5? This is dummy!
@@ -815,7 +817,7 @@ class Packager(object):
 
     def retrieve_external_vnf(self, descriptor_id):
         """
-        Retrieve descriptor from the ervice Platform catalogue.
+        Retrieve descriptor from the service Platform catalogue.
         It will loop through available Service Plaforms to retrieve the
         required descriptor
         :return: descriptor content
@@ -860,8 +862,8 @@ class Packager(object):
 
         self._package_resolvers.append(pr_entry)
 
-    def _add_artifact_dependency(self, name, url, md5, username='username',
-                                 password='password'):
+    def _add_artifact_dependency(self, name, vendor, version, url, md5,
+                                 username='username', password='password'):
 
         log.debug("Adding artifact dependency entry '{}'".format(name))
 
@@ -874,6 +876,8 @@ class Packager(object):
                 return
 
         ad_entry = {'name': name,
+                    'vendor': vendor,
+                    'version': version,
                     'url': url,
                     'md5': md5,
                     'credentials': {
