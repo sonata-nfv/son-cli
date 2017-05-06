@@ -40,10 +40,8 @@ class Experiment(object):
         self.__dict__.update(definition)
         # attributes
         self.experiment_configurations = list()
-        # backward compatibility imec mode
-        self.command_space_list = list()
+        self.pre_configuration = dict()
         self.configuration_space_list = list()
-        self.vnforder_list = list()
         self.overload_vnf_list = list()
 
     def populate(self):
@@ -59,17 +57,13 @@ class Experiment(object):
         for mp in self.measurement_points:
             rewrite_parameter_macros_to_lists(mp)
 
-        ######## imec
-        # (dedicated to iMEC use case (ugly that we compute it twice, but I don't want to break things))
+        ######## IMEC
         # check for vnfs that need overload detection (imec mode)
         if hasattr(self, 'overload_detection') :
             for vnf_name in self.overload_detection:
                 self.overload_vnf_list.append(vnf_name)
-        # aggregate all commands to be used in the experiment to a flat dict for further processing
-        command_dict, self.vnforder_list = self._get_command_space_as_dict()
-        # explore entire command space by calculating the Cartesian product over the given dict
-        self.command_space_list = compute_cartesian_product(command_dict)
-        #LOG.info("command space:{0}".format(command_dict))
+        # gather all configuration commands per VNF that need to be executed once before all tests start
+        self.pre_configuration = self._get_pre_configuration_as_dict()
 
         ######## UPB
         # generate a single flat dict containing all the parameter study lists defined in the PED
@@ -91,6 +85,26 @@ class Experiment(object):
             self.name,
             len(self.experiment_configurations)))
 
+    def _get_pre_configuration_as_dict(self):
+        """
+        Create a dict that lists all commands that need to be executed per VNF,
+        one-time execution as configuration before the tests start.
+        :return: dict
+        {"vnf_name1": [cmd1, cmd2, ...],
+         "vnf_nameN": [cmd, ...],
+        }
+        """
+        config_dict = dict()
+        for mp in self.measurement_points:
+            vnf_name = mp.get("name")
+            vnf_config = mp.get("configuration")
+            if vnf_config:
+                if not isinstance(vnf_config, list):
+                    vnf_config = [vnf_config]
+                config_dict[vnf_name]=vnf_config
+
+        LOG.debug('pre-configuration commands:{}'.format(config_dict))
+        return config_dict
 
     def _get_command_space_as_dict(self):
         """
@@ -168,7 +182,7 @@ class Experiment(object):
         for rl in self.measurement_points:
             name = rl.get("name")
             for k, v in rl.items():
-                if k == "name" or k == "connection_point":  # skip some fields
+                if k == "name" or k == "connection_point" or k == "configuration":  # skip some fields
                     continue
                 if not isinstance(v, list):
                     v = [v]

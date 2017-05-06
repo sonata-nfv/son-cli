@@ -163,7 +163,7 @@ class sonmonitor():
                 return 'son-monitor not started'
             sleep(1)
             wait_time += 1
-
+        logging.info('son-monitor started')
 
         return 'son-monitor started'
 

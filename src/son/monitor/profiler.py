@@ -55,12 +55,11 @@ from son.profile.helper import write_yaml
 import logging
 LOG = logging.getLogger('Profiler')
 LOG.setLevel(level=logging.INFO)
-#LOG.addHandler(logging.StreamHandler())
 LOG.propagate = True
-#logging.getLogger().removeHandler(logging.StreamHandler())
-from itertools import groupby
+import operator
+from collections import defaultdict, OrderedDict
 
-# TODO read from ped file
+# TODO read from ped file or config file
 SON_EMU_IP = '172.17.0.1'
 SON_EMU_IP = 'localhost'
 SON_EMU_REST_API_PORT = 5001
@@ -70,16 +69,17 @@ SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 # call from son-profile
 class Emu_Profiler():
 
-    def __init__(self, input_msd_path, output_msd_path, input_commands, configuration_commands, **kwargs):
+    def __init__(self, input_msd_path, output_msd_path, experiment, **kwargs):
+
+        self.configuration_space = experiment.configuration_space_list
+        self.pre_config_commands = experiment.pre_configuration
+        self.overload_vnf_list = experiment.overload_vnf_list
+        self.timeout = int(experiment.time_limit)
+        self.experiment_name = experiment.name
 
         # Grafana dashboard title
         defaults = {
             'title':'son-profile',
-            'timeout':20,
-            'overload_vnf_list':[],
-            'resource_configuration':kwargs.get('resource_configuration', [{}]),
-            'vnforder_list':kwargs.get('vnforder_list', {})
-
         }
         defaults.update(kwargs)
         self.title = defaults.get('title')
@@ -99,26 +99,14 @@ class Emu_Profiler():
             self.output_metrics = self.output_msd.get_metrics_list()
             LOG.debug('output metrics:{0}'.format(self.output_metrics))
 
-
-        # each list item is a dict with {vnf_name:"cmd_to_execute", ..}
-        self.input_commands = input_commands
-        LOG.info('input commands:{0}'.format(self.input_commands))
-
         # the configuration commands that needs to be executed before the load starts
-        self.configuration_commands = configuration_commands
-        LOG.info("configuration commands:{0}".format(self.configuration_commands))
-        # the order in which the vnf_commands need to be executed
-        self.vnforder_list = defaults.get('vnforder_list')
-        LOG.info("vnf order:{0}".format(self.vnforder_list))
+        LOG.info("configuration commands:{0}".format(self.pre_config_commands))
 
-        # the resource configuration that needs to be allocated before the load starts
-        self.resource_configuration = defaults.get('resource_configuration')
-        LOG.info("resource  configuration:{0}".format(self.resource_configuration))
-
-        self.timeout = int(defaults.get('timeout'))
         if self.timeout < 11:
             LOG.warning("timeout should be > 10 to allow overload detection")
 
+        # the resource configuration of the current experiment
+        self.resource_configuration = dict()
         # check if prometheus is running
         sonmonitor.monitor.start_containers()
 
@@ -128,13 +116,13 @@ class Emu_Profiler():
         if output_msd_path:
             self.output_msd.start(overwrite=True)
 
-        self.overload_vnf_list = defaults.get('overload_vnf_list')
+        LOG.info('overload_vnf_list: {0}'.format(self.overload_vnf_list))
         self.overload_monitor = Overload_Monitor(vnf_list=self.overload_vnf_list)
         # host overload flag
         self.overload = self.overload_monitor.overload_flag
 
         # profiling threaded function
-        self.profiling_thread = threading.Thread(target=self.profling_loop)
+        self.profiling_thread = threading.Thread(target=self.profiling_loop)
 
         # list of dict for profiling results
         self.profiling_results = list()
@@ -146,8 +134,8 @@ class Emu_Profiler():
         self.no_display = defaults.get('no_display', False)
 
     def start_experiment(self):
-        # start configuration commands
-        for vnf_name, cmd_list in self.configuration_commands.items():
+        # start pre-configuration commands
+        for vnf_name, cmd_list in self.pre_config_commands.items():
             for cmd in cmd_list:
                 self.emu.exec(vnf_name=vnf_name, cmd=cmd)
 
@@ -183,64 +171,90 @@ class Emu_Profiler():
         self.write_results_to_file("test_results.yml")
 
 
-    def profling_loop(self):
+    def profiling_loop(self):
 
         # start with empty results
         self.profiling_results.clear()
         self.run_number = 1
 
         # one cmd_dict per profile run
-        LOG.info("input commands: {0}".format(self.input_commands))
-        for cmd_dict in self.input_commands:
-            # configure all resource settings for every input command
-            LOG.info("resource config: {0}".format(self.resource_configuration))
-            for resource_dict in self.resource_configuration:
+        for experiment in self.configuration_space:
 
-                # reset metrics
-                for metric in self.input_metrics + self.output_metrics:
-                    metric.reset()
+            # parse the experiment's parameters
+            resource_dict = defaultdict(dict)
+            cmd_dict = {}
+            vnf_name2order = dict()
+            for key, value in experiment.items():
+                array = key.split(':')
+                if len(array) < 3:
+                    continue
+                type, vnf_name, param = array
+                if type == 'measurement_point' and param == 'cmd':
+                    cmd_dict[vnf_name] = value
+                elif type == 'measurement_point' and param == 'cmd_order':
+                    vnf_name2order[vnf_name] = int(value)
+                elif type == 'resource_limitation':
+                    resource_dict[vnf_name][param] = value
 
-                self.set_resources(resource_dict)
+            self.resource_configuration = resource_dict
+            LOG.info("resource config: {0}".format(resource_dict))
+            LOG.info("vnf commands: {0}".format(cmd_dict))
 
-                # start the load
-                for vnf_name in self.vnforder_list:
-                    cmd = cmd_dict[vnf_name]
-                    self.emu.exec(vnf_name=vnf_name, cmd=cmd)
-                #for vnf_name, cmd in cmd_dict:
-                #    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, ensure=True)
+            # create ordered list of vnf_names, so the commands are always executed in a defined order
+            vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
+            vnforder_list = [vnf_name for vnf_name, order in vnforder_dict.items()]
+            # also get the vnfs which do not have an cmd_order specified, and add them to the list
+            leftover_vnfs = [vnf_name for vnf_name in cmd_dict if vnf_name not in vnforder_list]
+            vnforder_list = vnforder_list + leftover_vnfs
+            LOG.info("vnf order:{0}".format(vnforder_list))
 
-                # let the load stabilize
+            # allocate the specified resources
+            self.set_resources()
+
+            # reset metrics
+            for metric in self.input_metrics + self.output_metrics:
+                metric.reset()
+
+            # start the load
+            for vnf_name in vnforder_list:
+                cmd = cmd_dict[vnf_name]
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd)
+
+            # let the load stabilize
+            time.sleep(1)
+            # reset the overload monitor
+            self.overload_monitor.reset()
+
+            # monitor the metrics
+            start_time = time.time()
+
+            while((time.time()-start_time) < self.timeout):
+                # add the new metric values to the list
+                input_metrics = self.query_metrics(self.input_metrics)
+                output_metrics = self.query_metrics(self.output_metrics)
                 time.sleep(1)
-                # reset the overload monitor
-                self.overload_monitor.reset()
+                if self.overload.is_set():
+                    LOG.info('overload detected')
 
-                # monitor the metrics
-                start_time = time.time()
+            # stop the load
+            LOG.info('end of experiment: {0} - run{1}/{2}'.format(self.experiment_name, self.run_number, len(self.configuration_space)))
+            for vnf_name, cmd in cmd_dict.items():
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd, action='stop')
 
-                while((time.time()-start_time) < self.timeout):
-                    # add the new metric values to the list
-                    input_metrics = self.query_metrics(self.input_metrics)
-                    output_metrics = self.query_metrics(self.output_metrics)
-                    time.sleep(1)
-                    if self.overload.is_set():
-                        LOG.info('overload detected')
+            # add the result of this profiling run to the results list
+            profiling_result = dict(
+                resource_alloc=copy.deepcopy(self.resource_configuration),
+                input_metrics=copy.deepcopy(input_metrics),
+                output_metrics=copy.deepcopy(output_metrics)
+            )
+            self.profiling_results.append(profiling_result)
+            self.run_number += 1
 
-                # stop the load
-                for vnf_name, cmd in cmd_dict.items():
-                    self.emu.exec(vnf_name=vnf_name, cmd=cmd, action='stop')
-
-                # add the result of this profiling run to the results list
-                profiling_result = dict(
-                    resource_alloc=copy.deepcopy(resource_dict),
-                    input_metrics=copy.deepcopy(input_metrics),
-                    output_metrics=copy.deepcopy(output_metrics)
-                )
-                self.profiling_results.append(profiling_result)
-                self.run_number += 1
+        LOG.info('end of experiment: {}'.format(self.experiment_name))
 
 
     def display_loop(self, stdscr):
-        # while profiling loop is running, display the metrics
+        # while profiling loop is running, display the metrics on the CLI
         # Clear screen
         stdscr.clear()
         # screen = curses.initscr()
@@ -394,40 +408,20 @@ class Emu_Profiler():
             #LOG.info("metric query: {1} {0} {2}".format(metric.value, metric_name, metric_unit))
         return metrics
 
-    def set_resources(self, resource_dict):
+    def set_resources(self):
         """
         Allocate the specified resources
         :param resource_dict:
-        {"function1:parameter1" : 0.1,
-         "functionN:parameterN" : 0.2,
+        {"vnf_name1" : {"param1":value,...},
+         "vnf_name2" : {"param1":value,...},
+         ...
         }
         :return:
         """
-
-        if len(resource_dict) == 0:
-            return
-
-
-        # group resources per vnf
-        def get_vnfname(key):
-            return key.split(':')[0]
-
-        resource_dict_grouped = {}
-        for vnf_name, param_list in groupby(resource_dict, get_vnfname):
-            if not resource_dict_grouped.get(vnf_name) :
-                resource_dict_grouped[vnf_name] = []
-            resource_dict_grouped[vnf_name] += list(param_list)
-
-        # execute resource allocation of all parameters per vnf
-        for vnf_name in resource_dict_grouped:
-            new_dict = {}
-            for param in resource_dict_grouped[vnf_name]:
-                if ':' not in param: continue
-                new_dict[param.split(':')[1]] = resource_dict[param]
-            if len(new_dict) > 0:
-                LOG.debug('vnf {1} set resources: {0}'.format(new_dict, vnf_name))
-                self.emu.update_vnf_resources(vnf_name, new_dict)
-
+        res = copy.deepcopy(self.resource_configuration)
+        for vnf_name in res:
+            resource_config = res[vnf_name]
+            self.emu.update_vnf_resources(vnf_name, resource_config)
 
 class Overload_Monitor():
 
