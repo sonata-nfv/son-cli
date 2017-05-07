@@ -85,7 +85,8 @@ class ProfileManager(object):
                                         output_msd_path=output_msd_path,
                                         experiment=experiment,
                                         title=self.ped['name'],
-                                        no_display=self.args.no_display)
+                                        no_display=self.args.no_display,
+                                        graph_only=self.args.graph_only)
             profiler.start_experiment()
 
     def _active_execution(self):
@@ -244,6 +245,14 @@ def parse_args(manual_args=None):
         required=False,
         default=False,
         dest="no_display",
+        action="store_true")
+
+    parser.add_argument(
+        "--graph-only",
+        help="only display graphs of previous profile run",
+        required=False,
+        default=False,
+        dest="graph_only",
         action="store_true")
 
     parser.add_argument(

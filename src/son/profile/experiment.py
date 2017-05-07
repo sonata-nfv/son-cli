@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 class Experiment(object):
 
     def __init__(self, definition):
+        self.resource_limitations = dict()
+        self.profile_calculations = list()
         # populate object from YAML definition
         self.__dict__.update(definition)
         # attributes
@@ -43,6 +45,7 @@ class Experiment(object):
         self.pre_configuration = dict()
         self.configuration_space_list = list()
         self.overload_vnf_list = list()
+
 
     def populate(self):
         """
@@ -106,38 +109,6 @@ class Experiment(object):
         LOG.debug('pre-configuration commands:{}'.format(config_dict))
         return config_dict
 
-    def _get_command_space_as_dict(self):
-        """
-        Create a dict that lists all commands that need to be executed per VNF
-        :return: dict
-        {"vnf_name1": [cmd1, cmd2, ...],
-         "vnf_nameN": [cmd, ...],
-        }
-        """
-        cmds = dict()
-        vnf_name2order = dict()
-        vnforder_list = []
-        for mp in self.measurement_points:
-            vnf_name = mp.get("name")
-            vnf_cmds = mp.get("cmd")
-            cmd_order = mp.get("cmd_order")
-            # check if not empty
-            if not vnf_cmds:
-                return (cmds, vnforder_list)
-            # make sure the cmds are in a list
-            if not isinstance(vnf_cmds, list):
-                vnf_cmds = [vnf_cmds]
-            cmds[vnf_name] = vnf_cmds
-
-            if cmd_order:
-                vnf_name2order[vnf_name] = int(cmd_order)
-            else:
-                vnf_name2order[vnf_name] = 0
-            # create ordered list of vnf_names, so the commands are always executed in a defined order
-            vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
-            vnforder_list = [vnf_name for vnf_name, order in vnforder_dict.items()]
-
-        return (cmds, vnforder_list)
 
     def _get_experiment_header_space_as_dict(self):
         """
