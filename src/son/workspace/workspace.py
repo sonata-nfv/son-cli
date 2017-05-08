@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 
 class Workspace:
     BACK_CONFIG_VERSION = "0.03"
-    CONFIG_VERSION = "0.04"
+    CONFIG_VERSION = "0.05"
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
     __descriptor_name__ = "workspace.yml"
@@ -118,7 +118,11 @@ class Workspace:
                 {'url': 'http://sp.int3.sonata-nfv.eu:32001',
                  'credentials': {'username': 'sonata',
                                  'password': 's0n@t@',
-                                 'token_file': 'token.txt'
+                                 'token_file': 'token.txt',
+                                 'signature': {'pub_key': '',
+                                               'prv_key': '',
+                                               'cert': ''
+                                               }
                                  }
                  }
              }
@@ -132,7 +136,6 @@ class Workspace:
                 }
              }
 
-
     def create_dirs(self):
         """
         Create the base directory structure for the workspace
@@ -145,7 +148,7 @@ class Workspace:
         dirs = [self.config['catalogues_dir'],
                 self.config['configuration_dir'],
                 self.config['platforms_dir'],
-                self.config['projects_dir']
+                self.config['projects_dir'],
                 ]
 
         for d in dirs:
@@ -230,6 +233,17 @@ class Workspace:
                     'topology': True
                     }
                  }
+
+        # 0.04
+        if ws_config['version'] <= "0.04":
+            sps = ws.config['service_platforms']
+            for sp_key, sp in sps.items():
+                sp['credentials']['signature'] = dict()
+                sp['credentials']['signature']['pub_key'] = ''
+                sp['credentials']['signature']['prv_key'] = ''
+                sp['credentials']['signature']['cert'] = ''
+
+        if ws_config['version'] < Workspace.CONFIG_VERSION:
             log.warning("Loading workspace with an old configuration "
                         "version ({0}). Updated configuration: {1}"
                         .format(ws_config['version'], ws.config))
@@ -262,11 +276,17 @@ class Workspace:
         self.service_platforms[sp_id] = {'url': '',
                                          'credentials': {'username': '',
                                                          'password': '',
-                                                         'token_file': ''}
+                                                         'token_file': '',
+                                                         'signature': {
+                                                             'pub_key': '',
+                                                             'prv_key': '',
+                                                             'cert': ''
+                                                         }}
                                          }
 
-    def config_service_platform(self, sp_id, url=None, username=None,
-                                password=None, token=None, default=None):
+    def config_service_platform(self, sp_id, default=None, url=None,
+                                username=None, password=None, token=None,
+                                pub_key=None, prv_key=None, cert=None):
 
         if sp_id not in self.service_platforms.keys():
             return
@@ -284,6 +304,15 @@ class Workspace:
 
         if token:
             sp['credentials']['token_file'] = token
+
+        if pub_key:
+            sp['credentials']['signature']['pub_key'] = pub_key
+
+        if prv_key:
+            sp['credentials']['signature']['prv_key'] = prv_key
+
+        if cert:
+            sp['credentials']['signature']['cert'] = cert
 
         if default:
             self.default_service_platform = sp_id

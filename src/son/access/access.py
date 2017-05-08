@@ -53,8 +53,8 @@ optional arguments:
 """
 
 # TODO: Remove!
-# import sys
-# sys.path.append('src/')
+import sys
+sys.path.append('src/')
 
 import logging
 import requests
@@ -103,12 +103,12 @@ class AccessClient:
 
     GK_API_VERSION = "/api/v2"    # "/api/v1"
     GK_API_BASE = "/"
-    GK_URI_REG = "/register"    # Register is not allowed from the SDK Access
-    GK_URI_LOGIN = "/login/user"
-    GK_URI_LOGOUT = "/logout"
-    GK_URI_PB_KEY = "/public-key"
+    # GK_URI_REG = "/register"    # Register is not allowed from the SDK Access
+    GK_URI_LOGIN = "/sessions"    # POST
+    GK_URI_LOGOUT = "/sessions"   # DELETE
+    GK_URI_PB_KEY = "/micro-services/public-key"
     # GK_URI_UPDT_PB_KEY = "/signatures"
-    GK_URI_UPDT_PB_KEY = "/users"
+    GK_URI_UPDT_PB_KEY = "/users"   # PATCH .../api/v2/users/:username
 
     def __init__(self, workspace, platform_id=None, log_level='INFO'):
         """
@@ -267,11 +267,13 @@ class AccessClient:
             password = self.platform['credentials']['password']
 
         # Construct the POST login request
-        credentials = (str(username) + ':' + str(password)).encode('utf-8')
-        encoded_creds = b64encode(credentials)
-        headers = {'Authorization': 'Basic %s' % (encoded_creds.decode('utf-8'))}
+        # credentials = (str(username) + ':' + str(password)).encode('utf-8')
+        credentials = json.dumps({'username': username, 'password': password})
+        # encoded_creds = b64encode(credentials)
+        # headers = {'Authorization': 'Basic %s' % (encoded_creds.decode('utf-8'))}
 
-        response = requests.post(url, headers=headers, verify=False)
+        response = requests.post(url, data=credentials, verify=False)
+        # response = requests.post(url, headers=headers, verify=False
         if not response.status_code in (200, 201):
             log.debug('Error {0}'.format(response.status_code))
             return response.text
@@ -445,7 +447,8 @@ class AccessClient:
             print("url=", url)
             print("body=", body)
 
-            r = requests.put(url, headers=headers, data=body)
+            r = requests.patch(url, headers=headers, data=body)
+            # r = requests.put(url, headers=headers, data=body)
 
             print("r.status_code=", r.status_code)
 
@@ -684,7 +687,7 @@ class AccessArgParse(object):
             metavar="PLATFORM_ID",
             help="Specify the ID of the Service Platform to use from "
                  "workspace configuration. If not specified will assume the ID"
-                 "in '{}'".format(Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM),
+                 "in 'default_service_platform'",   # "in '{}'".format(Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM),
             required=False
         )
         parser.add_argument(

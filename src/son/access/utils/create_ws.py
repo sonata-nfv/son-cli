@@ -25,7 +25,9 @@ conf_d = {
                           'sonata-nfv/son-schema/master/',
  'platforms_dir': 'platforms',
  'catalogues_dir': 'catalogues',
- 'configuration_dir': 'configuration'
+ 'configuration_dir': 'configuration',
+ 'projects_dir': 'projects',
+ 'validate_watch': '~/.son-workspace/projects'
 }
 
 conf_y = yaml.dump(conf_d)
