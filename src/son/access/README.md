@@ -86,6 +86,7 @@ optional arguments:
                         Specify username of the user
   -p PASSWORD, --password PASSWORD
                         Specify password of the user
+  --logout              Ends access token lifespan
 ```
 
 ### List resources - `list`

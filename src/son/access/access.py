@@ -53,8 +53,8 @@ optional arguments:
 """
 
 # TODO: Remove!
-import sys
-sys.path.append('src/')
+# import sys
+# sys.path.append('src/')
 
 import logging
 import requests
@@ -133,9 +133,8 @@ class AccessClient:
 
         try:
             # retrieve token from workspace
-            platform_dir = os.path.join(self.workspace.ws_root,
-                                        self.workspace.dirs[
-                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
             token_path = os.path.join(platform_dir,
                                       self.platform['credentials']['token_file'])
 
@@ -147,9 +146,8 @@ class AccessClient:
 
         try:
             # retrieve keypair from workspace
-            platform_dir = os.path.join(self.workspace.ws_root,
-                                        self.workspace.dirs[
-                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
             pub_path = os.path.join(platform_dir,
                                     self.platform['signature']['pub_key'])
             prv_path = os.path.join(platform_dir,
@@ -168,9 +166,8 @@ class AccessClient:
 
         # retrieve certificate from workspace
         try:
-            platform_dir = os.path.join(self.workspace.ws_root,
-                                        self.workspace.dirs[
-                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
             cert_path = os.path.join(platform_dir,
                                      self.platform['signature']['cert'])
             if os.path.isfile(cert_path):
@@ -182,11 +179,10 @@ class AccessClient:
 
         try:
             # retrieve token from workspace
-            self.platform_dir = os.path.join(self.workspace.ws_root,
-                                             self.workspace.dirs[
-                                                 workspace.CONFIG_STR_PLATFORMS_DIR])
+            self.platform_dir = os.path.join(self.workspace.workspace_root,
+                                             self.workspace.config['platforms_dir'])
         except:
-            self.platform_dir = os.path.join(self.workspace.ws_root)
+            self.platform_dir = os.path.join(self.workspace.workspace_root)
 
         # Create a push and pull client for available Service Platforms
         self.pull = dict()
@@ -288,12 +284,14 @@ class AccessClient:
             self.platform['credentials']['token_file'] = token_file
 
         token_path = os.path.join(
-            self.workspace.ws_root,
-            self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+            self.workspace.workspace_root,
+            self.workspace.config['platforms_dir'],
+            # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
             token_file)
 
         # token = response.text.replace('\n', '')
-        token = json.loads(response.text)['access_token']
+        token = json.loads(response.text)['token']['access_token']
+        # print('token=', token)
 
         if not os.path.exists(os.path.dirname(token_path)):
             try:
@@ -323,8 +321,9 @@ class AccessClient:
         if self.access_token is None:
             token_file = self.platform['credentials']['token_file']
             token_path = os.path.join(
-                self.workspace.ws_root,
-                self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+                self.workspace.workspace_root,
+                self.workspace.config['platforms_dir'],
+                # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
                 token_file)
 
             # Construct the POST logout request
@@ -355,8 +354,9 @@ class AccessClient:
             try:
                 token_file = self.platform['credentials']['token_file']
                 token_path = os.path.join(
-                    self.workspace.ws_root,
-                    self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+                    self.workspace.workspace_root,
+                    self.workspace.config['platforms_dir'],
+                    # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
                     token_file)
 
                 # Construct the POST login request
@@ -398,8 +398,9 @@ class AccessClient:
 
         try:
             response = requests.get(url, verify=False)
-            parsed_key = json.loads(response.text)['public-key']
-            # print(parsed_key)
+            parsed_key = json.loads(response.text)
+            parsed_key = parsed_key['items']['public-key']
+            # print('parsed_key=', parsed_key)
             platform_public_key = "-----BEGIN PUBLIC KEY-----\n"
             platform_public_key += parsed_key
             platform_public_key += "\n-----END PUBLIC KEY-----\n"
@@ -435,9 +436,14 @@ class AccessClient:
             simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
             simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
 
+            # print("simple_public=", simple_public)
+
             default_sp = self.workspace.default_service_platform
+
             url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + \
                   self.GK_URI_UPDT_PB_KEY + '/' + self.username   # TODO: Connect to the real GK API url
+
+            print("url=", url)
 
             headers = {'Content-type': 'application/json',
                       'Authorization': 'Bearer %s' % (self.access_token.decode('utf-8'))}
@@ -488,7 +494,7 @@ class AccessClient:
         """
 
         print("Pushing package")
-        print("SIGN=", sign)
+        print("SIGN =", sign)
 
         # TODO: Implement token expiry evaluation
         result = self.check_token_status()
@@ -628,7 +634,7 @@ class AccessClient:
 
     def store_nsd(self, nsd):
         store_path = os.path.join(
-            self.workspace.ws_root,
+            self.workspace.workspace_root,
             self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_NS_DIR],
             str(time.time())
         )
@@ -636,7 +642,7 @@ class AccessClient:
 
     def store_vnfd(self, vnfd):
         store_path = os.path.join(
-            self.workspace.ws_root,
+            self.workspace.workspace_root,
             self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
             str(time.time())
         )
@@ -716,12 +722,12 @@ class AccessArgParse(object):
 
         # handle workspace
         if args.workspace:
-            ws_root = args.workspace
+            workspace_root = args.workspace
         else:
-            ws_root = Workspace.DEFAULT_WORKSPACE_DIR
-        self.workspace = Workspace.__create_from_descriptor__(ws_root)
+            workspace_root = Workspace.DEFAULT_WORKSPACE_DIR
+        self.workspace = Workspace.__create_from_descriptor__(workspace_root)
         if not self.workspace:
-            print("Invalid workspace: ", ws_root)
+            print("Invalid workspace: ", workspace_root)
             return
 
         # handle debug
