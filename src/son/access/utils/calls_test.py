@@ -186,6 +186,18 @@ def sign():
     print('signature=', signature)
 
 
+# Verify
+# Knowing the public key, it is easy to verify a message.
+# The plain text is sent to the user along with the signature.
+# The receiving side calculates the hash value and then uses the public key verify() method to validate its origin.
+def verify(public_key, signature):
+    from Crypto.Hash import SHA256
+    from Crypto.PublicKey import RSA
+    text = 'abcdefgh'
+    hash = SHA256.new(text).digest()
+    public_key.verify(hash, signature)
+
+
 # generate_keypair()
 # token = user_login('user04', '1234')
 # print(token)
