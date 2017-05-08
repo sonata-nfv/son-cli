@@ -49,13 +49,13 @@ import numpy as np
 from scipy.stats import norm, t
 from son.profile.helper import write_yaml, read_yaml
 import logging
-LOG = logging.getLogger('Profiler')
-LOG.setLevel(level=logging.INFO)
-LOG.propagate = True
 import operator
 from collections import defaultdict, OrderedDict
 import matplotlib.pyplot as plt
-from multiprocessing import Process
+
+LOG = logging.getLogger('Profiler')
+LOG.setLevel(level=logging.INFO)
+LOG.propagate = True
 
 # TODO read from ped file or config file
 SON_EMU_IP = '172.17.0.1'

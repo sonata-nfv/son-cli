@@ -440,7 +440,10 @@ class Emu():
                    '-e', terminal_cmd]
             Popen(cmd)
 
-        return 'xterms started for {0}'.format(vnf_names)
+        ret = 'xterms started for {0}'.format(vnf_names)
+        if len(vnf_names) == 0 :
+            ret = 'vnf list is empty, no xterms started'
+        return ret
 
     def update_skewness_monitor(self, vnf_name, resource_name, action):
 
