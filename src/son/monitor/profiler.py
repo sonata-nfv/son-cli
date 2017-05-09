@@ -86,11 +86,13 @@ class Emu_Profiler():
         defaults.update(kwargs)
         self.title = defaults.get('title')
 
+        # results file
+        self.results_file = defaults.get('results_file', RESULT_FILE)
         # graph only option
         self.graph_only = defaults.get('graph_only', False)
         # only display graph of previous profile run
         if self.graph_only:
-            results = read_yaml(RESULT_FILE)
+            results = read_yaml(self.results_file)
             profile_calc = ProfileCalculator(self.experiment, results)
             profile_calc.display_graph()
             return
@@ -140,6 +142,7 @@ class Emu_Profiler():
 
         # list of dict for profiling results
         self.profiling_results = list()
+        self.profile_graphs = ProfileCalculator(self.experiment, self.profiling_results)
 
         # the number of the current profiling run
         self.run_number = 0
@@ -186,10 +189,10 @@ class Emu_Profiler():
         self.overload_monitor.stop(self.emu)
 
         # write results to file
-        self.write_results_to_file(RESULT_FILE)
+        self.write_results_to_file(self.results_file)
 
-        profile_calc = ProfileCalculator(self.experiment, self.profiling_results)
-        profile_calc.display_graph()
+        #profile_calc = ProfileCalculator(self.experiment, self.profiling_results)
+        self.profile_graphs.finalize_graph()
 
 
     def profiling_loop(self):
@@ -628,12 +631,68 @@ class ProfileCalculator():
     """
     def __init__(self, experiment, results):
         self.experiment = experiment
-        self.profile_calculations = experiment.profile_calculations
+        self.profile_graphs = experiment.profile_calculations # this is the profile_calculation description from the ped-file
         self.results = results
 
-    def display_graph(self):
+        #n = len(self.profile_graphs)
+        #plt.ioff()
         #plt.ion()
-        for profile in self.profile_calculations:
+        #self.fig, self.ax = plt.subplots(nrows=n, ncols=1)
+
+
+
+    def update_graph(self, results):
+        self.results = results
+        i = 1
+        n = len(self.profile_graphs)
+        plt.ioff()
+        self.fig, self.ax = plt.subplots(nrows=n, ncols=1)
+        for profile in self.profile_graphs:
+            plt.subplot(n, 1, i)
+            x_metric_id = profile['input_metric']
+            y_metric_id = profile['output_metric']
+
+            x_metrics = self._find_metrics(x_metric_id)
+            x_values = [m['average'] for m in x_metrics]
+            x_err_high = [m['CI_high'] - m['average'] for m in x_metrics]
+            x_err_low = [abs(m['CI_low'] - m['average']) for m in x_metrics]
+            x_unit = x_metrics[0]['unit']
+
+            y_metrics = self._find_metrics(y_metric_id)
+            y_values = [m['average'] for m in y_metrics]
+            y_err_high = [m['CI_high'] - m['average'] for m in y_metrics]
+            y_err_low = [abs(m['CI_low'] - m['average']) for m in y_metrics]
+            y_unit = y_metrics[0]['unit']
+
+            plt.xlabel('{0}({1})'.format(x_metric_id, x_unit))
+            plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
+
+            plt.title(profile['name'])
+
+            plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
+            plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o',
+                         capsize=2)
+            # plt.plot(x_values, y_values, marker='o')
+            #plt.draw()
+
+            i += 1
+        plt.tight_layout()
+        plt.show(block=False)
+        #plt.draw()
+
+    def finalize_graph(self):
+        self.display_graph()
+
+
+    def display_graph(self):
+        plt.close("all")
+        plt.ioff()
+        logging.info("profile graphs:{}".format(self.profile_graphs))
+        n = len(self.profile_graphs)
+        fig, ax = plt.subplots(nrows=n, ncols=1)
+        i = 1
+        for profile in self.profile_graphs:
+            plt.subplot(n, 1, i)
             x_metric_id = profile['input_metric']
             y_metric_id = profile['output_metric']
 
@@ -651,14 +710,14 @@ class ProfileCalculator():
 
             plt.xlabel('{0}({1})'.format(x_metric_id,x_unit))
             plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
-            plt.title(self.experiment.name)
-            #ax = plt.gca()
-            #ax.grid(True)
+            plt.title(profile['name'])
+
             plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
             plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o', capsize=2)
-            #plt.plot(x_values, y_values, marker='o')
-            plt.draw()
-            plt.show()
+
+            i += 1
+        plt.tight_layout()
+        plt.show()
 
     def _find_metrics(self, metric_id):
         """
