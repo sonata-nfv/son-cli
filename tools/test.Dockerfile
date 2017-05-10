@@ -31,8 +31,6 @@ RUN cd /son-cli/ansible \
     # Installing setuptools (now in >v34.0.0 dependencies must be installed in advance)
     && pip3 install wincertstore==0.2 certifi==2016.9.26 six>=1.10.0 packaging>=16.8 appdirs>=1.4.0 \
     && pip3 install setuptools==34.0.2 \
-    # Installing crypto lib dependency
-    && pip3 install Crypto \
     # Bootstrapping the test environment
     && python3.4 bootstrap.py \
     # Generating the test environment
