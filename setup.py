@@ -61,9 +61,9 @@ setup(
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
-                          'Flask', 'docker==2.0.2', 'scipy', 'numpy', 
-                          'watchdog', 'Flask-Cors', 'flask_cache', 'Crypto'],
-
+                          'Flask', 'docker==2.0.2', 'scipy', 'numpy',
+                          'watchdog', 'Flask-Cors', 'flask_cache', 'redis'],
+        # 'Crypto'],  # Lib installed in the test.Dockerfile
         zip_safe=False,
         entry_points={
             'console_scripts': [
