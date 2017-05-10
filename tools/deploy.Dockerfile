@@ -22,6 +22,8 @@ COPY ./dist/sonata_cli-*-py3-*.whl /tmp/
 RUN cd /ansible \
     # Start the basic Ansible setup
     && ansible-playbook install.yml \
+    # Installing crypto lib dependency
+    && pip3 install Crypto \
     && echo 'Installing son-cli' \
     # Install the son-cli package from a local wheel
     && pip3 install /tmp/sonata_cli-*-py3-*.whl \
