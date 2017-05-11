@@ -52,6 +52,8 @@ import logging
 import operator
 from collections import defaultdict, OrderedDict
 import matplotlib.pyplot as plt
+import multiprocessing
+from time import sleep
 
 LOG = logging.getLogger('Profiler')
 LOG.setLevel(level=logging.INFO)
@@ -78,7 +80,6 @@ class Emu_Profiler():
         self.experiment_name = experiment.name
         self.experiment = experiment
 
-
         # Grafana dashboard title
         defaults = {
             'title':'son-profile',
@@ -90,12 +91,18 @@ class Emu_Profiler():
         self.results_file = defaults.get('results_file', RESULT_FILE)
         # graph only option
         self.graph_only = defaults.get('graph_only', False)
+
+        # generate profiling results
+        self.profiling_results = list()
+        self.profile_calc = ProfileCalculator(self.experiment)
+
         # only display graph of previous profile run
         if self.graph_only:
-            results = read_yaml(self.results_file)
-            profile_calc = ProfileCalculator(self.experiment, results)
-            profile_calc.display_graph()
+            self.profile_calc.display_graph(file=self.results_file)
             return
+        else:
+            self.profile_calc.start_plot()
+            self.profile_calc.enable_updating.set()
 
         #class to control son-emu (export/query metrics)
         self.emu = Emu(SON_EMU_API)
@@ -116,11 +123,12 @@ class Emu_Profiler():
         # the configuration commands that needs to be executed before the load starts
         LOG.info("configuration commands:{0}".format(self.pre_config_commands))
 
+        # time the test that is running
         if self.timeout < 11:
             LOG.warning("timeout should be > 10 to allow overload detection")
 
         # the resource configuration of the current experiment
-        self.resource_configuration = dict()
+        self.resource_configuration = defaultdict(dict)
         # check if prometheus is running
         sonmonitor.monitor.start_containers()
 
@@ -140,12 +148,8 @@ class Emu_Profiler():
         # profiling threaded function
         self.profiling_thread = threading.Thread(target=self.profiling_loop)
 
-        # list of dict for profiling results
-        self.profiling_results = list()
-        self.profile_graphs = ProfileCalculator(self.experiment, self.profiling_results)
-
         # the number of the current profiling run
-        self.run_number = 0
+        self.run_number = 1
 
         # display option
         self.no_display = defaults.get('no_display', False)
@@ -184,15 +188,14 @@ class Emu_Profiler():
             # wait for profiling thread to end
             self.profiling_thread.join()
 
-
         # stop overload detection
         self.overload_monitor.stop(self.emu)
 
         # write results to file
         self.write_results_to_file(self.results_file)
 
-        #profile_calc = ProfileCalculator(self.experiment, self.profiling_results)
-        self.profile_graphs.finalize_graph()
+        #finalize the calculation of the performance profile
+        self.profile_calc.finalize_graph(show_final=self.no_display)
 
 
     def profiling_loop(self):
@@ -277,6 +280,9 @@ class Emu_Profiler():
             )
             result = self.filter_profile_results(profiling_result)
             self.profiling_results.append(result)
+            # update the plot
+            self.profile_calc.update_results(result)
+
             self.run_number += 1
 
         LOG.info('end of experiment: {}'.format(self.experiment_name))
@@ -315,13 +321,19 @@ class Emu_Profiler():
 
         stdscr.clear()
 
-        resultwin.addstr(0, 0, "------------ resource allocation ------------")
-        i = 1
-        for resource, value in self.resource_configuration[self.run_number-1].items():
-            resultwin.addstr(i, 0, "{0}".format(resource))
-            i += 1
+        i = 0
+        resultwin.addstr(i, 0, "---- Run: {2}/{3}  -----  Timer: {0} secs ----".format(
+            0, self.timeout, self.run_number, len(self.configuration_space)))
+        i += 1
+        resultwin.addstr(i, 0, "------------ resource allocation ------------")
+        i += 1
+        len_resources = 0
+        for vnf_name, resource_dict in self.resource_configuration.items():
+            for resource in resource_dict:
+                resultwin.addstr(len_resources+i, 0, "{0}".format(resource))
+                len_resources += 1
 
-        i += 2
+        i += 2 + len_resources
         resultwin.addstr(i, 0, "------------ input metrics ------------")
         i += 1
         for metric in self.input_metrics:
@@ -338,53 +350,38 @@ class Emu_Profiler():
         maxy, maxx = stdscr.getmaxyx()
         resultwin.refresh(0, 0, 0, 0, height, maxx-1)
 
+        time_counter = 0
         while self.profiling_thread.isAlive():
-
-            i = 1
-            resource_configs = len(self.resource_configuration[0])
-            if resource_configs > 0:
-                for resource, value in self.resource_configuration[(self.run_number-1)%resource_configs].items():
-                    resultwin.addstr(i, 40*self.run_number, "{0}".format(value))
+            resultwin.addstr(0, 0, "---- Run: {2}/{3}  ----- Timer: {0} secs ----".format(
+                time_counter, self.timeout, self.run_number, len(self.configuration_space)))
+            i = 2
+            for vnf_name, resource_dict in self.resource_configuration.items():
+                for resource, value in resource_dict.items():
+                    resultwin.addstr(i, 50, "{0}".format(value))
                     i += 1
 
             # start from length of resource parameters
             i += 3
             for metric in self.input_metrics:
-                resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
+                resultwin.addstr(i, 50, "{0:.2f}".format(metric.last_value))
                 i += 1
 
             i += 3
             for metric in self.output_metrics:
-                resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
+                resultwin.addstr(i, 50, "{0:.2f}".format(metric.last_value))
                 i += 1
-
-            # print the final result
-            result_number = 1
-            for result in self.profiling_results:
-
-                # start from length of resource parameters
-                i = len(self.resource_configuration[0]) + 4
-                for metric in result['input_metrics']:
-                    resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric['average'], metric['CI_low'], metric['CI_high']))
-                    i += 1
-
-                i += 3
-                for metric in result['output_metrics']:
-                    resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric['average'], metric['CI_low'], metric['CI_high']))
-                    i += 1
-
-                result_number += 1
 
             maxy, maxx = stdscr.getmaxyx()
             resultwin.refresh(0, 0, 0, 0, height, maxx-1)
             time.sleep(1)
+            time_counter += 1
 
         # print the final result
         result_number = 1
         for result in self.profiling_results:
 
             # start from length of resource parameters
-            i = len(self.resource_configuration[0]) + 4
+            i = len_resources + 5
             for metric in result['input_metrics']:
                 resultwin.addstr(i, 40 * result_number,
                               "{0:.2f} ({1:.2f},{2:.2f})".format(metric['average'], metric['CI_low'], metric['CI_high']))
@@ -629,80 +626,96 @@ class ProfileCalculator():
     """
     This class is used to calculate a perofrmance profile out of the test results of a ped experiment
     """
-    def __init__(self, experiment, results):
+    def __init__(self, experiment):
         self.experiment = experiment
         self.profile_graphs = experiment.profile_calculations # this is the profile_calculation description from the ped-file
-        self.results = results
+        self.results = []
+        self.resultQ = multiprocessing.Queue()
 
-        #n = len(self.profile_graphs)
-        #plt.ioff()
-        #plt.ion()
-        #self.fig, self.ax = plt.subplots(nrows=n, ncols=1)
+        self.enable_updating = multiprocessing.Event()
+        self.plot_process = multiprocessing.Process(target=self.update_graph, args=(self.resultQ, self.enable_updating))
 
+    def start_plot(self):
+        self.plot_process.start()
 
+    def update_results(self, result):
+        self.results.append(result)
+        self.resultQ.put(self.results)
 
-    def update_graph(self, results):
-        self.results = results
-        i = 1
+    def update_graph(self, resultQ, enable_updating):
+
+        # wait until update is needed
+        enable_updating.wait()
+
         n = len(self.profile_graphs)
-        plt.ioff()
-        self.fig, self.ax = plt.subplots(nrows=n, ncols=1)
-        for profile in self.profile_graphs:
-            plt.subplot(n, 1, i)
-            x_metric_id = profile['input_metric']
-            y_metric_id = profile['output_metric']
 
-            x_metrics = self._find_metrics(x_metric_id)
-            x_values = [m['average'] for m in x_metrics]
-            x_err_high = [m['CI_high'] - m['average'] for m in x_metrics]
-            x_err_low = [abs(m['CI_low'] - m['average']) for m in x_metrics]
-            x_unit = x_metrics[0]['unit']
+        while enable_updating.is_set():
+            results = resultQ.get()
+            i = 1
+            plt.close('all')
+            plt.subplots(nrows=n, ncols=1)
+            for profile in self.profile_graphs:
+                plt.subplot(n, 1, i)
+                x_metric_id = profile['input_metric']
+                y_metric_id = profile['output_metric']
 
-            y_metrics = self._find_metrics(y_metric_id)
-            y_values = [m['average'] for m in y_metrics]
-            y_err_high = [m['CI_high'] - m['average'] for m in y_metrics]
-            y_err_low = [abs(m['CI_low'] - m['average']) for m in y_metrics]
-            y_unit = y_metrics[0]['unit']
+                x_metrics = self._find_metrics(x_metric_id, results)
+                x_values = [m['average'] for m in x_metrics]
+                x_err_high = [m['CI_high'] - m['average'] for m in x_metrics]
+                x_err_low = [abs(m['CI_low'] - m['average']) for m in x_metrics]
+                x_unit = x_metrics[0]['unit']
 
-            plt.xlabel('{0}({1})'.format(x_metric_id, x_unit))
-            plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
+                y_metrics = self._find_metrics(y_metric_id, results)
+                y_values = [m['average'] for m in y_metrics]
+                y_err_high = [m['CI_high'] - m['average'] for m in y_metrics]
+                y_err_low = [abs(m['CI_low'] - m['average']) for m in y_metrics]
+                y_unit = y_metrics[0]['unit']
 
-            plt.title(profile['name'])
+                plt.xlabel('{0}({1})'.format(x_metric_id, x_unit))
+                plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
 
-            plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
-            plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o',
-                         capsize=2)
-            # plt.plot(x_values, y_values, marker='o')
-            #plt.draw()
+                plt.title(profile['name'])
 
-            i += 1
-        plt.tight_layout()
-        plt.show(block=False)
-        #plt.draw()
+                plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
+                plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o',
+                             capsize=2)
 
-    def finalize_graph(self):
-        self.display_graph()
+                i += 1
 
+            plt.tight_layout()
+            plt.draw()
+            plt.show(block=False)
 
-    def display_graph(self):
+    def finalize_graph(self, show_final=False):
+        self.enable_updating.clear()
+        self.plot_process.join(timeout=3)
+        self.plot_process.terminate()
+        # show plot window as blocking
+        if show_final:
+            self.display_graph()
+
+    def display_graph(self, file=None):
+        if file:
+            self.results = read_yaml(file)
+
         plt.close("all")
         plt.ioff()
         logging.info("profile graphs:{}".format(self.profile_graphs))
         n = len(self.profile_graphs)
-        fig, ax = plt.subplots(nrows=n, ncols=1)
+        plt.subplots(nrows=n, ncols=1)
         i = 1
         for profile in self.profile_graphs:
             plt.subplot(n, 1, i)
             x_metric_id = profile['input_metric']
             y_metric_id = profile['output_metric']
 
-            x_metrics = self._find_metrics(x_metric_id)
+            x_metrics = self._find_metrics(x_metric_id, self.results)
             x_values = [m['average'] for m in x_metrics]
             x_err_high = [m['CI_high']-m['average'] for m in x_metrics]
             x_err_low = [abs(m['CI_low']-m['average']) for m in x_metrics]
             x_unit = x_metrics[0]['unit']
 
-            y_metrics = self._find_metrics(y_metric_id)
+            y_metrics = self._find_metrics(y_metric_id, self.results)
             y_values = [m['average'] for m in y_metrics]
             y_err_high = [m['CI_high']-m['average'] for m in y_metrics]
             y_err_low = [abs(m['CI_low']-m['average']) for m in y_metrics]
@@ -719,14 +732,14 @@ class ProfileCalculator():
         plt.tight_layout()
         plt.show()
 
-    def _find_metrics(self, metric_id):
+    def _find_metrics(self, metric_id, results):
         """
         return all metric measurement points as found in the results
         :param metric_id:
         :return:
         """
         metric_list = []
-        for result in self.results:
+        for result in results:
             for metric_dict in result['input_metrics']:
                 if metric_dict['name'] == metric_id:
                     metric_list.append(metric_dict)

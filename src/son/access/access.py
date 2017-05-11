@@ -48,27 +48,35 @@ optional arguments:
   -p PLATFORM_ID, --platform PLATFORM_ID
                         Specify the ID of the Service Platform to use from
                         workspace configuration. If not specified will assume
-                        the IDin 'default_service_platform'
+                        the ID in 'default_service_platform'
   --debug               Set logging level to debug
 """
 
-import requests
+# TODO: Remove!
+# import sys
+# sys.path.append('src/')
+
 import logging
 import requests
 import yaml
+import json
 import sys
 import validators
-from datetime import datetime, timedelta
 import jwt
 import coloredlogs
 import os
-from os.path import expanduser
-from son.workspace.workspace import Workspace
 import time
-from son.access.helpers.helpers import json_response
-from son.access.models.models import User
-from son.access.config.config import GK_ADDRESS, GK_PORT
+from os.path import expanduser
+from datetime import datetime, timedelta
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from base64 import b64encode
+from base64 import b64decode
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
+from son.workspace.workspace import Workspace
+from son.access.helpers.helpers import json_response
+# from son.access.models.models import User
+from son.access.config.config import GK_ADDRESS, GK_PORT, PUBLIC_KEY_PATH, PRIVATE_KEY_PATH, CERT_PATH
 from son.access.pull import Pull
 from son.access.push import Push
 
@@ -76,28 +84,31 @@ log = logging.getLogger(__name__)
 
 
 class mcolors:
-     OKGREEN = '\033[92m'
-     FAIL = '\033[91m'
-     ENDC = '\033[0m'
+    OKGREEN = '\033[92m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
 
-     def disable(self):
-         self.OKGREEN = ''
-         self.FAIL = ''
-         self.ENDC = ''
+    def disable(self):
+        self.OKGREEN = ''
+        self.FAIL = ''
+        self.ENDC = ''
 
 
 class AccessClient:
-    ACCESS_VERSION = "0.3"
+    ACCESS_VERSION = "0.5"
 
     DEFAULT_ACCESS_DIR = os.path.join(expanduser("~"), ".son-access")
 
-    GK_API_VERSION = "/api/v2"
+    # TODO: Connect to the real GateKeeper API URLs or read form configuration file
+
+    GK_API_VERSION = "/api/v2"    # "/api/v1"
     GK_API_BASE = "/"
-    GK_URI_REG = "/register"
-    GK_URI_LOG = "/login"
-    GK_URI_AUT = "TBD"
-    GK_URI_REF = "/refresh"
-    GK_URI_TKV = "TBD"
+    # GK_URI_REG = "/register"    # Register is not allowed from the SDK Access
+    GK_URI_LOGIN = "/sessions"    # POST
+    GK_URI_LOGOUT = "/sessions"   # DELETE
+    GK_URI_PB_KEY = "/micro-services/public-key"
+    # GK_URI_UPDT_PB_KEY = "/signatures"
+    GK_URI_UPDT_PB_KEY = "/users"   # PATCH .../api/v2/users/:username
 
     def __init__(self, workspace, platform_id=None, log_level='INFO'):
         """
@@ -107,6 +118,12 @@ class AccessClient:
         """
         self.workspace = workspace
         self.platform_id = platform_id
+        self.platform_public_key = self.get_platform_public_key()
+        self.access_token = None
+        self.username = None
+        self.dev_public_key = None
+        self.dev_private_key = None
+        self.dev_certificate = None
         if self.platform_id:
             self.platform = self.workspace.get_service_platform(platform_id)
         else:
@@ -116,43 +133,79 @@ class AccessClient:
 
         try:
             # retrieve token from workspace
-            platform_dir = os.path.join(self.workspace.ws_root,
-                                        self.workspace.dirs[
-                                            workspace.CONFIG_STR_PLATFORMS_DIR])
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
             token_path = os.path.join(platform_dir,
                                       self.platform['credentials']['token_file'])
 
-            access_token = None
             if os.path.isfile(token_path):
                 with open(token_path, 'rb') as token_file:
-                    access_token = token_file.read()
-                    access_token = access_token[1:-1]
+                    self.access_token = token_file.read()
         except:
-            access_token = None
+            self.access_token = None
+
+        try:
+            # retrieve keypair from workspace
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
+            pub_path = os.path.join(platform_dir,
+                                    self.platform['signature']['pub_key'])
+            prv_path = os.path.join(platform_dir,
+                                    self.platform['signature']['prv_key'])
+
+            if os.path.isfile(pub_path):
+                with open(pub_path, 'rb') as pub_key_file:
+                    self.dev_public_key = pub_key_file.read()
+            if os.path.isfile(prv_path):
+                with open(prv_path, 'rb') as prv_key_file:
+                    self.dev_private_key = prv_key_file.read()
+
+        except:
+            self.dev_public_key = None
+            self.dev_private_key = None
+
+        # retrieve certificate from workspace
+        try:
+            platform_dir = os.path.join(self.workspace.workspace_root,
+                                        self.workspace.config['platforms_dir'])
+            cert_path = os.path.join(platform_dir,
+                                     self.platform['signature']['cert'])
+            if os.path.isfile(cert_path):
+                with open(cert_path, 'rb') as cert_key_file:
+                    self.dev_certificate = cert_key_file.read()
+
+        except:
+            self.dev_certificate = None
+
+        try:
+            # retrieve token from workspace
+            self.platform_dir = os.path.join(self.workspace.workspace_root,
+                                             self.workspace.config['platforms_dir'])
+        except:
+            self.platform_dir = os.path.join(self.workspace.workspace_root)
 
         # Create a push and pull client for available Service Platforms
         self.pull = dict()
         self.push = dict()
         for p_id, platform in self.workspace.service_platforms.items():
-            self.pull[p_id] = Pull(platform['url'], auth_token=access_token)
-            self.push[p_id] = Push(platform['url'], auth_token=access_token)
+            self.pull[p_id] = Pull(platform['url'])
+            self.push[p_id] = Push(platform['url'], pb_key=self.dev_public_key,
+                                   pr_key=self.dev_private_key, cert=self.dev_certificate)
 
         self.log_level = log_level
         coloredlogs.install(level=log_level)
-        self.JWT_SECRET = 'secret'
-        self.JWT_ALGORITHM = 'HS256'
-        self.JWT_EXP_DELTA_SECONDS = 20
 
-        # TODO: Deprecated?
-        try:
-            self.URL = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
-        except:
-            print("Platform url is required in config file")
+        # TODO: Deprecated
+        # try:
+        #    # Platform URL is found in self.platform['url']
+        #    self.URL = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
+        # except:
+        #    print("Platform url is required in config file")
 
         # Ensure parameters are valid
-        assert validators.url(self.URL),\
-            "Failed to init access client. Invalid URL: '{}'"\
-            .format(self.URL)
+        # assert validators.url(self.URL), \
+        #    "Failed to init access client. Invalid URL: '{}'" \
+        #        .format(self.URL)
 
     @property
     def default_push(self):
@@ -172,34 +225,36 @@ class AccessClient:
             if self.platform_id else None
 
     # DEPRECATED -> Users will only be able to register through SON-GUI
-    def client_register(self, username, password):
-        """
-        Request registration form on the Service Platform
-        :param username: user identifier
-        :param password: user password
-        :return: Initial JWT access_token? Or HTTP Code to confirm registration
-        """
-        form_data = {
-            'username': username,
-            'password': password
-        }
-
-        url = self.URL + self.GK_API_VERSION + self.GK_URI_REG
-
-        response = requests.post(url, data=form_data, verify=False)
-        print("Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
-        # TODO: Create userdata file? Check KEYCLOAK register form
-        return response
+    # def client_register(self, username, password):
+    #    """
+    #    Request registration form on the Service Platform
+    #    :param username: user identifier
+    #    :param password: user password
+    #    :return: Initial JWT access_token? Or HTTP Code to confirm registration
+    #    """
+    #    form_data = {
+    #        'username': username,
+    #        'password': password
+    #    }
+    #
+    #    url = self.URL + self.GK_API_VERSION + self.GK_URI_REG
+    #
+    #    response = requests.post(url, data=form_data, verify=False)
+    #    print("Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
+    #    # Create userdata file? Check KEYCLOAK register form
+    #    return response
 
     def client_login(self, username=None, password=None):
         """
         Make a POST request with username and password
         :param username: user identifier
         :param password: user password
-        :return: JW Access Token is returned from the GK server
+        :return: JWT Access Token is returned from the GK server
         """
 
-        url = self.platform['url'] + self.GK_API_VERSION + self.GK_URI_LOG
+        default_sp = self.workspace.default_service_platform
+        # url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_LOGIN
 
         if not username:
             username = self.platform['credentials']['username']
@@ -207,13 +262,18 @@ class AccessClient:
         if not password:
             password = self.platform['credentials']['password']
 
-        # Construct the POST request
-        form_data = {
-            'username': username,
-            'password': password
-        }
+        # Construct the POST login request
+        # credentials = (str(username) + ':' + str(password)).encode('utf-8')
+        credentials = json.dumps({'username': username, 'password': password})
+        # encoded_creds = b64encode(credentials)
+        # headers = {'Authorization': 'Basic %s' % (encoded_creds.decode('utf-8'))}
 
-        response = requests.post(url, data=form_data, verify=False)
+        response = requests.post(url, data=credentials, verify=False)
+        # response = requests.post(url, headers=headers, verify=False
+        if not response.status_code in (200, 201):
+            log.debug('Error {0}'.format(response.status_code))
+            return response.text
+
         log.debug("Access Token received: '{0}'".format(response.text))
 
         token_file = self.platform['credentials']['token_file']
@@ -221,55 +281,273 @@ class AccessClient:
             token_file = 'token.' + str(time.time())
             self.workspace.config_service_platform(self.platform_id,
                                                    token=token_file)
+            self.platform['credentials']['token_file'] = token_file
+
         token_path = os.path.join(
-            self.workspace.ws_root,
-            self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+            self.workspace.workspace_root,
+            self.workspace.config['platforms_dir'],
+            # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
             token_file)
 
-        token = response.text.replace('\n', '')
-        with open(token_path, "wb") as _file:
+        # token = response.text.replace('\n', '')
+        token = json.loads(response.text)['token']['access_token']
+        # print('token=', token)
+
+        if not os.path.exists(os.path.dirname(token_path)):
+            try:
+                os.makedirs(os.path.dirname(token_path))
+            except OSError as exc:  # Guard against race condition
+                raise
+
+        with open(token_path, "w+") as _file:
             _file.write(token)
+            self.access_token = token
 
         return response.text
 
     def client_logout(self):
         """
         Send request to /logout interface to end user session
-        :return: HTTP Code?
+        :return: HTTP Code 204
         """
-        pass
+        default_sp = self.workspace.default_service_platform
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_LOGOUT
 
-    def client_authenticate(self):
-        """
-        Send access_token in Authorization headers with
-        request to the restricted source (SP) to exchange for a
-        authenticity token (This method might be removed)
-        :return: HTTP code?
-        """
-        pass
+        result = self.check_token_status()
+        if not result:
+            print("Access session expired, log-in again")
+            return
 
-    def check_token_validity(self):
+        if self.access_token is None:
+            token_file = self.platform['credentials']['token_file']
+            token_path = os.path.join(
+                self.workspace.workspace_root,
+                self.workspace.config['platforms_dir'],
+                # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+                token_file)
+
+            # Construct the POST logout request
+            with open(token_path, "r") as _file:
+                self.access_token = _file.read
+
+        # print(self.access_token.decode('utf-8'))
+        headers = {'Authorization': 'Bearer %s' % (self.access_token.decode('utf-8'))}
+
+        response = requests.post(url, headers=headers, verify=False)
+        if response.status_code not in (200, 204):
+            log.debug('Error {0}'.format(response.status_code))
+            return response.text
+        log.debug("Successfully logged-out: '{0}'".format(response.text))
+        return response.status_code
+
+    # Token validation is done client-side using the Platform Public Key
+    def check_token_status(self):
         """
         Simple request to check if session has expired (TBD)
-        :return: HTTP code?
+        :return: Token status
         """
-        pass
 
-    def push_package(self, path):
+        # print('access_token=', self.access_token)
+        # print('platform_key=', self.platform_public_key)
+
+        if self.access_token is None:
+            try:
+                token_file = self.platform['credentials']['token_file']
+                token_path = os.path.join(
+                    self.workspace.workspace_root,
+                    self.workspace.config['platforms_dir'],
+                    # self.workspace.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR],
+                    token_file)
+
+                # Construct the POST login request
+                with open(token_path, "r") as _file:
+                    self.access_token = _file.read
+            except:
+                return True
+
+        if self.platform_public_key is None:
+            return True
+
+        try:
+            decoded = jwt.decode(self.access_token, self.platform_public_key, True,
+                                 algorithms='RS256', audience='adapter')  # options={'verify_aud': False})
+            print('contents', decoded)
+            try:
+                self.username = decoded['preferred_username']
+                return True
+            except:
+                return True
+        except jwt.DecodeError:
+            print('Token cannot be decoded because it failed validation')
+            return False
+        except jwt.ExpiredSignatureError:
+            print('Signature has expired')
+            return False
+        except jwt.InvalidIssuerError:
+            return False
+        except jwt.InvalidIssuedAtError:
+            return False
+
+    def get_platform_public_key(self):
+        """
+        Simple request to request the Platform Public Key
+        :return: Public Key, HTTP code 200
+        """
+        default_sp = self.workspace.default_service_platform
+        url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
+
+        try:
+            response = requests.get(url, verify=False)
+            parsed_key = json.loads(response.text)
+            parsed_key = parsed_key['items']['public-key']
+            # print('parsed_key=', parsed_key)
+            platform_public_key = "-----BEGIN PUBLIC KEY-----\n"
+            platform_public_key += parsed_key
+            platform_public_key += "\n-----END PUBLIC KEY-----\n"
+            # print(platform_public_key)
+            return RSA.importKey(platform_public_key).exportKey('PEM')
+
+        except:
+            # If the platform public key is not available, disable authentication and return None
+            log.error("Service Platform Public Key not found. Authentication is disabled.")
+            return None
+
+    def generate_keypair(self, platform_dir):
+        """
+        Generates User's Private Key and Public Key
+        :param platform_dir: Path to the location where keys will be saved
+        :returns: Private key, Public Key
+        """
+        # KeyPair = NamedTuple('KeyPair', [('public', str), ('private', str)])
+        algorithm = 'RS256'
+
+        key = RSA.generate(2048)
+        public = key.publickey().exportKey('PEM').decode('ascii')
+        private = key.exportKey('PEM').decode('ascii')
+
+        # print("public=", public)
+        # print("private=", private)
+
+        self.dev_public_key = public
+        self.dev_private_key = private
+
+        # Stores the keypair in the workspace configured platform dir
+        try:
+            simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
+            simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
+
+            # print("simple_public=", simple_public)
+
+            default_sp = self.workspace.default_service_platform
+
+            url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + \
+                  self.GK_URI_UPDT_PB_KEY + '/' + self.username   # TODO: Connect to the real GK API url
+
+            print("url=", url)
+
+            headers = {'Content-type': 'application/json',
+                      'Authorization': 'Bearer %s' % (self.access_token.decode('utf-8'))}
+
+            body = json.dumps({'public_key': simple_public})
+
+            print("url=", url)
+            print("body=", body)
+
+            r = requests.patch(url, headers=headers, data=body)
+            # r = requests.put(url, headers=headers, data=body)
+
+            print("r.status_code=", r.status_code)
+
+            if int(r.status_code) != 200:
+                log.error("Updating User's Public Key in remote Platform failed!")
+                return False
+
+            try:
+                pb_key_path = os.path.join(platform_dir,
+                                          self.platform['signature']['pub_key'])
+                prv_key_path = os.path.join(platform_dir,
+                                          self.platform['signature']['prv_key'])
+                # print("pb_key_path=", pb_key_path)
+                # print("prv_key_path=", prv_key_path)
+            except:
+                log.error("Error: User's Public and Private keys are not configured in the workspace!")
+                return False
+
+            with open(pb_key_path, mode="w+") as pb_file:
+                pb_file.write(self.dev_public_key)
+            with open(prv_key_path, mode="w+") as pr_file:
+                pr_file.write(self.dev_private_key)
+
+            log.info("User's Public and Private keys generated and saved successfully")
+            return True
+
+        except:
+            log.error("Error generating new keypair for the user")
+            return False
+
+    def push_package(self, path, sign=False):
         """
         Call push feature to upload a package to the SP Catalogue
+        :param path: location of the package to submit
+        :param sign: setting to state if the package is going to be signed
         :return: HTTP code 201 or 40X
         """
-        # mode = "push"
-        # url = "http://sp.int3.sonata-nfv.eu:32001"  # Read from config
-        # path = "samples/sonata-demo.son"
 
-        # Push son-package to the Service Platform
-        print(self.default_push.upload_package(path))
+        print("Pushing package")
+        print("SIGN =", sign)
+
+        # TODO: Implement token expiry evaluation
+        result = self.check_token_status()
+        if not result:
+            print("Access session expired, log-in again")
+            return
+
+        elif sign:
+            if self.platform_public_key is None:
+                log.error("Error: Authentication is disabled. It is not possible to sign.")
+                return
+
+            if not (self.dev_public_key and self.dev_private_key):
+                #  Generates keypair for the developer
+                result = self.generate_keypair(self.platform_dir)
+                if not result:
+                    return
+            # IN PROGRESS: CALL SIGN METHOD
+            # Push son-package to the Service Platform
+            sign = self.sign_package(path)
+            print(self.default_push.upload_package(self.access_token, path, sign))
+
+        else:
+            # Push son-package to the Service Platform
+            print(self.default_push.upload_package(self.access_token, path))
+
+    def sign_package(self, path, private_key=None):
+        """
+        Sign package feature using SHA256 hash and RSA keypair
+        :param path: location of the package to submit
+        :param private_key: optional private_key used in signature (default None)
+        :return: string containing an int representation of the package's signature
+        """
+        if private_key:
+            # Private key used to test
+            private_key_obj = RSA.importKey(private_key)
+        else:
+            private_key_obj = RSA.importKey(self.dev_private_key)
+        try:
+            with open(path, 'rb') as fhandle:
+                package_content = fhandle.read()
+        except IOError as err:
+            print("I/O error: {0}".format(err))
+        # File read as binary, it's not necessary to encode 'utf-8' to hash
+        package_hash = SHA256.new(package_content).digest()
+        # Signature is a tuple containing an integer as first entry
+        signature = private_key_obj.sign(package_hash, '')
+        return str(signature[0])
 
     def deploy_service(self, service_id):
         """
         Call push feature to request a service instantiation to the SP Catalogue
+        :param service_id: unique identifier of the service to be instanced
         :return: HTTP code 20X or 40X
         """
         print(self.default_push.instantiate_service(service_id))
@@ -293,6 +571,12 @@ class AccessClient:
         pull = self.default_pull if not platform_id else self.pull[platform_id]
         if not pull:
             log.error("Service Platform not defined. Aborting")
+            return
+
+        # TODO: Implement token expiry evaluation
+        result = self.check_token_status()
+        if not result:
+            print("Access session expired, log-in again")
             return
 
         # resources by id
@@ -350,7 +634,7 @@ class AccessClient:
 
     def store_nsd(self, nsd):
         store_path = os.path.join(
-            self.workspace.ws_root,
+            self.workspace.workspace_root,
             self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_NS_DIR],
             str(time.time())
         )
@@ -358,7 +642,7 @@ class AccessClient:
 
     def store_vnfd(self, vnfd):
         store_path = os.path.join(
-            self.workspace.ws_root,
+            self.workspace.workspace_root,
             self.workspace.dirs[self.workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
             str(time.time())
         )
@@ -371,7 +655,6 @@ class AccessClient:
 
 
 class AccessArgParse(object):
-
     def __init__(self):
         usage = """son-access [optional] command [<args>]
         The supported commands are:
@@ -383,7 +666,9 @@ class AccessArgParse(object):
         """
         examples = """Example usage:
             access auth -u tester -p 1234
+            access auth --logout
             access push --upload samples/sonata-demo.son
+            access push --upload samples/sonata-demo.son --sign
             access list services
             access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             access pull services --id sonata.eu firewall-vnf 1.0
@@ -408,7 +693,7 @@ class AccessArgParse(object):
             metavar="PLATFORM_ID",
             help="Specify the ID of the Service Platform to use from "
                  "workspace configuration. If not specified will assume the ID"
-                 "in '{}'".format(Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM),
+                 "in 'default_service_platform'",   # "in '{}'".format(Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM),
             required=False
         )
         parser.add_argument(
@@ -417,7 +702,6 @@ class AccessArgParse(object):
             required=False,
             action="store_true"
         )
-
         parser.add_argument(
             "command",
             help="Command to run"
@@ -428,22 +712,22 @@ class AccessArgParse(object):
         for idx in range(1, len(sys.argv)):
             v = sys.argv[idx]
             if (v == "-w" or v == "--workspace" or
-               v == '-p' or v == "--platform"):
+                        v == '-p' or v == "--platform"):
                 command_idx += 2
             elif v == '--debug':
                 command_idx += 1
 
-        self.subarg_idx = command_idx+1
+        self.subarg_idx = command_idx + 1
         args = parser.parse_args(sys.argv[1: self.subarg_idx])
 
         # handle workspace
         if args.workspace:
-            ws_root = args.workspace
+            workspace_root = args.workspace
         else:
-            ws_root = Workspace.DEFAULT_WORKSPACE_DIR
-        self.workspace = Workspace.__create_from_descriptor__(ws_root)
+            workspace_root = Workspace.DEFAULT_WORKSPACE_DIR
+        self.workspace = Workspace.__create_from_descriptor__(workspace_root)
         if not self.workspace:
-            print("Invalid workspace: ", ws_root)
+            print("Invalid workspace: ", workspace_root)
             return
 
         # handle debug
@@ -483,11 +767,21 @@ class AccessArgParse(object):
             help="Specify password of the user",
             required=False
         )
+        parser.add_argument(
+            "--logout",
+            help="Logout the access token",
+            action='store_true',
+            required=False
+        )
         args = parser.parse_args(sys.argv[self.subarg_idx:])
 
-        rsp = self.ac.client_login(username=args.username,
-                                   password=args.password)
-        print("Authentication is successful: %s" % rsp)
+        if args.logout:
+            rsp = self.ac.client_logout()
+            print("Authentication response: %s" % rsp)
+        else:
+            rsp = self.ac.client_login(username=args.username,
+                                       password=args.password)
+            print("Authentication response: %s" % rsp)
 
     def list(self):
         parser = ArgumentParser(
@@ -520,6 +814,18 @@ class AccessArgParse(object):
             required=False,
             metavar="PACKAGE_PATH"
         )
+
+        mutex_parser = parser.add_mutually_exclusive_group(
+            required=False
+        )
+        # Optional argument to set package signing on
+        mutex_parser.add_argument(
+            "--sign",
+            help="Sign the package option to submit a signed package",
+            dest="sign",
+            action='store_true',
+            required=False
+        )
         parser.add_argument(
             "--deploy",
             type=str,
@@ -535,10 +841,14 @@ class AccessArgParse(object):
             exit(1)
 
         if args.upload:
-            # TODO: Check token expiration
-            package_path = args.upload
-            print(package_path)
-            self.ac.push_package(package_path)
+            if args.sign:
+                package_path = args.upload
+                print(package_path)
+                self.ac.push_package(package_path, sign=True)
+            else:
+                package_path = args.upload
+                print(package_path)
+                self.ac.push_package(package_path, sign=False)
 
         elif args.deploy:
             service_uuid = args.deploy
@@ -640,13 +950,13 @@ class AccessArgParse(object):
             required=False,
             metavar="PASSWORD"
         )
-        parser.add_argument(
-            "--token",
-            help="Configure token filename",
-            type=str,
-            required=False,
-            metavar="TOKEN_FILE"
-        )
+        # parser.add_argument(
+        #    "--token",
+        #    help="Configure token filename",
+        #    type=str,
+        #    required=False,
+        #    metavar="TOKEN_FILE"
+        # )
         parser.add_argument(
             "--default",
             help="Set Service Platform as default",
@@ -668,9 +978,9 @@ class AccessArgParse(object):
             exit(0)
 
         if not (args.url or args.username or args.password or args.token or
-                args.default):
+                    args.default):
             log.error("At least one of the following arguments must be "
-                      "specified: (--url | --username | --password | --token "
+                      "specified: (--url | --username | --password "
                       "| --default)")
             exit(1)
 
@@ -694,7 +1004,7 @@ class AccessArgParse(object):
                                                url=args.url,
                                                username=args.username,
                                                password=args.password,
-                                               token=args.token,
+                                               # token=args.token,
                                                default=args.default)
 
         log.info("Service Platform ID='{0}':\n{1}"
@@ -705,6 +1015,7 @@ class AccessArgParse(object):
 def main():
     AccessArgParse()
 
+
 if __name__ == '__main__':
-    #TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
+    # TODO: Call 'fake' User Management Auth on mock.py while real User Management module is WIP
     main()
