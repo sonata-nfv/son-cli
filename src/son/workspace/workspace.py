@@ -97,6 +97,30 @@ class Workspace:
     def config(self):
         return self._ws_config
 
+    @property
+    def catalogues_dir(self):
+        return self.config['catalogues']
+
+    @property
+    def configuration_dir(self):
+        return self.config['configuration_dir']
+
+    @property
+    def platforms_dir(self):
+        return self.config['platforms_dir']
+
+    @property
+    def projects_dir(self):
+        return self.config['projects_dir']
+
+    @property
+    def ns_catalogue_dir(self):
+        return os.path.join(self.catalogues_dir, 'ns_catalogue')
+
+    @property
+    def vnf_catalogue_dir(self):
+        return os.path.join(self.catalogues_dir, 'vnf_catalogue')
+
     def load_default_config(self):
         self.config['version'] = self.CONFIG_VERSION
         self.config['name'] = 'SONATA Workspace'
@@ -146,6 +170,8 @@ class Workspace:
         os.makedirs(self.workspace_root, exist_ok=False)
 
         dirs = [self.config['catalogues_dir'],
+                os.path.join(self.config['catalogues_dir'], 'ns_catalogue'),
+                os.path.join(self.config['catalogues_dir'], 'vnf_catalogue'),
                 self.config['configuration_dir'],
                 self.config['platforms_dir'],
                 self.config['projects_dir'],
