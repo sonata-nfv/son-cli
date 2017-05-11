@@ -74,3 +74,133 @@ def push_tests():
     push_client = Push(base_url="http://sp.int.sonata-nfv.eu:32001", auth_token=access_token)
     print(push_client.upload_package("../samples/sonata-demo.son"))
 
+
+def generate_keypair():
+    import requests
+    import json
+    from Crypto.PublicKey import RSA
+    algorithm = 'RS256'
+
+    key = RSA.generate(2048)
+    public = key.publickey().exportKey('PEM').decode('ascii')
+    private = key.exportKey('PEM').decode('ascii')
+
+    #simple_public = key.publickey().exportKey().splitlines()[1:-1]
+    simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
+    print('simple_public1=', simple_public)
+    simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
+
+    print('simple_public2=', simple_public)
+    #simple_public = (b'\n'.join(simple_public))
+    #print('simple_public2=', simple_public)
+
+    print("public=", public)
+    print("private=", private)
+
+    with open("private_key", mode="w") as pr_file:
+            pr_file.write(private)
+    with open("public_key", mode="w") as pb_file:
+            pb_file.write(public)
+
+    # TODO: Save Public Key in Service Platform User Management database
+    url = "http://127.0.0.1:5001/api/v2/signature"
+    # headers =
+    body = json.dumps({'public_key': simple_public})
+    print("body=", body)
+
+    r = requests.put(url, headers={'Content-type': 'application/json'}, data=body)
+    if r.status_code == 201:
+        msg = "Upload succeeded"
+
+def user_login(username, password):
+    import requests
+    import json
+    from base64 import b64encode, b64decode
+
+    # Construct the POST login request
+    creds = (str(username) + ':' + str(password)).encode("utf-8")
+    # print(str(username) + ':' + str(password))
+    print(creds)
+    encoded_password = b64encode(creds)
+    print(encoded_password)
+    print(encoded_password.decode("utf-8"))
+    headers = {'Authorization': 'Basic %s' % (encoded_password.decode("utf-8"))}
+
+    url = "http://sp.int3.sonata-nfv.eu:5600/api/v1/login/user"
+
+    response = requests.post(url, headers=headers, verify=False)
+    if not response.status_code in (200, 201):
+        return response.text
+    token = json.loads(response.text)['access_token']
+    return token
+
+def get_platform_public_key():
+    """
+    Simple request to request the Platform Public Key
+    :return: Public Key, HTTP code 200
+    """
+    from Crypto.PublicKey import RSA
+    import requests
+    import json
+
+    url = 'http://sp.int3.sonata-nfv.eu:5600/api/v1/public-key'
+    response = requests.get(url, verify=False)
+    # print(response.status_code, response.text)
+    parsed_key = json.loads(response.text)['public-key']
+    print(parsed_key)
+    platform_public_key = "-----BEGIN PUBLIC KEY-----\n"
+    platform_public_key += parsed_key
+    platform_public_key += "\n-----END PUBLIC KEY-----\n"
+    print(platform_public_key)
+    key = RSA.importKey(platform_public_key).exportKey('PEM')
+    print(key)
+    return key
+
+
+def check_token(key, access_token):
+    import jwt
+    """
+    Simple request to check if session has expired (TBD)
+    :return: Token status
+    """
+    # access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJPelpfa1VoUzAwNlF0SFVKTWtPWUxtV2NRaFNyTlgwV0p1aFNVMTZHR1NFIn0.eyJqdGkiOiJjYTU0MjM0NC1hMTgxLTRkYmEtOWU5Yi1mOGM5ZjMwOWY2NDkiLCJleHAiOjE0OTIwMDc2NjIsIm5iZiI6MCwiaWF0IjoxNDkyMDA3MzYyLCJpc3MiOiJodHRwOi8vc29uLWtleWNsb2FrOjU2MDEvYXV0aC9yZWFsbXMvc29uYXRhIiwiYXVkIjoiYWRhcHRlciIsInN1YiI6IjllNzMwZWJlLTk3MzgtNGY1ZC05OTNiLTEzYjlmOGJjOTFlZiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFkYXB0ZXIiLCJhdXRoX3RpbWUiOjAsInNlc3Npb25fc3RhdGUiOiIwMzU3YmNiYS03ZjFiLTRjNzYtOTBjZi1hOTA2MjViNDIxZTMiLCJhY3IiOiIxIiwiY2xpZW50X3Nlc3Npb24iOiJkNGNmZWFhNS1iMDE3LTRlYmQtOTA3MS0xMGNhZTIxNzMxYzAiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdDo4MDgxIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZXZlbG9wZXIiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sIm5hbWUiOiJVc2VyIFNhbXBsZSIsInByZWZlcnJlZF91c2VybmFtZSI6InVzZXIwMSIsImdpdmVuX25hbWUiOiJVc2VyIiwiZmFtaWx5X25hbWUiOiJTYW1wbGUiLCJlbWFpbCI6InVzZXIuc2FtcGxlQGVtYWlsLmNvbSJ9.Q_vh4QenmJjf1MFPHSWsLQFsU6u0VB37YUMC8tN7prqFRSHe8EztYXhfixh1pxkqb8doaxTcR2DWC4orhzWc-3srFwbAHI5y_ZiZ54gFQBwUW3mAEhSsLkD-MJTqLJ9hexHYj0I2zpSGBsWdbMCeg0AVUnWt7BGTfJ8CUQo5GJWyWnusJ95WFr9XgZ5QR_bxJLqYzoh1QnLxN1kXEYGeTYuL36Miaf5KOzY2FiQyKnj4arSEScJFQQy2FVjxSD3yOXTBl6pcMPvdKOGIIdcPw1Maf0dATTcT1dprX-HEonaE0nduCXYquCedB_fJr21WHRMs62ZagL7cEgU7eXoowA'
+    try:
+        contents = jwt.decode(access_token, key, True, algorithms='RS256', audience='adapter')  # options={'verify_aud': False})
+        print('contents', contents)
+        return True
+    except jwt.ExpiredSignatureError:
+        print('Signature has expired')
+        return False
+
+
+def sign():
+    from Crypto.Hash import SHA256
+    from Crypto.PublicKey import RSA
+    key = RSA.generate(2048)
+    public = key.publickey().exportKey('PEM').decode('ascii')
+    private = key.exportKey('PEM').decode('ascii')
+
+    text = 'abcdefgh'.encode('utf-8')
+    hash = SHA256.new(text).digest()
+    signature = key.sign(hash, '')
+    print('signature=', signature)
+
+
+# Verify
+# Knowing the public key, it is easy to verify a message.
+# The plain text is sent to the user along with the signature.
+# The receiving side calculates the hash value and then uses the public key verify() method to validate its origin.
+def verify(public_key, signature):
+    from Crypto.Hash import SHA256
+    from Crypto.PublicKey import RSA
+    text = 'abcdefgh'
+    hash = SHA256.new(text).digest()
+    public_key.verify(hash, signature)
+
+
+# generate_keypair()
+# token = user_login('user04', '1234')
+# print(token)
+# key = get_platform_public_key()
+# check_token(key, token)
+# sign()
