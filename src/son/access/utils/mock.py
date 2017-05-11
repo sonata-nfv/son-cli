@@ -135,6 +135,20 @@ def requests():
     print('Instantiation request received')
     return make_response(jsonify({'OK': 'Instantiation initiated'}), 200)
 
+
+# request.args: the key/value pairs in the URL query string
+# request.form: the key/value pairs in the body, from a HTML post form, or JavaScript request that isn't JSON encoded
+# request.files: the files in the body, which Flask keeps separate from form. HTML forms must use enctype=multipart/form-data or files will not be uploaded.
+# request.values: combined args and form, preferring args if keys overlap
+@app.route('/api/v2/signature', methods=['PUT'])
+def signature():
+    print('Signature update received')
+    public_key = json.loads(request.data.decode('utf-8'))
+    print('public_key=', public_key['public_key'])
+
+    return make_response(jsonify({'OK': 'Update done'}), 200)
+
+
 def main():
     app.run(
         host='127.0.0.1',

@@ -17,6 +17,8 @@ RUN apt-get clean \
     && echo 'Done'
 
 WORKDIR /son-cli
+ENV PYTHONIOENCODING "UTF-8"
+ENV LC_ALL C
 
 COPY . /son-cli
 

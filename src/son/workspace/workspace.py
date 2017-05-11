@@ -37,74 +37,104 @@ log = logging.getLogger(__name__)
 
 
 class Workspace:
-    WORKSPACE_VERSION = "0.03"
-
+    BACK_CONFIG_VERSION = "0.03"
+    CONFIG_VERSION = "0.05"
     DEFAULT_WORKSPACE_DIR = os.path.join(expanduser("~"), ".son-workspace")
     DEFAULT_SCHEMAS_DIR = os.path.join(expanduser("~"), ".son-schema")
-
-    # Parameter strings for the configuration descriptor.
-    CONFIG_STR_NAME = "name"
-    CONFIG_STR_VERSION = "version"
-    CONFIG_STR_CATALOGUES_DIR = "catalogues_dir"
-    CONFIG_STR_CATALOGUE_NS_DIR = "ns_catalogue"
-    CONFIG_STR_CATALOGUE_VNF_DIR = "vnf_catalogue"
-    CONFIG_STR_CONFIG_DIR = "configuration_dir"
-    CONFIG_STR_PLATFORMS_DIR = "platforms_dir"
-    CONFIG_STR_PROJECTS_DIR = "projects_dir"
-    CONFIG_STR_SCHEMAS_REMOTE_MASTER = "schemas_remote_master"
-    CONFIG_STR_SCHEMAS_LOCAL_MASTER = "schemas_local_master"
-    CONFIG_STR_DESCRIPTOR_EXTENSION = "default_descriptor_extension"
-    CONFIG_STR_SERVICE_PLATFORMS = "service_platforms"
-    CONFIG_STR_DEF_SERVICE_PLATFORM = "default_service_platform"
-    CONFIG_STR_LOGGING_LEVEL = "log_level"
-
     __descriptor_name__ = "workspace.yml"
 
-    def __init__(self, ws_root, ws_name='SONATA workspace', log_level='INFO'):
-        self.log_level = log_level
-        coloredlogs.install(level=log_level)
-        self.ws_root = ws_root
-        self.ws_name = ws_name
-        self.dirs = dict()
-        self.schemas = dict()
-        self.default_descriptor_extension = ""
-        self.load_default_config()
+    def __init__(self, ws_root, config=None, ws_name=None, log_level=None):
 
-        # Catalogue servers
-        self._service_platforms = dict()
-        self._service_platforms['sp1'] = \
-            {'url': 'http://sp.int3.sonata-nfv.eu:32001',
-             'credentials': {'username': 'sonata',
-                             'password': 's0n@t@',
-                             'token_file': 'token.txt'}
-             }
-        self._default_service_platform = 'sp1'
+        self._ws_root = ws_root
+        self._ws_config = dict()
+
+        if config:
+            self._ws_config = config
+
+        else:
+            self.load_default_config()
+            if ws_name:
+                self.config['name'] = ws_name
+            if log_level:
+                self.config['log_level'] = log_level
+
+        coloredlogs.install(level=self.config['log_level'])
+
+    @property
+    def workspace_root(self):
+        return self._ws_root
+
+    @property
+    def workspace_name(self):
+        return self.config['name']
+
+    @property
+    def default_descriptor_extension(self):
+        return self.config['default_descriptor_extension']
+
+    @property
+    def log_level(self):
+        return self.config['log_level']
+
+    @log_level.setter
+    def log_level(self, value):
+        self.config['log_level'] = value
+        coloredlogs.install(level=value)
+
+    @property
+    def schemas_local_master(self):
+        return self.config['schemas_local_master']
+
+    @property
+    def schemas_remote_master(self):
+        return self.config['schemas_remote_master']
+
+    @property
+    def validate_watchers(self):
+        return self.config['validate_watchers']
+
+    @property
+    def config(self):
+        return self._ws_config
 
     def load_default_config(self):
-        self.dirs[self.CONFIG_STR_CATALOGUES_DIR] = 'catalogues'
-        self.dirs[self.CONFIG_STR_CONFIG_DIR] = 'configuration'
-        self.dirs[self.CONFIG_STR_PLATFORMS_DIR] = 'platforms'
+        self.config['version'] = self.CONFIG_VERSION
+        self.config['name'] = 'SONATA Workspace'
+        self.config['log_level'] = 'INFO'
 
-        self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
-            Workspace.DEFAULT_SCHEMAS_DIR
+        self.config['catalogues_dir'] = 'catalogues'
+        self.config['configuration_dir'] = 'configuration'
+        self.config['platforms_dir'] = 'platforms'
+        self.config['projects_dir'] = 'projects'
 
-        self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
+        self.config['schemas_local_master'] = Workspace.DEFAULT_SCHEMAS_DIR
+        self.config['schemas_remote_master'] = \
             "https://raw.githubusercontent.com/sonata-nfv/son-schema/master/"
 
-        # Sub-directories of catalogues
-        self.dirs[self.CONFIG_STR_CATALOGUE_NS_DIR] = \
-            os.path.join(self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
-                         self.CONFIG_STR_CATALOGUE_NS_DIR)
+        self.config['default_descriptor_extension'] = 'yml'
 
-        self.dirs[self.CONFIG_STR_CATALOGUE_VNF_DIR] = \
-            os.path.join(self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
-                         self.CONFIG_STR_CATALOGUE_VNF_DIR)
-
-        # Projects dir (optional)
-        self.dirs[self.CONFIG_STR_PROJECTS_DIR] = 'projects'
-
-        # Extension for YAML - schema/descriptor files
-        self.default_descriptor_extension = "yml"
+        self.config['service_platforms'] = \
+            {'sp1':
+                {'url': 'http://sp.int3.sonata-nfv.eu:32001',
+                 'credentials': {'username': 'sonata',
+                                 'password': 's0n@t@',
+                                 'token_file': 'token.txt',
+                                 'signature': {'pub_key': '',
+                                               'prv_key': '',
+                                               'cert': ''
+                                               }
+                                 }
+                 }
+             }
+        self.config['default_service_platform'] = 'sp1'
+        self.config['validate_watchers'] = \
+            {os.path.join(self.workspace_root, self.config['projects_dir'])
+             : {'type': 'project',
+                'syntax': True,
+                'integrity': True,
+                'topology': True
+                }
+             }
 
     def create_dirs(self):
         """
@@ -112,66 +142,27 @@ class Workspace:
         Invoked upon workspace creation.
         :return:
         """
+        log.info('Creating workspace at %s', self.workspace_root)
+        os.makedirs(self.workspace_root, exist_ok=False)
 
-        log.info('Creating workspace at %s', self.ws_root)
-        os.makedirs(self.ws_root, exist_ok=False)
-        for d in self.dirs:
-            path = os.path.join(self.ws_root, self.dirs[d])
+        dirs = [self.config['catalogues_dir'],
+                self.config['configuration_dir'],
+                self.config['platforms_dir'],
+                self.config['projects_dir'],
+                ]
+
+        for d in dirs:
+            path = os.path.join(self.workspace_root, d)
             os.makedirs(path, exist_ok=True)
 
-    def create_catalog_sample(self):
-        d = {'name': 'My personal catalog',
-             'credentials': 'personal'
-             }
-
-        ws_file_path = os.path.join(self.ws_root,
-                                    self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
-                                    'personal.yml')
-
-        with open(ws_file_path, 'w') as ws_file:
-            ws_file.write(yaml.dump(d, default_flow_style=False))
-
-    def create_ws_descriptor(self):
+    def write_ws_descriptor(self):
         """
         Creates a workspace configuration file descriptor.
         This is triggered by workspace creation and configuration changes.
         :return:
         """
-        cfg_d = {self.CONFIG_STR_VERSION:
-                 Workspace.WORKSPACE_VERSION,
-
-                 self.CONFIG_STR_NAME:
-                 self.ws_name,
-
-                 self.CONFIG_STR_CATALOGUES_DIR:
-                 self.dirs[self.CONFIG_STR_CATALOGUES_DIR],
-
-                 self.CONFIG_STR_CONFIG_DIR:
-                 self.dirs[self.CONFIG_STR_CONFIG_DIR],
-
-                 self.CONFIG_STR_PLATFORMS_DIR:
-                 self.dirs[self.CONFIG_STR_PLATFORMS_DIR],
-
-                 self.CONFIG_STR_SCHEMAS_LOCAL_MASTER:
-                 self.schemas[self.CONFIG_STR_SCHEMAS_LOCAL_MASTER],
-
-                 self.CONFIG_STR_SCHEMAS_REMOTE_MASTER:
-                 self.schemas[self.CONFIG_STR_SCHEMAS_REMOTE_MASTER],
-
-                 self.CONFIG_STR_SERVICE_PLATFORMS:
-                 self._service_platforms,
-
-                 self.CONFIG_STR_DEF_SERVICE_PLATFORM:
-                 self._default_service_platform,
-
-                 self.CONFIG_STR_LOGGING_LEVEL:
-                 self.log_level,
-
-                 self.CONFIG_STR_DESCRIPTOR_EXTENSION:
-                 self.default_descriptor_extension
-                 }
-
-        ws_file_path = os.path.join(self.ws_root,
+        cfg_d = self.config.copy()
+        ws_file_path = os.path.join(self.workspace_root,
                                     Workspace.__descriptor_name__)
 
         ws_file = open(ws_file_path, 'w')
@@ -180,12 +171,12 @@ class Workspace:
         return cfg_d
 
     def create_files(self):
-        self.create_ws_descriptor()
-        self.create_catalog_sample()
+        self.write_ws_descriptor()
 
     def check_ws_exists(self):
-        ws_file = os.path.join(self.ws_root, Workspace.__descriptor_name__)
-        return os.path.exists(ws_file) or os.path.exists(self.ws_root)
+        ws_file = os.path.join(self.workspace_root,
+                               Workspace.__descriptor_name__)
+        return os.path.exists(ws_file) or os.path.exists(self.workspace_root)
 
     @staticmethod
     def __create_from_descriptor__(ws_root):
@@ -200,61 +191,79 @@ class Workspace:
                       .format(ws_filename))
             return None
 
-        ws_file = open(ws_filename)
-        ws_config = yaml.load(ws_file)
+        ws_file = open(ws_filename, 'r')
+        try:
+            ws_config = yaml.load(ws_file)
 
-        if not ws_config[Workspace.CONFIG_STR_VERSION] == \
-                Workspace.WORKSPACE_VERSION:
-            log.error("Reading a workspace configuration "
-                      "with a different version {}"
-                      .format(ws_config[Workspace.CONFIG_STR_VERSION]))
+        except yaml.YAMLError as exc:
+            log.error("Error parsing descriptor file '{0}': {1}"
+                      .format(ws_filename, exc))
+            return
+        if not ws_config:
+            log.error("Couldn't read descriptor file: '{0}'"
+                      .format(ws_filename))
             return
 
-        ws = Workspace(ws_root,
-                       ws_name=ws_config[Workspace.CONFIG_STR_NAME],
-                       log_level=ws_config[Workspace.CONFIG_STR_LOGGING_LEVEL])
+        if not ws_config['version'] == Workspace.CONFIG_VERSION:
 
-        ws.dirs[Workspace.CONFIG_STR_CATALOGUES_DIR] = \
-            ws_config[Workspace.CONFIG_STR_CATALOGUES_DIR]
+            if ws_config['version'] < Workspace.BACK_CONFIG_VERSION:
+                log.error("Workspace configuration version '{0}' is no longer "
+                          "supported (<{1})"
+                          .format(ws_config['version'],
+                                  Workspace.BACK_CONFIG_VERSION))
+                return
+            if ws_config['version'] > \
+                    Workspace.CONFIG_VERSION:
+                log.error("Workspace configuration version '{0}' is ahead of "
+                          "the current supported version (={1})"
+                          .format(ws_config['version'],
+                                  Workspace.CONFIG_VERSION))
+                return
 
-        ws.dirs[Workspace.CONFIG_STR_CONFIG_DIR] = \
-            ws_config[Workspace.CONFIG_STR_CONFIG_DIR]
+        ws = Workspace(ws_root, config=ws_config)
 
-        ws.dirs[Workspace.CONFIG_STR_PLATFORMS_DIR] = \
-            ws_config[Workspace.CONFIG_STR_PLATFORMS_DIR]
+        # Make adjustments to support backwards compatibility
+        # 0.03
+        if ws_config['version'] == "0.03":
+            ws.config['validate_watchers'] = \
+                {os.path.join(ws.workspace_root, ws.config['projects_dir'])
+                 : {'type': 'project',
+                    'syntax': True,
+                    'integrity': True,
+                    'topology': True
+                    }
+                 }
 
-        ws.schemas[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER] = \
-            expanduser(ws_config[Workspace.CONFIG_STR_SCHEMAS_LOCAL_MASTER])
+        # 0.04
+        if ws_config['version'] <= "0.04":
+            sps = ws.config['service_platforms']
+            for sp_key, sp in sps.items():
+                sp['credentials']['signature'] = dict()
+                sp['credentials']['signature']['pub_key'] = ''
+                sp['credentials']['signature']['prv_key'] = ''
+                sp['credentials']['signature']['cert'] = ''
 
-        ws.schemas[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER] = \
-            ws_config[Workspace.CONFIG_STR_SCHEMAS_REMOTE_MASTER]
-
-        ws.service_platforms = \
-            ws_config[Workspace.CONFIG_STR_SERVICE_PLATFORMS]
-
-        ws.default_service_platform = \
-            ws_config[Workspace.CONFIG_STR_DEF_SERVICE_PLATFORM]
-
-        ws.descriptor_extension = \
-            ws_config[Workspace.CONFIG_STR_DESCRIPTOR_EXTENSION]
-
+        if ws_config['version'] < Workspace.CONFIG_VERSION:
+            log.warning("Loading workspace with an old configuration "
+                        "version ({0}). Updated configuration: {1}"
+                        .format(ws_config['version'], ws.config))
         return ws
 
     @property
     def default_service_platform(self):
-        return self._default_service_platform
+        return self.config['default_service_platform']
 
     @default_service_platform.setter
     def default_service_platform(self, sp_id):
-        self._default_service_platform = sp_id
+        self.config['default_service_platform'] = sp_id
 
     @property
     def service_platforms(self):
-        return self._service_platforms
+        return self.config['service_platforms']
 
     @service_platforms.setter
     def service_platforms(self, sps):
-        self._service_platforms = sps
+        self.config['service_platforms'] = sps
 
     def get_service_platform(self, sp_id):
         if sp_id not in self.service_platforms.keys():
@@ -267,11 +276,17 @@ class Workspace:
         self.service_platforms[sp_id] = {'url': '',
                                          'credentials': {'username': '',
                                                          'password': '',
-                                                         'token_file': ''}
+                                                         'token_file': '',
+                                                         'signature': {
+                                                             'pub_key': '',
+                                                             'prv_key': '',
+                                                             'cert': ''
+                                                         }}
                                          }
 
-    def config_service_platform(self, sp_id, url=None, username=None,
-                                password=None, token=None, default=None):
+    def config_service_platform(self, sp_id, default=None, url=None,
+                                username=None, password=None, token=None,
+                                pub_key=None, prv_key=None, cert=None):
 
         if sp_id not in self.service_platforms.keys():
             return
@@ -290,11 +305,20 @@ class Workspace:
         if token:
             sp['credentials']['token_file'] = token
 
+        if pub_key:
+            sp['credentials']['signature']['pub_key'] = pub_key
+
+        if prv_key:
+            sp['credentials']['signature']['prv_key'] = prv_key
+
+        if cert:
+            sp['credentials']['signature']['cert'] = cert
+
         if default:
-            self._default_service_platform = sp_id
+            self.default_service_platform = sp_id
 
         # update workspace config descriptor
-        self.create_ws_descriptor()
+        self.write_ws_descriptor()
 
     def __eq__(self, other):
         """
@@ -303,10 +327,9 @@ class Workspace:
         as is only the need to compare configurations.
         """
         return isinstance(other, type(self)) \
-            and self.ws_name == other.ws_name \
-            and self.ws_root == other.ws_root \
-            and self.dirs == other.dirs \
-            and self.schemas == other.schemas
+            and self.workspace_name == other.workspace_name \
+            and self.workspace_root == other.workspace_root \
+            and self.config == other.config
 
 
 def main():
