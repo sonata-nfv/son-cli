@@ -24,6 +24,8 @@
         - gfortran
         - libopenblas-dev
         - liblapack-dev
+        - pkg-config
+        - libfreetype6-dev
         - python-matplotlib
 
     - name: ensure docker repo key (son-monitor dependency)
