@@ -86,7 +86,8 @@ class ProfileManager(object):
                                         experiment=experiment,
                                         title=self.ped['name'],
                                         no_display=self.args.no_display,
-                                        graph_only=self.args.graph_only)
+                                        graph_only=self.args.graph_only,
+                                        results_file=self.args.results_file )
             profiler.start_experiment()
 
     def _active_execution(self):
@@ -249,11 +250,19 @@ def parse_args(manual_args=None):
 
     parser.add_argument(
         "--graph-only",
-        help="only display graphs of previous profile run",
+        help="only display graphs using the stored results",
         required=False,
         default=False,
         dest="graph_only",
         action="store_true")
+
+    parser.add_argument(
+        "-r",
+        "--results_file",
+        help="file to store the results",
+        required=False,
+        default="test_results.yml",
+        dest="results_file")
 
     parser.add_argument(
         "--generator",
