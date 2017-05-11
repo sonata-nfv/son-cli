@@ -1,5 +1,5 @@
 
-def test_signature():
+def signature():
     from son.access.access import AccessClient
     from son.workspace.workspace import Workspace
     from Crypto.PublicKey import RSA
