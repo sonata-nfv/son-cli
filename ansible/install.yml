@@ -44,5 +44,14 @@
       with_items:
         - chmod +x /usr/local/bin/docker-compose
 
+    - name: install numpy (son-monitor dependency)
+      pip: name=numpy state=latest executable=pip3
+
+    - name: install scipy (son-monitor dependency)
+      pip: name=scipy state=latest executable=pip3
+
+    - name: install matplotlib (son-monitor dependency)
+      pip: name=matplotlib state=latest executable=pip3
+
     - name: install docker python api (son-monitor dependency)
       pip: name=docker version=2.0.2 executable=pip3
