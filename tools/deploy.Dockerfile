@@ -16,6 +16,17 @@ RUN apt-get clean \
     && apt-get clean \
     && echo 'Done'
 
+# Pre-install this to speed-up the next steps
+RUN apt-get remove -y python3-setuptools \
+    && wget https://bootstrap.pypa.io/get-pip.py \
+    && python3 get-pip.py \
+    && pip3 install -U pip pytest \
+    # Installing setuptools (now in >v34.0.0 dependencies must be installed in advance)
+    && pip3 install wincertstore==0.2 certifi==2016.9.26 six>=1.10.0 packaging>=16.8 appdirs>=1.4.0 \
+    && pip3 install setuptools==34.0.2
+
+RUN pip3 install numpy scipy matplotlib
+
 COPY ansible /ansible
 COPY ./dist/sonata_cli-*-py3-*.whl /tmp/
 
