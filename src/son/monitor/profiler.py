@@ -46,14 +46,13 @@ from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery
 import threading
 from collections import deque
 import numpy as np
-from scipy.stats import norm, t
+from scipy.stats import t
 from son.profile.helper import write_yaml, read_yaml
 import logging
 import operator
 from collections import defaultdict, OrderedDict
 import matplotlib.pyplot as plt
 import multiprocessing
-from time import sleep
 
 LOG = logging.getLogger('Profiler')
 LOG.setLevel(level=logging.INFO)

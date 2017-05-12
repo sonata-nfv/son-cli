@@ -24,22 +24,14 @@ partner consortium (www.sonata-nfv.eu).
 from requests import get, put, delete, Session
 from son.monitor.utils import *
 from son.monitor.prometheus_lib import query_Prometheus
-from subprocess import Popen, check_output, check_call
-import os
-import sys
-import pkg_resources
-from shutil import copy, rmtree, copytree
+from subprocess import Popen
 import paramiko
 import shlex
 import select
-from time import sleep, time, perf_counter
+from time import sleep
 from threading import Thread
-
 from son.monitor.msd import msd as msd_object
 
-import re
-
-import math
 
 import logging
 LOG = logging.getLogger('son_emu_lib')

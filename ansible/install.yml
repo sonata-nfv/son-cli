@@ -26,7 +26,9 @@
         - liblapack-dev
         - pkg-config
         - libfreetype6-dev
-        - python-matplotlib
+        - python3-numpy
+        - python3-scipy
+        - python3-matplotlib
 
     - name: ensure docker repo key (son-monitor dependency)
       shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
@@ -41,15 +43,6 @@
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
-
-    - name: install numpy (son-monitor dependency)
-      pip: name=numpy state=latest executable=pip3
-
-    - name: install scipy (son-monitor dependency)
-      pip: name=scipy state=latest executable=pip3
-
-    - name: install matplotlib (son-monitor dependency)
-      pip: name=matplotlib state=latest executable=pip3
 
     - name: install docker python api (son-monitor dependency)
       pip: name=docker version=2.0.2 executable=pip3

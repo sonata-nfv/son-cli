@@ -74,8 +74,8 @@ SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
 # specify if son-emu is runnign in a seperate VM that has ssh login
 SON_EMU_IN_VM = False
-SON_EMU_USER = 'steven' # 'vagrant'
-SONE_EMU_PASSW = 'test' # 'vagrant'
+SON_EMU_USER = 'vagrant'
+SONE_EMU_PASSW = 'vagrant'
 
 # initalize the vims accessible from the SDK
 emu = Emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
@@ -242,6 +242,7 @@ parser.add_argument(
           start: start exporting the monitoring metrics from the msd
           stop: stop exporting the monitoring metrics from the msd
           """)
+
 # vnf names to start an xterm for
 parser.add_argument(
     "--vnf_names", "-n", dest="vnf_names",
