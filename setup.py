@@ -63,7 +63,7 @@ setup(
                           'termcolor', 'tabulate', 'networkx', 'PyJWT',
                           'Flask', 'docker==2.0.2', 'scipy', 'numpy',
                           'watchdog', 'Flask-Cors', 'flask_cache', 'redis',
-                          'pycrypto'],
+                          'pycrypto', 'matplotlib'],
         zip_safe=False,
         entry_points={
             'console_scripts': [

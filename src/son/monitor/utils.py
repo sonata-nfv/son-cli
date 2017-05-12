@@ -34,7 +34,8 @@ def parse_vnf_interface( vnf_name_str):
     try:
         vnf_interface = vnf_name_str.split(':')[1]
     except:
-        vnf_interface = None
+        #vnf_interface = None
+        vnf_interface = vnf_name_str
 
     return vnf_interface
 

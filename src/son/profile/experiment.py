@@ -36,15 +36,16 @@ LOG = logging.getLogger(__name__)
 class Experiment(object):
 
     def __init__(self, definition):
+        self.resource_limitations = dict()
+        self.profile_calculations = list()
         # populate object from YAML definition
         self.__dict__.update(definition)
         # attributes
         self.experiment_configurations = list()
-        # backward compatibility imec mode
-        self.command_space_list = list()
+        self.pre_configuration = dict()
         self.configuration_space_list = list()
-        self.vnforder_list = list()
         self.overload_vnf_list = list()
+
 
     def populate(self):
         """
@@ -59,19 +60,15 @@ class Experiment(object):
         for mp in self.measurement_points:
             rewrite_parameter_macros_to_lists(mp)
 
-        ######## imec
-        # (dedicated to iMEC use case (ugly that we compute it twice, but I don't want to break things))
+        ######## IMEC
         # check for vnfs that need overload detection (imec mode)
         if hasattr(self, 'overload_detection') :
             for vnf_name in self.overload_detection:
                 self.overload_vnf_list.append(vnf_name)
-        # aggregate all commands to be used in the experiment to a flat dict for further processing
-        command_dict, self.vnforder_list = self._get_command_space_as_dict()
-        # explore entire command space by calculating the Cartesian product over the given dict
-        self.command_space_list = compute_cartesian_product(command_dict)
-        #LOG.info("command space:{0}".format(command_dict))
+        # gather all configuration commands per VNF that need to be executed once before all tests start
+        self.pre_configuration = self._get_pre_configuration_as_dict()
 
-        ######## UPB       
+        ######## UPB
         # generate a single flat dict containing all the parameter study lists defined in the PED
         # this includes: header parameters (repetitions), measurement point commands (all), and
         # function resource limitations
@@ -91,39 +88,27 @@ class Experiment(object):
             self.name,
             len(self.experiment_configurations)))
 
-
-    def _get_command_space_as_dict(self):
+    def _get_pre_configuration_as_dict(self):
         """
-        Create a dict that lists all commands that need to be executed per VNF
+        Create a dict that lists all commands that need to be executed per VNF,
+        one-time execution as configuration before the tests start.
         :return: dict
         {"vnf_name1": [cmd1, cmd2, ...],
          "vnf_nameN": [cmd, ...],
         }
         """
-        cmds = dict()
-        vnf_name2order = dict()
-        vnforder_list = []
+        config_dict = dict()
         for mp in self.measurement_points:
             vnf_name = mp.get("name")
-            vnf_cmds = mp.get("cmd")
-            cmd_order = mp.get("cmd_order")
-            # check if not empty
-            if not vnf_cmds:
-                return (cmds, vnforder_list)
-            # make sure the cmds are in a list
-            if not isinstance(vnf_cmds, list):
-                vnf_cmds = [vnf_cmds]
-            cmds[vnf_name] = vnf_cmds
+            vnf_config = mp.get("configuration")
+            if vnf_config:
+                if not isinstance(vnf_config, list):
+                    vnf_config = [vnf_config]
+                config_dict[vnf_name]=vnf_config
 
-            if cmd_order:
-                vnf_name2order[vnf_name] = int(cmd_order)
-            else:
-                vnf_name2order[vnf_name] = 0
-            # create ordered list of vnf_names, so the commands are always executed in a defined order
-            vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
-            vnforder_list = [vnf_name for vnf_name, order in vnforder_dict.items()]
+        LOG.debug('pre-configuration commands:{}'.format(config_dict))
+        return config_dict
 
-        return (cmds, vnforder_list)
 
     def _get_experiment_header_space_as_dict(self):
         """
@@ -132,7 +117,7 @@ class Experiment(object):
         r = dict()
         r["repetition"] = list(range(0, self.repetitions))
         return r
-    
+
     def _get_function_resource_space_as_dict(self):
         """
         Create a flat dictionary with configuration lists to be tested for each configuration parameter.
@@ -151,7 +136,7 @@ class Experiment(object):
                     continue
                 if not isinstance(v, list):
                     v = [v]
-                r["resource_limitation:%s:%s" % (name, k)] = v       
+                r["resource_limitation:%s:%s" % (name, k)] = v
         return r
 
     def _get_mp_space_as_dict(self):
@@ -168,13 +153,13 @@ class Experiment(object):
         for rl in self.measurement_points:
             name = rl.get("name")
             for k, v in rl.items():
-                if k == "name" or k == "connection_point":  # skip some fields
+                if k == "name" or k == "connection_point" or k == "configuration":  # skip some fields
                     continue
                 if not isinstance(v, list):
                     v = [v]
                 r["measurement_point:%s:%s" % (name, k)] = v
         return r
- 
+
 
 class ServiceExperiment(Experiment):
 
