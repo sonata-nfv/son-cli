@@ -25,21 +25,13 @@ from requests import get, put, delete, Session
 from son.monitor.utils import *
 from son.monitor.prometheus_lib import query_Prometheus
 from subprocess import Popen
-import os
-import sys
-import pkg_resources
-from shutil import copy, rmtree, copytree
 import paramiko
 import shlex
 import select
-from time import sleep, time, perf_counter
+from time import sleep
 from threading import Thread
-
 from son.monitor.msd import msd as msd_object
 
-import re
-
-import math
 
 import logging
 LOG = logging.getLogger('son_emu_lib')
@@ -93,7 +85,8 @@ class Emu():
 
     # parse the msd file and export the metrics from son-emu and show in grafana
     def start_msd(self, file=None, **kwargs):
-
+        # check if prometheus is running
+        kwargs.get('monitor').start_containers()
         # initialize msd object
         msd_obj = msd_object(file, self)
         msd_obj.start()
@@ -170,7 +163,30 @@ class Emu():
         #process.wait()
         return process
 
-    def docker_exec(self, cmd, vnf_name, action='start'):
+    def host_exec(self, cmd, action='start'):
+        wait = False
+        if action == "stop":
+            # remove quotes from command
+            # remove whole process tree
+            # send SIGTERM (not SIGKILL -9)
+            cmd_new = cmd.replace('"', '')
+            cmd_new = "pkill -15 -f '" + cmd_new + "'"
+            #cmd = "kill -TERM -- -$(pgrep -f '{cmd}')".format(cmd=cmd.replace('"',''))
+            cmd_list = shlex.split(cmd_new)
+            wait = True
+        else:
+            cmd_list = shlex.split(cmd)
+
+        p = Popen(cmd_list)
+
+        LOG.info('vnf: {0} executing command: {1}'.format('host', cmd_list))
+        if wait:
+            p.wait()
+        else:
+            # allow some time to start the cmd
+            sleep(1)
+
+    def docker_exec(self, cmd, vnf_name, action):
 
         docker_name = 'mn.' + str(vnf_name)
         container = self.docker_client.containers.get(docker_name)
@@ -198,6 +214,13 @@ class Emu():
         else:
             # allow some time to start the cmd
             sleep(1)
+
+    def exec(self, cmd, vnf_name, action='start'):
+        if vnf_name == 'host':
+            self.host_exec(cmd, action)
+        else:
+            self.docker_exec(cmd, vnf_name, action)
+
 
     # export a network interface traffic rate counter
     def monitor_interface(self, action, vnf_name, metric, **kwargs):
@@ -405,11 +428,14 @@ class Emu():
             if self.emu_in_vm:
                 terminal_cmd = "./ssh_login.exp {0} {1} {2} '{3}'".format(self.son_emu_ip, self.ssh_user,
                                                                        self.ssh_password, terminal_cmd)
-            cmd = ['xterm', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
+            cmd = ['xterm', '-xrm', 'XTerm*selectToClipboard: true', '-xrm', 'XTerm.vt100.allowTitleOps: false', '-T', vnf_name,
                    '-e', terminal_cmd]
             Popen(cmd)
 
-        return 'xterms started for {0}'.format(vnf_names)
+        ret = 'xterms started for {0}'.format(vnf_names)
+        if len(vnf_names) == 0 :
+            ret = 'vnf list is empty, no xterms started'
+        return ret
 
     def update_skewness_monitor(self, vnf_name, resource_name, action):
 

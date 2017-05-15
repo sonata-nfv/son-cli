@@ -39,112 +39,132 @@ import curses
 import sys
 import copy
 import os
-
 from son.monitor.msd import msd
 from son.monitor.son_emu import Emu
 import son.monitor.monitor as sonmonitor
-
 from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery
-
 import threading
 from collections import deque
 import numpy as np
-from scipy.stats import norm, t
-from son.profile.helper import write_yaml
-
+from scipy.stats import t
+from son.profile.helper import write_yaml, read_yaml
 import logging
+import operator
+from collections import defaultdict, OrderedDict
+import matplotlib.pyplot as plt
+import multiprocessing
+
 LOG = logging.getLogger('Profiler')
 LOG.setLevel(level=logging.INFO)
-#LOG.addHandler(logging.StreamHandler())
 LOG.propagate = True
-#logging.getLogger().removeHandler(logging.StreamHandler())
-from itertools import groupby
 
-# TODO read from ped file
+# TODO read from ped file or config file
 SON_EMU_IP = '172.17.0.1'
 SON_EMU_IP = 'localhost'
 SON_EMU_REST_API_PORT = 5001
 SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
+# path+file to store the results (working directory = default)
+RESULT_FILE = "test_results.yml"
 
 # call from son-profile
 class Emu_Profiler():
 
-    def __init__(self, input_msd_path, output_msd_path, input_commands, configuration_commands, **kwargs):
+    def __init__(self, input_msd_path, output_msd_path, experiment, **kwargs):
+
+        self.configuration_space = experiment.configuration_space_list
+        self.pre_config_commands = experiment.pre_configuration
+        self.overload_vnf_list = experiment.overload_vnf_list
+        self.timeout = int(experiment.time_limit)
+        self.experiment_name = experiment.name
+        self.experiment = experiment
 
         # Grafana dashboard title
         defaults = {
             'title':'son-profile',
-            'timeout':20,
-            'overload_vnf_list':[],
-            'resource_configuration':kwargs.get('resource_configuration', [{}]),
-            'vnforder_list':kwargs.get('vnforder_list', {})
-
         }
         defaults.update(kwargs)
         self.title = defaults.get('title')
+
+        # results file
+        self.results_file = defaults.get('results_file', RESULT_FILE)
+        # graph only option
+        self.graph_only = defaults.get('graph_only', False)
+
+        # generate profiling results
+        self.profiling_results = list()
+        self.profile_calc = ProfileCalculator(self.experiment)
+
+        # only display graph of previous profile run
+        if self.graph_only:
+            self.profile_calc.display_graph(file=self.results_file)
+            return
+        else:
+            self.profile_calc.start_plot()
+            self.profile_calc.enable_updating.set()
+
         #class to control son-emu (export/query metrics)
         self.emu = Emu(SON_EMU_API)
         # list of class Metric
-        self.input_msd = msd(input_msd_path, self.emu, title=self.title)
-        self.input_metrics = self.input_msd.get_metrics_list()
-        LOG.info('input metrics:{0}'.format(self.input_metrics))
-
-        self.output_msd = msd(output_msd_path, self.emu, title=self.title)
-        self.output_metrics = self.output_msd.get_metrics_list()
-        LOG.info('output metrics:{0}'.format(self.output_metrics))
-
-
-        # each list item is a dict with {vnf_name:"cmd_to_execute", ..}
-        self.input_commands = input_commands
-        LOG.info('input commands:{0}'.format(self.input_commands))
+        self.input_metrics = []
+        self.input_msd = None
+        if input_msd_path:
+            self.input_msd = msd(input_msd_path, self.emu, title=self.title)
+            self.input_metrics = self.input_msd.get_metrics_list()
+            LOG.info('input metrics:{0}'.format(self.input_metrics))
+        self.output_metrics = []
+        self.output_msd = None
+        if output_msd_path:
+            self.output_msd = msd(output_msd_path, self.emu, title=self.title)
+            self.output_metrics = self.output_msd.get_metrics_list()
+            LOG.debug('output metrics:{0}'.format(self.output_metrics))
 
         # the configuration commands that needs to be executed before the load starts
-        self.configuration_commands = configuration_commands
-        LOG.info("configuration commands:{0}".format(self.configuration_commands))
-        # the order in which the vnf_commands need to be executed
-        self.vnforder_list = defaults.get('vnforder_list')
-        LOG.info("vnf order:{0}".format(self.vnforder_list))
+        LOG.info("configuration commands:{0}".format(self.pre_config_commands))
 
-        # the resource configuration that needs to be allocated before the load starts
-        self.resource_configuration = defaults.get('resource_configuration')
-        LOG.info("resource  configuration:{0}".format(self.resource_configuration))
-
-        self.timeout = int(defaults.get('timeout'))
+        # time the test that is running
         if self.timeout < 11:
             LOG.warning("timeout should be > 10 to allow overload detection")
 
+        # the resource configuration of the current experiment
+        self.resource_configuration = defaultdict(dict)
         # check if prometheus is running
         sonmonitor.monitor.start_containers()
 
         # export msd's to Grafana
-        self.input_msd.start()
-        self.output_msd.start(overwrite=False)
+        overwrite = True
+        if input_msd_path:
+            self.input_msd.start(overwrite=overwrite)
+            overwrite = False
+        if output_msd_path:
+            self.output_msd.start(overwrite=overwrite)
 
-        overload_vnf_list = defaults.get('overload_vnf_list')
-        self.overload_monitor = Overload_Monitor(vnf_list=overload_vnf_list)
+        LOG.info('overload_vnf_list: {0}'.format(self.overload_vnf_list))
+        self.overload_monitor = Overload_Monitor(vnf_list=self.overload_vnf_list)
         # host overload flag
         self.overload = self.overload_monitor.overload_flag
 
         # profiling threaded function
-        self.profiling_thread = threading.Thread(target=self.profling_loop)
-
-        # list of dict for profiling results
-        self.profiling_results = list()
+        self.profiling_thread = threading.Thread(target=self.profiling_loop)
 
         # the number of the current profiling run
-        self.run_number = 0
+        self.run_number = 1
 
         # display option
         self.no_display = defaults.get('no_display', False)
 
+
     def start_experiment(self):
-        # start configuration commands
-        for vnf_name, cmd_list in self.configuration_commands.items():
+        if self.graph_only:
+            return
+
+         # start pre-configuration commands
+        for vnf_name, cmd_list in self.pre_config_commands.items():
             for cmd in cmd_list:
-                self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd)
 
         # start overload detection
+        #if len(self.overload_vnf_list) > 0 :
         self.overload_monitor.start(self.emu)
 
         # start the profling loop
@@ -167,70 +187,108 @@ class Emu_Profiler():
             # wait for profiling thread to end
             self.profiling_thread.join()
 
-
         # stop overload detection
         self.overload_monitor.stop(self.emu)
 
         # write results to file
-        self.write_results_to_file("test_results.yml")
+        self.write_results_to_file(self.results_file)
+
+        #finalize the calculation of the performance profile
+        self.profile_calc.finalize_graph(show_final=self.no_display)
 
 
-    def profling_loop(self):
+    def profiling_loop(self):
 
         # start with empty results
         self.profiling_results.clear()
         self.run_number = 1
 
         # one cmd_dict per profile run
-        for cmd_dict in self.input_commands:
-            # configure all resource settings for every input command
-            for resource_dict in self.resource_configuration:
+        for experiment in self.configuration_space:
 
-                # reset metrics
-                for metric in self.input_metrics + self.output_metrics:
-                    metric.reset()
+            # parse the experiment's parameters
+            resource_dict = defaultdict(dict)
+            cmd_dict = {}
+            vnf_name2order = dict()
+            for key, value in experiment.items():
+                array = key.split(':')
+                if len(array) < 3:
+                    continue
+                type, vnf_name, param = array
+                if type == 'measurement_point' and param == 'cmd':
+                    cmd_dict[vnf_name] = value
+                elif type == 'measurement_point' and param == 'cmd_order':
+                    vnf_name2order[vnf_name] = int(value)
+                elif type == 'resource_limitation':
+                    resource_dict[vnf_name][param] = value
 
-                self.set_resources(resource_dict)
+            self.resource_configuration = resource_dict
+            LOG.info("resource config: {0}".format(resource_dict))
+            LOG.info("vnf commands: {0}".format(cmd_dict))
 
-                # start the load
-                for vnf_name in self.vnforder_list:
-                    cmd = cmd_dict[vnf_name]
-                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd)
-                #for vnf_name, cmd in cmd_dict:
-                #    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, ensure=True)
+            # create ordered list of vnf_names, so the commands are always executed in a defined order
+            vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
+            vnforder_list = [vnf_name for vnf_name, order in vnforder_dict.items()]
+            # also get the vnfs which do not have an cmd_order specified, and add them to the list
+            leftover_vnfs = [vnf_name for vnf_name in cmd_dict if vnf_name not in vnforder_list]
+            vnforder_list = vnforder_list + leftover_vnfs
+            LOG.debug("vnf order:{0}".format(vnforder_list))
 
-                # let the load stabilize
+            # allocate the specified resources
+            self.set_resources()
+
+            # reset metrics
+            for metric in self.input_metrics + self.output_metrics:
+                metric.reset()
+
+            # start the load
+            for vnf_name in vnforder_list:
+                cmd = cmd_dict[vnf_name]
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd)
+
+            # let the load stabilize
+            time.sleep(1)
+            # reset the overload monitor
+            self.overload_monitor.reset()
+
+            # monitor the metrics
+            start_time = time.time()
+            LOG.info('waiting {} seconds while gathering metrics...'.format(self.timeout))
+
+            while((time.time()-start_time) < self.timeout):
+                # add the new metric values to the list
+                input_metrics = self.query_metrics(self.input_metrics)
+                output_metrics = self.query_metrics(self.output_metrics)
                 time.sleep(1)
-                # reset the overload monitor
-                self.overload_monitor.reset()
+                if self.overload.is_set():
+                    LOG.info('overload detected')
 
-                # monitor the metrics
-                start_time = time.time()
+            # stop the load
+            LOG.info('end of experiment: {0} - run{1}/{2}'.format(self.experiment_name, self.run_number, len(self.configuration_space)))
+            for vnf_name, cmd in cmd_dict.items():
+                self.emu.exec(vnf_name=vnf_name, cmd=cmd, action='stop')
 
-                while((time.time()-start_time) < self.timeout):
-                    # add the new metric values to the list
-                    input_metrics = self.query_metrics(self.input_metrics)
-                    output_metrics = self.query_metrics(self.output_metrics)
-                    time.sleep(1)
-                    if self.overload.is_set():
-                        LOG.info('overload detected')
+            # add the result of this profiling run to the results list
+            profiling_result = dict(
+                resource_alloc=(self.resource_configuration),
+                input_metrics=(input_metrics),
+                output_metrics=(output_metrics),
+                name=self.experiment_name,
+                run=self.run_number,
+                total=len(self.configuration_space)
+            )
+            result = self.filter_profile_results(profiling_result)
+            self.profiling_results.append(result)
+            # update the plot
+            self.profile_calc.update_results(result)
 
-                # stop the load
-                for vnf_name, cmd in cmd_dict.items():
-                    self.emu.docker_exec(vnf_name=vnf_name, cmd=cmd, action='stop')
+            self.run_number += 1
 
-                # add the result of this profiling run to the results list
-                profiling_result = dict(
-                    resource_alloc=copy.deepcopy(resource_dict),
-                    input_metrics=copy.deepcopy(input_metrics),
-                    output_metrics=copy.deepcopy(output_metrics)
-                )
-                self.profiling_results.append(profiling_result)
-                self.run_number += 1
+        LOG.info('end of experiment: {}'.format(self.experiment_name))
 
 
     def display_loop(self, stdscr):
-        # while profiling loop is running, display the metrics
+        # while profiling loop is running, display the metrics on the CLI
         # Clear screen
         stdscr.clear()
         # screen = curses.initscr()
@@ -262,13 +320,19 @@ class Emu_Profiler():
 
         stdscr.clear()
 
-        resultwin.addstr(0, 0, "------------ resource allocation ------------")
-        i = 1
-        for resource, value in self.resource_configuration[self.run_number-1].items():
-            resultwin.addstr(i, 0, "{0}".format(resource))
-            i += 1
+        i = 0
+        resultwin.addstr(i, 0, "---- Run: {2}/{3}  -----  Timer: {0} secs ----".format(
+            0, self.timeout, self.run_number, len(self.configuration_space)))
+        i += 1
+        resultwin.addstr(i, 0, "------------ resource allocation ------------")
+        i += 1
+        len_resources = 0
+        for vnf_name, resource_dict in self.resource_configuration.items():
+            for resource in resource_dict:
+                resultwin.addstr(len_resources+i, 0, "{0}".format(resource))
+                len_resources += 1
 
-        i += 2
+        i += 2 + len_resources
         resultwin.addstr(i, 0, "------------ input metrics ------------")
         i += 1
         for metric in self.input_metrics:
@@ -285,61 +349,47 @@ class Emu_Profiler():
         maxy, maxx = stdscr.getmaxyx()
         resultwin.refresh(0, 0, 0, 0, height, maxx-1)
 
+        time_counter = 0
         while self.profiling_thread.isAlive():
-
-            i = 1
-            resource_configs = len(self.resource_configuration)
-            for resource, value in self.resource_configuration[(self.run_number-1)%resource_configs].items():
-                resultwin.addstr(i, 40*self.run_number, "{0}".format(value))
-                i += 1
+            resultwin.addstr(0, 0, "---- Run: {2}/{3}  ----- Timer: {0} secs ----".format(
+                time_counter, self.timeout, self.run_number, len(self.configuration_space)))
+            i = 2
+            for vnf_name, resource_dict in self.resource_configuration.items():
+                for resource, value in resource_dict.items():
+                    resultwin.addstr(i, 50, "{0}".format(value))
+                    i += 1
 
             # start from length of resource parameters
             i += 3
             for metric in self.input_metrics:
-                resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
+                resultwin.addstr(i, 50, "{0:.2f}".format(metric.last_value))
                 i += 1
 
             i += 3
             for metric in self.output_metrics:
-                resultwin.addstr(i, 40*self.run_number, "{0:.2f}".format(metric.last_value))
+                resultwin.addstr(i, 50, "{0:.2f}".format(metric.last_value))
                 i += 1
-
-            # print the final result
-            result_number = 1
-            for result in self.profiling_results:
-
-                # start from length of resource parameters
-                i = len(self.resource_configuration[0]) + 4
-                for metric in result['input_metrics']:
-                    resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
-                    i += 1
-
-                i += 3
-                for metric in result['output_metrics']:
-                    resultwin.addstr(i, 40*result_number, "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
-                    i += 1
-
-                result_number += 1
 
             maxy, maxx = stdscr.getmaxyx()
             resultwin.refresh(0, 0, 0, 0, height, maxx-1)
             time.sleep(1)
+            time_counter += 1
 
         # print the final result
         result_number = 1
         for result in self.profiling_results:
 
             # start from length of resource parameters
-            i = len(self.resource_configuration[0]) + 4
+            i = len_resources + 5
             for metric in result['input_metrics']:
                 resultwin.addstr(i, 40 * result_number,
-                              "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
+                              "{0:.2f} ({1:.2f},{2:.2f})".format(metric['average'], metric['CI_low'], metric['CI_high']))
                 i += 1
 
             i += 3
             for metric in result['output_metrics']:
                 resultwin.addstr(i, 40 * result_number,
-                              "{0:.2f} ({1:.2f},{2:.2f})".format(metric.average, metric.CI[0], metric.CI[1]))
+                              "{0:.2f} ({1:.2f},{2:.2f})".format(metric['average'], metric['CI_low'], metric['CI_high']))
                 i += 1
 
             result_number += 1
@@ -364,6 +414,43 @@ class Emu_Profiler():
     def write_results_to_file(self, file_name):
         write_yaml(file_name, self.profiling_results)
 
+    def filter_profile_results(self, profile_result):
+        result = dict()
+        result['name'] = profile_result['name'] + str(profile_result['run'])
+        result['input_metrics'] = []
+        result['output_metrics'] = []
+        result['resource_alloc'] = dict()
+        for metric in profile_result['input_metrics']:
+            metric_dict = dict(
+                name = metric.metric_name,
+                type = metric.metric_type,
+                unit = metric.unit,
+                average = metric.average,
+                desc = metric.desc,
+                CI_low = float(metric.CI[0]),
+                CI_high = float(metric.CI[1]),
+            )
+            result['input_metrics'].append(metric_dict)
+
+        for metric in profile_result['output_metrics']:
+            metric_dict = dict(
+                name=metric.metric_name,
+                type=metric.metric_type,
+                unit=metric.unit,
+                average=metric.average,
+                desc=metric.desc,
+                CI_low=float(metric.CI[0]),
+                CI_high=float(metric.CI[1]),
+            )
+            result['output_metrics'].append(metric_dict)
+
+        # avoid copying empty dicts into the results
+        for vnf_name in profile_result['resource_alloc']:
+            if len(profile_result['resource_alloc'][vnf_name]) > 0:
+                result['resource_alloc'][vnf_name] = profile_result['resource_alloc'][vnf_name]
+
+        return result
+
     def stop_experiment(self):
         self.input_msd.stop()
         self.output_msd.stop()
@@ -375,6 +462,7 @@ class Emu_Profiler():
             try:
                 ret = query_Prometheus(query)
                 metric.addValue(float(ret[1]))
+                LOG.debug('metric: {0}={1}'.format(metric.metric_name, float(ret[1])))
             except:
                  LOG.info('Prometheus query failed: {0} \nquery: {1} \nerror:{2}'.format(ret, query, sys.exc_info()[0]))
                  continue
@@ -383,40 +471,20 @@ class Emu_Profiler():
             #LOG.info("metric query: {1} {0} {2}".format(metric.value, metric_name, metric_unit))
         return metrics
 
-    def set_resources(self, resource_dict):
+    def set_resources(self):
         """
         Allocate the specified resources
         :param resource_dict:
-        {"function1:parameter1" : 0.1,
-         "functionN:parameterN" : 0.2,
+        {"vnf_name1" : {"param1":value,...},
+         "vnf_name2" : {"param1":value,...},
+         ...
         }
         :return:
         """
-
-        if len(resource_dict) == 0:
-            return
-
-
-        # group resources per vnf
-        def get_vnfname(key):
-            return key.split(':')[0]
-
-        resource_dict_grouped = {}
-        for vnf_name, param_list in groupby(resource_dict, get_vnfname):
-            if not resource_dict_grouped.get(vnf_name) :
-                resource_dict_grouped[vnf_name] = []
-            resource_dict_grouped[vnf_name] += list(param_list)
-
-        # execute resource allocation of all parameters per vnf
-        for vnf_name in resource_dict_grouped:
-            new_dict = {}
-            for param in resource_dict_grouped[vnf_name]:
-                if ':' not in param: continue
-                new_dict[param.split(':')[1]] = resource_dict[param]
-            if len(new_dict) > 0:
-                LOG.debug('vnf {1} set resources: {0}'.format(new_dict, vnf_name))
-                self.emu.update_vnf_resources(vnf_name, new_dict)
-
+        res = copy.deepcopy(self.resource_configuration)
+        for vnf_name in res:
+            resource_config = res[vnf_name]
+            self.emu.update_vnf_resources(vnf_name, resource_config)
 
 class Overload_Monitor():
 
@@ -551,3 +619,131 @@ class CursesHandler(logging.Handler):
             raise
         except:
             self.handleError(record)
+
+
+class ProfileCalculator():
+    """
+    This class is used to calculate a perofrmance profile out of the test results of a ped experiment
+    """
+    def __init__(self, experiment):
+        self.experiment = experiment
+        self.profile_graphs = experiment.profile_calculations # this is the profile_calculation description from the ped-file
+        self.results = []
+        self.resultQ = multiprocessing.Queue()
+
+        self.enable_updating = multiprocessing.Event()
+        self.plot_process = multiprocessing.Process(target=self.update_graph, args=(self.resultQ, self.enable_updating))
+
+    def start_plot(self):
+        self.plot_process.start()
+
+    def update_results(self, result):
+        self.results.append(result)
+        self.resultQ.put(self.results)
+
+    def update_graph(self, resultQ, enable_updating):
+
+        # wait until update is needed
+        enable_updating.wait()
+
+        n = len(self.profile_graphs)
+
+        while enable_updating.is_set():
+            results = resultQ.get()
+            i = 1
+            plt.close('all')
+            plt.subplots(nrows=n, ncols=1)
+            for profile in self.profile_graphs:
+                plt.subplot(n, 1, i)
+                x_metric_id = profile['input_metric']
+                y_metric_id = profile['output_metric']
+
+                x_metrics = self._find_metrics(x_metric_id, results)
+                x_values = [m['average'] for m in x_metrics]
+                x_err_high = [m['CI_high'] - m['average'] for m in x_metrics]
+                x_err_low = [abs(m['CI_low'] - m['average']) for m in x_metrics]
+                x_unit = x_metrics[0]['unit']
+
+                y_metrics = self._find_metrics(y_metric_id, results)
+                y_values = [m['average'] for m in y_metrics]
+                y_err_high = [m['CI_high'] - m['average'] for m in y_metrics]
+                y_err_low = [abs(m['CI_low'] - m['average']) for m in y_metrics]
+                y_unit = y_metrics[0]['unit']
+
+                plt.xlabel('{0}({1})'.format(x_metric_id, x_unit))
+                plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
+
+                plt.title(profile['name'])
+
+                plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
+                plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o',
+                             capsize=2)
+
+                i += 1
+
+            plt.tight_layout()
+            plt.draw()
+            plt.show(block=False)
+
+    def finalize_graph(self, show_final=False):
+        self.enable_updating.clear()
+        self.plot_process.join(timeout=3)
+        self.plot_process.terminate()
+        # show plot window as blocking
+        if show_final:
+            self.display_graph()
+
+    def display_graph(self, file=None):
+        if file:
+            self.results = read_yaml(file)
+
+        plt.close("all")
+        plt.ioff()
+        logging.info("profile graphs:{}".format(self.profile_graphs))
+        n = len(self.profile_graphs)
+        plt.subplots(nrows=n, ncols=1)
+        i = 1
+        for profile in self.profile_graphs:
+            plt.subplot(n, 1, i)
+            x_metric_id = profile['input_metric']
+            y_metric_id = profile['output_metric']
+
+            x_metrics = self._find_metrics(x_metric_id, self.results)
+            x_values = [m['average'] for m in x_metrics]
+            x_err_high = [m['CI_high']-m['average'] for m in x_metrics]
+            x_err_low = [abs(m['CI_low']-m['average']) for m in x_metrics]
+            x_unit = x_metrics[0]['unit']
+
+            y_metrics = self._find_metrics(y_metric_id, self.results)
+            y_values = [m['average'] for m in y_metrics]
+            y_err_high = [m['CI_high']-m['average'] for m in y_metrics]
+            y_err_low = [abs(m['CI_low']-m['average']) for m in y_metrics]
+            y_unit = y_metrics[0]['unit']
+
+            plt.xlabel('{0}({1})'.format(x_metric_id,x_unit))
+            plt.ylabel('{0}({1})'.format(y_metric_id, y_unit))
+            plt.title(profile['name'])
+
+            plt.grid(b=True, which='both', color='lightgrey', linestyle='--')
+            plt.errorbar(x_values, y_values, xerr=[x_err_low, x_err_high], yerr=[y_err_low, y_err_high], fmt='--o', capsize=2)
+
+            i += 1
+        plt.tight_layout()
+        plt.show()
+
+    def _find_metrics(self, metric_id, results):
+        """
+        return all metric measurement points as found in the results
+        :param metric_id:
+        :return:
+        """
+        metric_list = []
+        for result in results:
+            for metric_dict in result['input_metrics']:
+                if metric_dict['name'] == metric_id:
+                    metric_list.append(metric_dict)
+            for metric_dict in result['output_metrics']:
+                if metric_dict['name'] == metric_id:
+                    metric_list.append(metric_dict)
+
+        return metric_list

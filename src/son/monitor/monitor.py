@@ -74,8 +74,8 @@ SON_EMU_API = "http://{0}:{1}".format(SON_EMU_IP, SON_EMU_REST_API_PORT)
 
 # specify if son-emu is runnign in a seperate VM that has ssh login
 SON_EMU_IN_VM = False
-SON_EMU_USER = 'steven' # 'vagrant'
-SONE_EMU_PASSW = 'test' # 'vagrant'
+SON_EMU_USER = 'vagrant'
+SONE_EMU_PASSW = 'vagrant'
 
 # initalize the vims accessible from the SDK
 emu = Emu(SON_EMU_API, ip= SON_EMU_IP, vm=SON_EMU_IN_VM, user=SON_EMU_USER, password=SONE_EMU_PASSW)
@@ -158,12 +158,12 @@ class sonmonitor():
             list2 = emu.docker_client.containers.list(filters={'status': 'running', 'name': 'grafana'})
             if len(list1+list2) >= 2:
                 self.started = True
-                sleep(3)
+                sleep(8)
             if wait_time > 5:
                 return 'son-monitor not started'
             sleep(1)
             wait_time += 1
-
+        logging.info('son-monitor started')
 
         return 'son-monitor started'
 
@@ -242,6 +242,7 @@ parser.add_argument(
           start: start exporting the monitoring metrics from the msd
           stop: stop exporting the monitoring metrics from the msd
           """)
+
 # vnf names to start an xterm for
 parser.add_argument(
     "--vnf_names", "-n", dest="vnf_names",
@@ -337,6 +338,7 @@ def _execute_command(args):
     elif args["command"] is not None:
         VIM_class = eval(args.get('vim'))
         # call the VIM class method with the same name as the command arg
+        args['monitor'] = monitor
         ret = getattr(VIM_class, args["command"][0])(**args)
         logging.debug("cmd: {0} \nreturn: {1}".format(args["command"][0], ret))
 

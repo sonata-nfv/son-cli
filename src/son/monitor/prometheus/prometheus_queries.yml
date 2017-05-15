@@ -31,7 +31,7 @@ computequery:
     query_template: 'sum(rate(container_cpu_usage_seconds_total{{name="mn.{0}"}}[5s]))*100'
     unit: '%'
   - metric_name: 'mem'
-    query_template: 'container_memory_usage_bytes{{name="mn.{0}"}}/1000000'
+    query_template: 'sum(container_memory_usage_bytes{{name="mn.{0}"}}/1000000)'
     unit: 'MB'
   - metric_name: 'host_cpu'
     query_template: 'sum(rate(container_cpu_usage_seconds_total{{id="/"}}[5s]))*100'
