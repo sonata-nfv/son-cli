@@ -81,20 +81,13 @@ class ProfileManager(object):
         for experiment in self.service_experiments:
             input_msd_path = experiment.input_metrics
             output_msd_path = experiment.output_metrics
-            input_commands = experiment.command_space_list
-            configuration_commands = experiment.configuration_space_list   # TODO check changed format
-            resource_list = experiment.configuration_space_list  # TODO check changed format
-            timeout = experiment.time_limit
             profiler = Passive_Emu_Profiler(input_msd_path=input_msd_path,
                                         output_msd_path=output_msd_path,
-                                        input_commands=input_commands,
-                                        configuration_commands=configuration_commands,
-                                        overload_vnf_list = experiment.overload_vnf_list,
-                                        timeout=timeout,
+                                        experiment=experiment,
                                         title=self.ped['name'],
                                         no_display=self.args.no_display,
-                                        resource_configuration=resource_list,
-                                        vnforder_list=experiment.vnforder_list)
+                                        graph_only=self.args.graph_only,
+                                        results_file=self.args.results_file )
             profiler.start_experiment()
 
     def _active_execution(self):
@@ -179,13 +172,13 @@ class ProfileManager(object):
         function_experiments = list()
 
         # service experiments
-        for e in input_ped.get("service_experiments"):
+        for e in input_ped.get("service_experiments", []):
             e_obj = ServiceExperiment(e)
             e_obj.populate()
             service_experiments.append(e_obj)
 
         # function experiments
-        for e in input_ped.get("function_experiments"):
+        for e in input_ped.get("function_experiments", []):
             e_obj = FunctionExperiment(e)
             e_obj.populate()
             function_experiments.append(e_obj)
@@ -254,6 +247,22 @@ def parse_args(manual_args=None):
         default=False,
         dest="no_display",
         action="store_true")
+
+    parser.add_argument(
+        "--graph-only",
+        help="only display graphs using the stored results",
+        required=False,
+        default=False,
+        dest="graph_only",
+        action="store_true")
+
+    parser.add_argument(
+        "-r",
+        "--results_file",
+        help="file to store the results",
+        required=False,
+        default="test_results.yml",
+        dest="results_file")
 
     parser.add_argument(
         "--generator",

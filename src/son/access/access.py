@@ -409,7 +409,7 @@ class AccessClient:
 
         except:
             # If the platform public key is not available, disable authentication and return None
-            log.error("Service Platform Public Key not found. Authentication is disabled.")
+            log.warning("Service Platform Public Key not found. Authentication is disabled.")
             return None
 
     def generate_keypair(self, platform_dir):
