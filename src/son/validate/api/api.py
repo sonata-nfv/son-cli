@@ -217,7 +217,11 @@ def get_resource_key(path):
 
 
 def process_request():
+
+
     source = request.form['source']
+
+
 
     if source == 'local' and 'path' in request.form:
         keypath = request.form['path']
@@ -267,15 +271,20 @@ def _validate_object_from_request(object_type):
     if not keypath or not path:
         return render_errors(), 400
 
-    syntax = eval(request.form['syntax']) \
+    syntax = str2bool(request.form['syntax']) \
         if 'syntax' in request.form else True
-    integrity = eval(request.form['integrity']) \
+    integrity = str2bool(request.form['integrity']) \
         if 'integrity' in request.form else False
-    topology = eval(request.form['topology']) \
+    print(request.form['topology'])
+    topology = str2bool(request.form['topology']) \
         if 'topology' in request.form else False
 
     return _validate_object(keypath, path, object_type,
                             syntax, integrity, topology)
+
+
+def str2bool(v):
+    return v.lower() in ("yes", "true", "t", "1")
 
 
 def validate_parameters(obj_type, syntax, integrity, topology):
