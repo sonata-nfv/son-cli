@@ -359,6 +359,7 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
 
     if resource and validation:
         log.info("Returning cached result for '{0}'".format(vid))
+        update_resource_validation(rid, vid)
         return validation['result']
 
     log.info("Starting validation [type={}, path={}, flags={}"
