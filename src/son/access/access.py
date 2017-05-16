@@ -28,7 +28,7 @@
 usage: son-access [optional] command [<args>]
         The supported commands are:
            auth     Authenticate a user
-           list     List available resources (service, functions, packages, ...)
+           list     List available resources (service, functions, packages,...)
            push     Submit a son-package or request a service instantiation
            pull     Request resources (services, functions, packages, ...)
            config   Configure access parameters
@@ -52,31 +52,21 @@ optional arguments:
   --debug               Set logging level to debug
 """
 
-# TODO: Remove!
-# import sys
-# sys.path.append('src/')
 
 import logging
 import requests
 import yaml
 import json
 import sys
-import validators
 import jwt
 import coloredlogs
 import os
 import time
 from os.path import expanduser
-from datetime import datetime, timedelta
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from base64 import b64encode
-from base64 import b64decode
+from argparse import ArgumentParser
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 from son.workspace.workspace import Workspace
-from son.access.helpers.helpers import json_response
-# from son.access.models.models import User
-from son.access.config.config import GK_ADDRESS, GK_PORT, PUBLIC_KEY_PATH, PRIVATE_KEY_PATH, CERT_PATH
 from son.access.pull import Pull
 from son.access.push import Push
 
@@ -99,7 +89,8 @@ class AccessClient:
 
     DEFAULT_ACCESS_DIR = os.path.join(expanduser("~"), ".son-access")
 
-    # TODO: Connect to the real GateKeeper API URLs or read form configuration file
+    # TODO: Connect to the real GateKeeper API URLs or read
+    # form configuration file
 
     GK_API_VERSION = "/api/v2"    # "/api/v1"
     GK_API_BASE = "/"
@@ -243,7 +234,8 @@ class AccessClient:
     #    url = self.URL + self.GK_API_VERSION + self.GK_URI_REG
     #
     #    response = requests.post(url, data=form_data, verify=False)
-    #    print("Registration response: ", mcolors.OKGREEN + response.text + "\n", mcolors.ENDC)
+    #    print("Registration response: ", mcolors.OKGREEN + response.text + \
+    #  "\n", mcolors.ENDC)
     #    # Create userdata file? Check KEYCLOAK register form
     #    return response
 
@@ -256,7 +248,8 @@ class AccessClient:
         """
 
         default_sp = self.workspace.default_service_platform
-        # url = self.workspace.get_service_platform(default_sp)['url'] + self.GK_API_VERSION + self.GK_URI_PB_KEY
+        # url = self.workspace.get_service_platform(default_sp)['url'] +  \
+        # self.GK_API_VERSION + self.GK_URI_PB_KEY
         url = self.workspace.get_service_platform(default_sp)['url'] + \
               self.GK_API_VERSION + self.GK_URI_LOGIN
 
@@ -270,7 +263,8 @@ class AccessClient:
         # credentials = (str(username) + ':' + str(password)).encode('utf-8')
         credentials = json.dumps({'username': username, 'password': password})
         # encoded_creds = b64encode(credentials)
-        # headers = {'Authorization': 'Basic %s' % (encoded_creds.decode('utf-8'))}
+        # headers = {'Authorization': 'Basic %s' %
+        # (encoded_creds.decode('utf-8'))}
 
         response = requests.post(url, data=credentials, verify=False)
         # response = requests.post(url, headers=headers, verify=False
@@ -415,7 +409,8 @@ class AccessClient:
             return RSA.importKey(platform_public_key).exportKey('PEM')
 
         except:
-            # If the platform public key is not available, disable authentication and return None
+            # If the platform public key is not available, disable
+            # authentication and return None
             log.error("Service Platform Public Key not found. "
                       "Authentication is disabled.")
             return None
@@ -470,7 +465,8 @@ class AccessClient:
             print("r.status_code=", r.status_code)
 
             if int(r.status_code) != 200:
-                log.error("Updating User's Public Key in remote Platform failed!")
+                log.error("Updating User's Public Key in remote "
+                          "Platform failed!")
                 return False
 
             try:
@@ -540,8 +536,10 @@ class AccessClient:
         """
         Sign package feature using SHA256 hash and RSA keypair
         :param path: location of the package to submit
-        :param private_key: optional private_key used in signature (default None)
-        :return: string containing an int representation of the package's signature
+        :param private_key: optional private_key used in signature 
+                           (default None)
+        :return: string containing an int representation of the 
+                 package's signature
         """
         if private_key:
             # Private key used to test
@@ -561,7 +559,8 @@ class AccessClient:
 
     def deploy_service(self, service_id):
         """
-        Call push feature to request a service instantiation to the SP Catalogue
+        Call push feature to request a service instantiation to the 
+        SP Catalogue
         :param service_id: unique identifier of the service to be instanced
         :return: HTTP code 20X or 40X
         """
@@ -571,10 +570,12 @@ class AccessClient:
                       platform_id=None):
         """
         Call pull feature to request a resource from the SP Catalogue
-        :param resource_type: a valid resource classifier (services, functions, packages)
+        :param resource_type: a valid resource classifier 
+                              (services, functions, packages)
         :param identifier: resource identifier which can be of two types:
-        name.trio id ('vendor=%s&name=%s&version=%s') or uuid (xxx-xxxx-xxxx...)
-        :param uuid: boolean that indicates the identifier is 'uuid-type' if True
+        name.trio id ('vendor=%s&name=%s&version=%s') or uuid (xxx-xxxx-xxxx..)
+        :param uuid: boolean that indicates the identifier 
+                     is 'uuid-type' if True
         :param platform_id: specify from which Service Platform should the
         resource be pulled. If not specified, the default will be used.
         :return: A valid resource (Package, descriptor)
@@ -674,7 +675,7 @@ class AccessArgParse(object):
         usage = """son-access [optional] command [<args>]
         The supported commands are:
            auth     Authenticate a user
-           list     List available resources (service, functions, packages, ...)
+           list     List available resources (service, functions, packages,...)
            push     Submit a son-package or request a service instantiation
            pull     Request resources (services, functions, packages, ...)
            config   Configure access parameters
