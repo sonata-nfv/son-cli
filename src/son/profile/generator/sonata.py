@@ -113,6 +113,13 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         #n.manifest["name"] += "-{}".format(ec.run_id)
         n.metadata["run_id"] = ec.run_id
         n.metadata["exname"] = ec.name
+        try:
+            n.metadata["time_limit"] = int(float(ec.experiment.time_limit))
+        except:
+            LOG.warning("Could not get time_limit for experiment {} using 60s".format(
+                n.metadata["exname"]
+            ))
+            n.metadata["time_limit"] = 60
         LOG.debug("Created service from base: '{}' for experiment '{}' with run ID: {}".format(
             n.manifest["name"],
             n.metadata["exname"],
@@ -325,9 +332,10 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         """
         r = dict()
         for i, s in service_objs.items():
-            r[i] = s.pack(output_path, self.args.verbose, workspace_dir=workspace_dir)
-            self.generated_services[i] = s  # keep a pointer for statistics output
-        LOG.info("Generated {} service packages in '{}'".format(len(r), output_path))
+            r[i] = dict()
+            r[i]["sonfile"] = s.pack(output_path, self.args.verbose, workspace_dir=workspace_dir)
+            r[i]["time_limit"] = s.metadata.get("time_limit")
+            self.generated_services[i] = s  # keep a pointformat(len(r), output_path))
         return r
 
     def print_generation_and_packaging_statistics(self):

@@ -142,7 +142,7 @@ class ProfileManager(object):
 
             # for now, set the timeout to 60 seconds, later on specified in ped
             # currently specified individually for experiment groups, however only one timeout is accepted
-            timeout = 10
+            timeout = 10  # TODO @edmaas remove this. time_limits are now available in gen_conf_list
 
             # start the experiment series
             profiler = Active_Emu_Profiler(remote_hosts)
