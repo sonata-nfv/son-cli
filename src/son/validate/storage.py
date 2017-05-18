@@ -545,8 +545,7 @@ class Service(Descriptor):
         super().__init__(descriptor_file)
         self._functions = {}
         self._vnf_id_map = {}
-        self._fw_paths = {}
-        self._fw_path_graphs = {}
+        self._fw_graphs = list()
 
     @property
     def functions(self):
@@ -557,12 +556,12 @@ class Service(Descriptor):
         return self._functions
 
     @property
-    def fw_paths(self):
+    def fw_graphs(self):
         """
         Provides the forwarding paths specified in the service.
         :return: forwarding paths dict
         """
-        return self._fw_paths
+        return self._fw_graphs
 
     @property
     def all_function_interfaces(self):
@@ -810,7 +809,7 @@ class Service(Descriptor):
 
         return graph
 
-    def load_forwarding_paths(self):
+    def load_forwarding_graphs(self):
         """
         Load all forwarding paths of all forwarding graphs, defined in the
         service content.
@@ -823,7 +822,14 @@ class Service(Descriptor):
             return
 
         for fgraph in self.content['forwarding_graphs']:
+            s_fwgraph = dict()
+            s_fwgraph['fg_id'] = fgraph['fg_id']
+            s_fwgraph['fw_paths'] = list()
+
             for fpath in fgraph['network_forwarding_paths']:
+                s_fwpath = dict()
+                s_fwpath['fp_id'] = fpath['fp_id']
+
                 path_dict = {}
                 for cxpt in fpath['connection_points']:
                     iface = cxpt['connection_point_ref']
@@ -840,13 +846,18 @@ class Service(Descriptor):
                         evtlog.log("Duplicate referenced position '{0}' "
                                    "in forwarding path id='{1}'. Ignoring "
                                    "connection point: '{2}'"
-                                   .format(pos, fpath['fp_id'], path_dict[pos]),
+                                   .format(pos, fpath['fp_id'],
+                                           path_dict[pos]),
                                    self.id,
                                    'evt_nsd_top_fwgraph_position_duplicate')
                     path_dict[pos] = iface
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
-                self._fw_paths[fpath['fp_id']] = list(d.values())
+
+                s_fwpath['path'] = list(d.values())
+                s_fwgraph['fw_paths'].append(s_fwpath)
+
+            self._fw_graphs.append(s_fwgraph)
 
         return True
 

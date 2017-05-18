@@ -25,7 +25,6 @@
 # partner consortium (www.sonata-nfv.eu).
 
 import os
-import sys
 import inspect
 import logging
 import coloredlogs
@@ -35,8 +34,6 @@ import time
 import shutil
 import atexit
 import errno
-import yaml
-import json
 from son.validate import event
 from contextlib import closing
 from son.package.md5 import generate_hash
@@ -44,8 +41,7 @@ from son.schema.validator import SchemaValidator
 from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
-    build_descriptor_id, CountCalls
-from networkx.readwrite import json_graph
+    build_descriptor_id
 
 log = logging.getLogger(__name__)
 evtlog = event.get_logger(__name__)
@@ -88,6 +84,8 @@ class Validator(object):
         evtlog.reset()
 
         self.evtid = None
+
+        self._fwgraphs = dict()
 
     @property
     def errors(self):
@@ -671,8 +669,8 @@ class Validator(object):
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
                     if iface_tokens[0] not in function.units.keys():
-                        evtlog.log("Invalid interface id='{0}' of link id='{1}'"
-                                   ": Unit id='{2}' is not defined"
+                        evtlog.log("Invalid interface id='{0}' of link "
+                                   "id='{1}': Unit id='{2}' is not defined"
                                    .format(iface, lid, iface_tokens[0]),
                                    function.id,
                                    'evt_vnfd_itg_undefined_cpoint')
@@ -710,47 +708,65 @@ class Validator(object):
                        service.id,
                        'evt_nsd_top_topgraph_disconnected')
 
-        # load forwarding paths
-        if not service.load_forwarding_paths():
-            evtlog.log("Couldn't load service forwarding paths. "
-                       "Aborting validation.",
+        # load forwarding graphs
+        if not service.load_forwarding_graphs():
+            evtlog.log("Couldn't load service forwarding graphs. ",
                        service.id,
                        'evt_nsd_top_badsection_fwgraph')
             return
 
         # analyse forwarding paths
-        for fpid, fw_path in service.fw_paths.items():
-            log.debug("Building forwarding path id='{0}'".format(fpid))
+        for fw_graph in service.fw_graphs:
 
-            # check if number of connection points is odd
-            if len(fw_path) % 2 != 0:
-                evtlog.log("The forwarding path id='{0}' has an odd number "
-                           "of connection points".format(fpid),
-                           service.id,
-                           'evt_nsd_top_fwgraph_cpoints_odd')
+            # #inmaintenace
+            fpg = nx.DiGraph()
+            # end---
 
-            trace = service.trace_path(fw_path)
-            if 'BREAK' in trace:
-                evtlog.log("The forwarding path id='{0}' is invalid for the "
-                           "specified topology. {1} breakpoint(s) "
-                           "found the path: {2}"
-                           .format(fpid, trace.count('BREAK'), trace),
-                           service.id,
-                           'evt_nsd_top_fwpath_invalid')
-                # skip further analysis on this path
-                continue
+            for fw_path in fw_graph['fw_paths']:
 
-            log.debug("Forwarding path id='{0}': {1}".format(fpid, trace))
+                # check if number of connection points is odd
+                if len(fw_path['path']) % 2 != 0:
+                    evtlog.log("The forwarding path fg_id='{0}', fp_id='{1}' "
+                               "has an odd number of connection points".
+                               format(fw_graph['fg_id'], fw_path['fp_id']),
+                               service.id,
+                               'evt_nsd_top_fwgraph_cpoints_odd')
 
-            # path is valid in specified topology, let's check for cycles
-            fpg = nx.Graph()
-            fpg.add_path(trace)
-            cycles = Validator._find_graph_cycles(fpg, fpg.nodes()[0])
+                fw_path['trace'] = service.trace_path(fw_path['path'])
+                if 'BREAK' in fw_path['trace']:
+
+                    evtid = event.generate_evt_id()
+                    evtlog.log("The forwarding path fg_id='{0}', fp_id='{1}' "
+                               "is invalid for the specified topology. "
+                               "{2} breakpoint(s) found the path: {3}"
+                               .format(fw_graph['fg_id'],
+                                       fw_path['fp_id'],
+                                       fw_path['trace'].count('BREAK'),
+                                       fw_path['trace']),
+                               evtid,
+                               'evt_nsd_top_fwpath_invalid')
+                    fw_path['event_id'] = evtid
+                    # skip further analysis on this path
+                    continue
+
+                log.debug("Forwarding path fg_id='{0}', fp_id='{1}': {2}"
+                          .format(fw_graph['fg_id'], fw_path['fp_id'],
+                                  fw_path['trace']))
+
+                fpg.add_path(fw_path['trace'])
+
+            cycles = list(nx.simple_cycles(fpg))
             if cycles and len(cycles) > 0:
-                evtlog.log("Found cycles forwarding path id={0}: {1}"
-                           .format(fpid, cycles),
-                           service.id,
-                           'evt_nsd_top_fwpath_cycles')
+                evtid = event.generate_evt_id()
+                evtlog.log("Found {0} cycle(s) in forwarding graph "
+                           "fg_id='{1}': {2}"
+                           .format(len(cycles), fw_graph['fg_id'], cycles),
+                           evtid,
+                           'evt_nsd_top_fwgraph_cycles')
+                fw_graph['cycles'] = cycles
+                fw_graph['event_id'] = evtid
+
+
 
         return True
 
@@ -868,6 +884,8 @@ class Validator(object):
 
     @staticmethod
     def _find_graph_cycles(graph, node, prev_node=None, backtrace=None):
+
+        print(". {} <-- {}".format(node, backtrace))
 
         if not backtrace:
             backtrace = []

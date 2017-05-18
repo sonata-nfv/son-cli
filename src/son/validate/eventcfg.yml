@@ -67,7 +67,7 @@ evt_nsd_top_topgraph_failed: error
 # NSD [topology] - topology graph is disconnected
 evt_nsd_top_topgraph_disconnected: warning
 
-# NSD [topology] - bad section 'forwarding paths'
+# NSD [topology] - bad section 'forwarding graphs'
 evt_nsd_top_badsection_fwgraph: error
 
 # NSD [topology] - no 'forwarding_graphs' section
@@ -86,7 +86,7 @@ evt_nsd_top_fwgraph_cpoints_odd: warning
 evt_nsd_top_fwpath_invalid: error
 
 # NSD [topology] - cycles found in forwarding path
-evt_nsd_top_fwpath_cycles: warning
+evt_nsd_top_fwgraph_cycles: warning
 
 
 ## FUNCTION

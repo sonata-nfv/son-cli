@@ -2,6 +2,7 @@ import yaml
 import logging
 import os
 import pkg_resources
+import uuid
 
 
 class EventLogger(object):
@@ -73,3 +74,7 @@ def get_logger(name):
     if not name:
         return
     return EventLogger.manager.get_logger(name)
+
+
+def generate_evt_id():
+    return str(uuid.uuid4())

@@ -183,7 +183,7 @@ def resource_exists(rid):
 
 
 def update_resource_validation(rid, vid):
-    if not validation_exits(vid):
+    if not validation_exists(vid):
         log.error("Internal error: failed to update resource")
         return
 
@@ -238,14 +238,14 @@ def set_validation(vid, result=None, net_topology=None, net_fwgraph=None):
     cache.set('validations', validations)
 
 
-def validation_exits(vid):
+def validation_exists(vid):
     if not cache.get('validations'):
         return False
     return vid in cache.get('validations').keys()
 
 
 def get_validation(vid):
-    if not validation_exits(vid):
+    if not validation_exists(vid):
         return
     return cache.get('validations')[vid]
 
@@ -379,9 +379,10 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
     print_result(validator, result)
     json_result = gen_report_result(rid, validator)
     net_topology = gen_report_net_topology(validator)
-    # todo: missing topology and fwgraphs
+    net_fwgraph = gen_report_net_fwgraph(validator)
 
-    set_validation(vid, result=json_result, net_topology=net_topology)
+    set_validation(vid, result=json_result, net_topology=net_topology,
+                   net_fwgraph=net_fwgraph)
     update_resource_validation(rid, vid)
 
     return json_result
@@ -453,7 +454,7 @@ def report():
 @app.route('/report/result/<string:resource_id>', methods=['GET'])
 def report_result(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exits(vid) or \
+    if not validation_exists(vid) or \
                     'result' not in get_validation(vid).keys():
         return '', 404
 
@@ -463,7 +464,7 @@ def report_result(resource_id):
 @app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exits(vid) or \
+    if not validation_exists(vid) or \
                     'net_topology' not in get_validation(vid).keys():
         return '', 404
     return get_validation(vid)['net_topology']
@@ -472,7 +473,7 @@ def report_topology(resource_id):
 @app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exits(vid) or \
+    if not validation_exists(vid) or \
                     'net_fwgraph' not in get_validation(vid).keys():
         return '', 404
     return get_validation(vid)['net_fwgraph']
@@ -529,7 +530,7 @@ def gen_report():
 
         # omit resources that don't have a validation available
         vid = resource['latest_vid']
-        if not validation_exits(vid):
+        if not validation_exists(vid):
             continue
 
         report[rid] = dict()
@@ -574,13 +575,21 @@ def gen_report_net_topology(validator):
         report = report[0]
         return report
 
-    return json.dumps(report)
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def gen_report_net_fwgraph(validator):
-    report = dict()
+    report = list()
     for sid, service in validator.storage.services.items():
-        pass
+        report.append(service.fw_graphs)
+
+    # TODO: temp patch for returning only the fwgraph of the first service
+    if len(report) > 0:
+        report = report[0]
+
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def get_local(path):
