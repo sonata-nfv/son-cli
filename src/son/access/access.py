@@ -409,10 +409,8 @@ class AccessClient:
             return RSA.importKey(platform_public_key).exportKey('PEM')
 
         except:
-            # If the platform public key is not available, disable
-            # authentication and return None
-            log.error("Service Platform Public Key not found. "
-                      "Authentication is disabled.")
+            # If the platform public key is not available, disable authentication and return None
+            log.warning("Service Platform Public Key not found. Authentication is disabled.")
             return None
 
     def generate_keypair(self, platform_dir):
