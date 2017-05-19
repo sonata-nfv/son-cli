@@ -57,7 +57,7 @@ The son-cli tools have the following dependencies:
 * [Flask](http://flask.pocoo.org/) >= 0.11.1 (BSD)
 * [numpy](https://pypi.python.org/pypi/numpy)  >= 1.11.3 (BSD)
 * [scipy](https://pypi.python.org/pypi/scipy) >= 0.18.1 (BSD)
-* [matplotlib] (https://matplotlib.org/) >= 2.0.1 (PSF)
+* [matplotlib](https://matplotlib.org/) >= 2.0.1 (PSF)
 
 
 ## Contributing
