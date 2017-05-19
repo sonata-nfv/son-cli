@@ -26,6 +26,7 @@
         - liblapack-dev
         - pkg-config
         - libfreetype6-dev
+        - libpng-dev
         - python3-numpy
         - python3-scipy
         - python3-matplotlib
