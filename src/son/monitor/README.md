@@ -116,7 +116,7 @@ son-monitor dump stop
 
 This command installs the metrics defined in a monitoring specific descriptor file 
 and starts all the related docker files (Grafana, Prometheus DB). A new Grafana dashboard is started where the defined metrics are shown.
-This is the recommended usage for son-monitor.
+This is the recommended usage for son-monitor. More info on the [msd file](https://github.com/sonata-nfv/son-cli/wiki/son-monitor:-msd-file) documentation on the wiki.
 ```
 son-monitor msd -f file.yml
 ```
