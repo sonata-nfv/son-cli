@@ -125,4 +125,5 @@ evt_vnfd_top_topgraph_failed: error
 ### GENERAL
 
 # Duplicate declaration of connection point
+evt_invalid_descriptor: error
 evt_duplicate_cpoint: error

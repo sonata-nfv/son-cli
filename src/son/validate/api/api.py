@@ -545,6 +545,8 @@ def gen_report():
 
 
 def gen_report_result(resource_id, validator):
+
+    print("building result report for {0}".format(resource_id))
     report = dict()
     report['resource_id'] = resource_id
     report['error_count'] = validator.error_count

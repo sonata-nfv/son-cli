@@ -32,7 +32,7 @@ from son.validate.util import descriptor_id, read_descriptor_file
 from son.validate import event
 
 log = logging.getLogger(__name__)
-evtlog = event.get_logger(__name__)
+evtlog = event.get_logger('validator.events')
 
 
 class DescriptorStorage(object):
@@ -335,7 +335,7 @@ class Descriptor(Node):
         self._filename = value
         content = read_descriptor_file(self._filename)
         if content:
-            self.content = read_descriptor_file(self._filename)
+            self.content = content
 
     @property
     def links(self):

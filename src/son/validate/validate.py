@@ -35,6 +35,7 @@ import shutil
 import atexit
 import errno
 from son.validate import event
+from son.validate.event import EventLogger
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -44,7 +45,7 @@ from son.validate.util import read_descriptor_files, list_files, strip_root, \
     build_descriptor_id
 
 log = logging.getLogger(__name__)
-evtlog = event.get_logger(__name__)
+evtlog = event.get_logger('validator.events')
 
 
 class Validator(object):
@@ -89,7 +90,7 @@ class Validator(object):
 
     @property
     def errors(self):
-        return evtlog.errors
+        return EventLogger.normalize(evtlog.errors)
 
     @property
     def error_count(self):
@@ -100,7 +101,7 @@ class Validator(object):
 
     @property
     def warnings(self):
-        return evtlog.warnings
+        return EventLogger.normalize(evtlog.warnings)
 
     @property
     def warning_count(self):
@@ -744,7 +745,8 @@ class Validator(object):
                                        fw_path['trace'].count('BREAK'),
                                        fw_path['trace']),
                                evtid,
-                               'evt_nsd_top_fwpath_invalid')
+                               'evt_nsd_top_fwpath_invalid',
+                               scope='multi')
                     fw_path['event_id'] = evtid
                     # skip further analysis on this path
                     continue
@@ -762,7 +764,8 @@ class Validator(object):
                            "fg_id='{1}': {2}"
                            .format(len(cycles), fw_graph['fg_id'], cycles),
                            evtid,
-                           'evt_nsd_top_fwgraph_cycles')
+                           'evt_nsd_top_fwgraph_cycles',
+                           scope='multi')
                 fw_graph['cycles'] = cycles
                 fw_graph['event_id'] = evtid
 
