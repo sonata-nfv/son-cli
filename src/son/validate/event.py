@@ -12,7 +12,6 @@ class EventLogger(object):
         self._name = name
         self._log = logging.getLogger(name)
         self._events = list()
-        #self.init_events()
 
         # load events config
         configpath = pkg_resources.resource_filename(
@@ -56,12 +55,6 @@ class EventLogger(object):
 
     def reset(self):
         self._events.clear()
-        #self.init_events()
-
-    #def init_events(self):
-    #    # initialize events logger
-    #    for l in ['error', 'warning', 'none']:
-    #        self._events[l] = dict()
 
     def log(self, msg, object_id, event_code, scope='single'):
         level = self._eventdict[event_code]
@@ -73,8 +66,6 @@ class EventLogger(object):
         elif level == 'none':
             pass
 
-        print("logging {}".format(msg))
-
         event = dict()
         event['object_id'] = object_id
         event['level'] = level
@@ -83,25 +74,6 @@ class EventLogger(object):
         event['messages'] = list()
         event['messages'].append(msg)
         self._events.append(event)
-        print(self._events)
-
-        #
-        # if id not in {scope['id'] for scope in self._eventdict[event]}:
-        #     scope = dict()
-        #     scope['id'] = id
-        #     scope['scope'] = scope
-        #
-        # if event not in sc
-        #
-        #
-        # object_dict = {x.id: x for x in object_list}
-        #
-        # if id not in self._events[level]:
-        #     node = self._events[level][id] = dict()
-        #     if event not in node:
-        #         node[event] = list()
-        #
-        # self._events[level][id][event].append(msg)
 
 
 class LoggerManager(object):
