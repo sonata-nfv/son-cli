@@ -52,6 +52,9 @@ optional arguments:
   --debug               Set logging level to debug
 """
 
+# TODO: Remove!
+# import sys
+# sys.path.append('src/')
 
 import logging
 import requests
@@ -99,7 +102,8 @@ class AccessClient:
     GK_URI_LOGOUT = "/sessions"   # DELETE
     GK_URI_PB_KEY = "/micro-services/public-key"
     # GK_URI_UPDT_PB_KEY = "/signatures"
-    GK_URI_UPDT_PB_KEY = "/users"   # PATCH .../api/v2/users/:username
+    GK_URI_UPDT_PB_KEY = "/users"   # PATCH /api/v2/users/:username/user-public-key
+    GK_URI_UPDT_PB_KEY_II = "/user-public-key"
 
     def __init__(self, workspace, platform_id=None, log_level='INFO'):
         """
@@ -442,9 +446,12 @@ class AccessClient:
 
             default_sp = self.workspace.default_service_platform
 
+            # patch '/:username/user-public-key/?' do
+            # log_message = 'GtkApi:: PATCH /api/v2/users/:username/user-public-key'
+
             url = self.workspace.get_service_platform(default_sp)['url'] + \
                   self.GK_API_VERSION + self.GK_URI_UPDT_PB_KEY + '/' + \
-                  self.username   # TODO: Connect to the real GK API url
+                  self.username + '/' + self.GK_URI_UPDT_PB_KEY_II  # TODO: Connect to the real GK API url
 
             print("url=", url)
 
@@ -454,9 +461,10 @@ class AccessClient:
 
             body = json.dumps({'public_key': simple_public})
 
-            print("url=", url)
+            # print("url=", url)
             print("body=", body)
 
+            print("Updating User Public Key...")
             r = requests.patch(url, headers=headers, data=body)
             # r = requests.put(url, headers=headers, data=body)
 
