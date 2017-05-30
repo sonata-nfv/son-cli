@@ -767,17 +767,15 @@ class Validator(object):
             #  (interface pair) that integrate a particular cycle.
 
             fpg = nx.DiGraph()
-            pgraph = nx.DiGraph()
             for fw_path in fw_graph['fw_paths']:
-                vnf_path = []
                 prev_node = None
                 prev_iface = None
                 pair_complete = False
-                pair = 0
+
                 # convert 'interface' path into vnf path
                 for interface in fw_path['path']:
                     # find vnf_id of interface
-                    is_func_iface = False
+                    func = None
                     if interface in service.all_function_interfaces:
                         func = service.function_of_interface(interface)
                         if not func:
@@ -790,9 +788,8 @@ class Validator(object):
 
                     else:
                         node = interface
-                        is_func_iface = True
 
-                        pgraph.add_node(node)
+                        fpg.add_node(node)
 
                     if pair_complete:
                         if prev_node and prev_node == node:
@@ -802,13 +799,16 @@ class Validator(object):
                                        .format(fw_graph['fg_id'],
                                                fw_path['fp_id'],
                                                node),
-                                       service.id,
+                                       func.id,
                                        'evt_nsd_top_fwpath_inside_vnf')
 
-                        pgraph.add_edge(prev_node, node,
-                                        attr_dict={'from': prev_iface,
-                                                   'to': interface})
-                        vnf_path.append(node)
+                            # reset trace and leave
+                            fw_path['trace'] = []
+                            return
+
+                        fpg.add_edge(prev_node, node,
+                                     attr_dict={'from': prev_iface,
+                                                'to': interface})
                         pair_complete = False
 
                     else:
@@ -821,21 +821,14 @@ class Validator(object):
                                                interface),
                                        service.id,
                                        'evt_nsd_top_fwpath_disrupted')
-                            # add this vnf anyway (continue after disruption)
-                            vnf_path.append(node)
-
-                        elif is_func_iface or not vnf_path:
-                            vnf_path.append(node)
 
                         pair_complete = True
 
                     prev_node = node
                     prev_iface = interface
 
-                fpg.add_path(vnf_path, fp_id=fw_path['fp_id'])
-
             # find cycles
-            complete_cycles = list(nx.simple_cycles(pgraph))
+            complete_cycles = list(nx.simple_cycles(fpg))
 
             # remove 1-hop cycles
             cycles = []
@@ -863,7 +856,7 @@ class Validator(object):
                                   .format(cycle))
                         continue
 
-                    edge_data = pgraph.get_edge_data(node, next_node)
+                    edge_data = fpg.get_edge_data(node, next_node)
                     link['from'] = edge_data['from']
                     link['to'] = edge_data['to']
 
@@ -874,7 +867,7 @@ class Validator(object):
             if cycles_list and len(cycles_list) > 0:
                 evtid = event.generate_evt_id()
                 evtlog.log("Found {0} cycle(s) in forwarding graph "
-                           "fg_id='{1}': {2}"
+                           "fg_id='{1}': \n{2}"
                            .format(len(cycles_list),
                                    fw_graph['fg_id'],
                                    yaml.dump(cycles_list,
