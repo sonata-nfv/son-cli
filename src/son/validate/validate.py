@@ -27,6 +27,8 @@
 import os
 import inspect
 import logging
+import uuid
+
 import coloredlogs
 import networkx as nx
 import zipfile
@@ -34,6 +36,7 @@ import time
 import shutil
 import atexit
 import errno
+import yaml
 from son.validate import event
 from son.validate.event import EventLogger
 from contextlib import closing
@@ -719,10 +722,6 @@ class Validator(object):
         # analyse forwarding paths
         for fw_graph in service.fw_graphs:
 
-            # #inmaintenace
-            fpg = nx.DiGraph()
-            # end---
-
             for fw_path in fw_graph['fw_paths']:
 
                 # check if number of connection points is odd
@@ -733,43 +732,158 @@ class Validator(object):
                                service.id,
                                'evt_nsd_top_fwgraph_cpoints_odd')
 
-                fw_path['trace'] = service.trace_path(fw_path['path'])
-                if 'BREAK' in fw_path['trace']:
+                fw_path['trace'] = service.trace_path_pairs(fw_path['path'])
 
+                if any(pair['break'] is True for pair in fw_path['trace']):
                     evtid = event.generate_evt_id()
                     evtlog.log("The forwarding path fg_id='{0}', fp_id='{1}' "
                                "is invalid for the specified topology. "
-                               "{2} breakpoint(s) found the path: {3}"
+                               "{2} breakpoint(s) found the path: \n{3}"
                                .format(fw_graph['fg_id'],
                                        fw_path['fp_id'],
-                                       fw_path['trace'].count('BREAK'),
-                                       fw_path['trace']),
+                                       sum(pair['break'] is True for pair in
+                                           fw_path['trace']),
+                                       yaml.dump(fw_path['trace'],
+                                                 default_flow_style=False)),
                                evtid,
                                'evt_nsd_top_fwpath_invalid',
                                scope='multi')
                     fw_path['event_id'] = evtid
-                    # skip further analysis on this path
-                    continue
+
+                    # skip further analysis
+                    return
 
                 log.debug("Forwarding path fg_id='{0}', fp_id='{1}': {2}"
                           .format(fw_graph['fg_id'], fw_path['fp_id'],
                                   fw_path['trace']))
 
-                fpg.add_path(fw_path['trace'])
+            # cycles must be analysed at the vnf level, not interface level.
+            # here, a directed graph between vnfs must be created,
+            # containing the interfaces of each node and edges between nodes.
+            # Each edge must contain the pair of interfaces that links the
+            # two nodes.
+            # Having this structure is possible to find cycles between vnfs
+            # and more importantly, identify which are the links
+            #  (interface pair) that integrate a particular cycle.
 
-            cycles = list(nx.simple_cycles(fpg))
-            if cycles and len(cycles) > 0:
+            fpg = nx.DiGraph()
+            pgraph = nx.DiGraph()
+            for fw_path in fw_graph['fw_paths']:
+                vnf_path = []
+                prev_node = None
+                prev_iface = None
+                pair_complete = False
+                pair = 0
+                # convert 'interface' path into vnf path
+                for interface in fw_path['path']:
+                    # find vnf_id of interface
+                    is_func_iface = False
+                    if interface in service.all_function_interfaces:
+                        func = service.function_of_interface(interface)
+                        if not func:
+                            log.error(
+                                "Internal error: couldn't find corresponding"
+                                " VNFs in forwarding path '{}'"
+                                .format(fw_path['fp_id']))
+                            return
+                        node = service.vnf_id(func)
+
+                    else:
+                        node = interface
+                        is_func_iface = True
+
+                        pgraph.add_node(node)
+
+                    if pair_complete:
+                        if prev_node and prev_node == node:
+                            evtlog.log("The forwarding path fg_id='{0}', "
+                                       "fp_id='{1}' contains a path within the"
+                                       " same VNF id='{2}'"
+                                       .format(fw_graph['fg_id'],
+                                               fw_path['fp_id'],
+                                               node),
+                                       service.id,
+                                       'evt_nsd_top_fwpath_inside_vnf')
+
+                        pgraph.add_edge(prev_node, node,
+                                        attr_dict={'from': prev_iface,
+                                                   'to': interface})
+                        vnf_path.append(node)
+                        pair_complete = False
+
+                    else:
+                        if prev_node and prev_node != node:
+                            evtlog.log("The forwarding path fg_id='{0}', "
+                                       "fp_id='{1}' is disrupted at the "
+                                       "connection point: '{2}'"
+                                       .format(fw_graph['fg_id'],
+                                               fw_path['fp_id'],
+                                               interface),
+                                       service.id,
+                                       'evt_nsd_top_fwpath_disrupted')
+                            # add this vnf anyway (continue after disruption)
+                            vnf_path.append(node)
+
+                        elif is_func_iface or not vnf_path:
+                            vnf_path.append(node)
+
+                        pair_complete = True
+
+                    prev_node = node
+                    prev_iface = interface
+
+                fpg.add_path(vnf_path, fp_id=fw_path['fp_id'])
+
+            # find cycles
+            complete_cycles = list(nx.simple_cycles(pgraph))
+
+            # remove 1-hop cycles
+            cycles = []
+            for cycle in complete_cycles:
+                if len(cycle) > 2:
+                    cycles.append(cycle)
+
+            # build cycles representative interface structure
+            cycles_list = []
+            for cycle in cycles:
+                cycle_dict = {'cycle_id': str(uuid.uuid4()), 'cycle_path': []}
+
+                for idx, node in enumerate(cycle):
+                    link = {}
+
+                    if idx+1 == len(cycle):  # at last element
+                        next_node = cycle[0]
+                    else:
+                        next_node = cycle[idx+1]
+
+                    neighbours = fpg.neighbors(node)
+                    if next_node not in neighbours:
+                        log.error("Internal error: couldn't find next hop "
+                                  "when building structure of cycle: {}"
+                                  .format(cycle))
+                        continue
+
+                    edge_data = pgraph.get_edge_data(node, next_node)
+                    link['from'] = edge_data['from']
+                    link['to'] = edge_data['to']
+
+                    cycle_dict['cycle_path'].append(link)
+                cycles_list.append(cycle_dict)
+
+            # report cycles
+            if cycles_list and len(cycles_list) > 0:
                 evtid = event.generate_evt_id()
                 evtlog.log("Found {0} cycle(s) in forwarding graph "
                            "fg_id='{1}': {2}"
-                           .format(len(cycles), fw_graph['fg_id'], cycles),
+                           .format(len(cycles_list),
+                                   fw_graph['fg_id'],
+                                   yaml.dump(cycles_list,
+                                             default_flow_style=False)),
                            evtid,
                            'evt_nsd_top_fwgraph_cycles',
                            scope='multi')
-                fw_graph['cycles'] = cycles
+                fw_graph['cycles'] = cycles_list
                 fw_graph['event_id'] = evtid
-
-
 
         return True
 

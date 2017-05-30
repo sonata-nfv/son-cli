@@ -88,6 +88,12 @@ evt_nsd_top_fwpath_invalid: error
 # NSD [topology] - cycles found in forwarding path
 evt_nsd_top_fwgraph_cycles: warning
 
+# NSD [topology] - forwarding path contains a link between interfaces of the same VNF
+evt_nsd_top_fwpath_inside_vnf: error
+
+# NSD [topology] - forwarding path is disrupted, i.e. doesn't continue from the previous ending point
+evt_nsd_top_fwpath_disrupted: error
+
 
 ## FUNCTION
 

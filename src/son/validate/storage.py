@@ -431,8 +431,6 @@ class Descriptor(Node):
 
         self._links[lid] = Link(lid, interfaces[0], interfaces[1])
 
-
-
     def load_virtual_links(self):
         """
         Load 'virtual_links' section of the descriptor.
@@ -452,7 +450,6 @@ class Descriptor(Node):
                 self.add_bridge(link['id'],
                                 link['connection_points_reference'])
         return True
-
 
     def find_unused_interfaces(self):
         """
@@ -597,6 +594,20 @@ class Service(Descriptor):
             if fid == function.id:
                 return vnf_id
         return
+
+    def function_of_interface(self, interface):
+        """
+        Provides the function associated with an interface.
+        :param interface: interface str
+        :return: function object
+        """
+
+
+        for fid, f in self.functions.items():
+            for iface in f.interfaces:
+                if iface == interface or \
+                                (self.vnf_id(f) + ':' + iface) == interface:
+                    return f
 
     def associate_function(self, function, vnf_id):
         """
@@ -899,6 +910,18 @@ class Service(Descriptor):
             if path[x+1] not in neighbours:
                 trace.append("BREAK")
         trace.append(path[-1])
+        return trace
+
+    def trace_path_pairs(self, path):
+        trace = []
+        for x in range(0, len(path), 2):
+            if x+1 >= len(path):
+                node_pair = {'break': False, 'from': path[x], 'to': None}
+            else:
+                node_pair = {'break': False, 'from': path[x], 'to': path[x+1]}
+                if path[x+1] not in self._graph.neighbors(path[x]):
+                    node_pair['break'] = True
+            trace.append(node_pair)
         return trace
 
     def find_undeclared_interfaces(self, interfaces=None):
