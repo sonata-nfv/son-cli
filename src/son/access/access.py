@@ -135,10 +135,12 @@ class AccessClient:
                 platform_dir, self.platform['credentials']['token_file'])
 
             if os.path.isfile(token_path):
-                with open(token_path, 'rb') as token_file:
+                with open(token_path, 'r') as token_file:
                     self.access_token = token_file.read()
         except:
             self.access_token = None
+
+        log.info("Loaded access_token='{}'".format(self.access_token))
 
         try:
             # retrieve keypair from workspace
@@ -150,15 +152,18 @@ class AccessClient:
                                     self.platform['signature']['prv_key'])
 
             if os.path.isfile(pub_path):
-                with open(pub_path, 'rb') as pub_key_file:
+                with open(pub_path, 'r') as pub_key_file:
                     self.dev_public_key = pub_key_file.read()
             if os.path.isfile(prv_path):
-                with open(prv_path, 'rb') as prv_key_file:
+                with open(prv_path, 'r') as prv_key_file:
                     self.dev_private_key = prv_key_file.read()
 
         except:
             self.dev_public_key = None
             self.dev_private_key = None
+
+        # log.info("Loaded dev_public_key='{}'".format(self.dev_public_key))
+        # log.info("Loaded dev_private_key='{}'".format(self.dev_private_key))
 
         # retrieve certificate from workspace
         try:
@@ -167,7 +172,7 @@ class AccessClient:
             cert_path = os.path.join(platform_dir,
                                      self.platform['signature']['cert'])
             if os.path.isfile(cert_path):
-                with open(cert_path, 'rb') as cert_key_file:
+                with open(cert_path, 'r') as cert_key_file:
                     self.dev_certificate = cert_key_file.read()
 
         except:
@@ -438,10 +443,9 @@ class AccessClient:
 
         # Stores the keypair in the workspace configured platform dir
         try:
-            simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
-            simple_public = simple_public.replace('-----END PUBLIC KEY-----',
+            simple_public = public.replace('-----BEGIN PUBLIC KEY-----\n', '')
+            simple_public = simple_public.replace('\n-----END PUBLIC KEY-----',
                                                   '')
-
             # print("simple_public=", simple_public)
 
             default_sp = self.workspace.default_service_platform
@@ -457,8 +461,8 @@ class AccessClient:
             print("url=", url)
 
             headers = {'Content-type': 'application/json',
-                      'Authorization': 'Bearer %s' %
-                                       (self.access_token.decode('utf-8'))}
+                      'Authorization': 'Bearer %s' % self.access_token}
+                                       #(self.access_token.decode('utf-8'))}
 
             body = json.dumps({'public_key': simple_public})
 
