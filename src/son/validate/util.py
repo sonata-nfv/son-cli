@@ -27,8 +27,10 @@
 import os
 import yaml
 import logging
+from son.validate import event
 
 log = logging.getLogger(__name__)
+evtlog = event.get_logger('validator.events')
 
 
 def read_descriptor_files(files):
@@ -65,19 +67,24 @@ def read_descriptor_file(file):
             descriptor = yaml.load(_file)
 
         except yaml.YAMLError as exc:
-            log.error("Error parsing descriptor file: {0}".format(exc))
+            evtlog.log("Error parsing descriptor file: {0}".format(exc),
+                       file,
+                       'evt_invalid_descriptor')
             return
 
         if not descriptor:
-            log.error("Couldn't read descriptor file: '{0}'"
-                      .format(file))
+            evtlog.log("Couldn't read descriptor file: '{0}'".format(file),
+                       file,
+                       'evt_invalid_descriptor')
             return
+
         if 'vendor' not in descriptor or \
                 'name' not in descriptor or \
                 'version' not in descriptor:
             log.warning("Invalid SONATA descriptor file: '{0}'. Ignoring."
                         .format(file))
             return
+
         return descriptor
 
 
