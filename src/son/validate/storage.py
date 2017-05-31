@@ -32,7 +32,7 @@ from son.validate.util import descriptor_id, read_descriptor_file
 from son.validate import event
 
 log = logging.getLogger(__name__)
-evtlog = event.get_logger(__name__)
+evtlog = event.get_logger('validator.events')
 
 
 class DescriptorStorage(object):
@@ -335,7 +335,7 @@ class Descriptor(Node):
         self._filename = value
         content = read_descriptor_file(self._filename)
         if content:
-            self.content = read_descriptor_file(self._filename)
+            self.content = content
 
     @property
     def links(self):
@@ -431,8 +431,6 @@ class Descriptor(Node):
 
         self._links[lid] = Link(lid, interfaces[0], interfaces[1])
 
-
-
     def load_virtual_links(self):
         """
         Load 'virtual_links' section of the descriptor.
@@ -452,7 +450,6 @@ class Descriptor(Node):
                 self.add_bridge(link['id'],
                                 link['connection_points_reference'])
         return True
-
 
     def find_unused_interfaces(self):
         """
@@ -545,8 +542,7 @@ class Service(Descriptor):
         super().__init__(descriptor_file)
         self._functions = {}
         self._vnf_id_map = {}
-        self._fw_paths = {}
-        self._fw_path_graphs = {}
+        self._fw_graphs = list()
 
     @property
     def functions(self):
@@ -557,12 +553,12 @@ class Service(Descriptor):
         return self._functions
 
     @property
-    def fw_paths(self):
+    def fw_graphs(self):
         """
         Provides the forwarding paths specified in the service.
         :return: forwarding paths dict
         """
-        return self._fw_paths
+        return self._fw_graphs
 
     @property
     def all_function_interfaces(self):
@@ -598,6 +594,20 @@ class Service(Descriptor):
             if fid == function.id:
                 return vnf_id
         return
+
+    def function_of_interface(self, interface):
+        """
+        Provides the function associated with an interface.
+        :param interface: interface str
+        :return: function object
+        """
+
+
+        for fid, f in self.functions.items():
+            for iface in f.interfaces:
+                if iface == interface or \
+                                (self.vnf_id(f) + ':' + iface) == interface:
+                    return f
 
     def associate_function(self, function, vnf_id):
         """
@@ -810,7 +820,7 @@ class Service(Descriptor):
 
         return graph
 
-    def load_forwarding_paths(self):
+    def load_forwarding_graphs(self):
         """
         Load all forwarding paths of all forwarding graphs, defined in the
         service content.
@@ -823,7 +833,14 @@ class Service(Descriptor):
             return
 
         for fgraph in self.content['forwarding_graphs']:
+            s_fwgraph = dict()
+            s_fwgraph['fg_id'] = fgraph['fg_id']
+            s_fwgraph['fw_paths'] = list()
+
             for fpath in fgraph['network_forwarding_paths']:
+                s_fwpath = dict()
+                s_fwpath['fp_id'] = fpath['fp_id']
+
                 path_dict = {}
                 for cxpt in fpath['connection_points']:
                     iface = cxpt['connection_point_ref']
@@ -840,13 +857,18 @@ class Service(Descriptor):
                         evtlog.log("Duplicate referenced position '{0}' "
                                    "in forwarding path id='{1}'. Ignoring "
                                    "connection point: '{2}'"
-                                   .format(pos, fpath['fp_id'], path_dict[pos]),
+                                   .format(pos, fpath['fp_id'],
+                                           path_dict[pos]),
                                    self.id,
                                    'evt_nsd_top_fwgraph_position_duplicate')
                     path_dict[pos] = iface
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
-                self._fw_paths[fpath['fp_id']] = list(d.values())
+
+                s_fwpath['path'] = list(d.values())
+                s_fwgraph['fw_paths'].append(s_fwpath)
+
+            self._fw_graphs.append(s_fwgraph)
 
         return True
 
@@ -888,6 +910,18 @@ class Service(Descriptor):
             if path[x+1] not in neighbours:
                 trace.append("BREAK")
         trace.append(path[-1])
+        return trace
+
+    def trace_path_pairs(self, path):
+        trace = []
+        for x in range(0, len(path), 2):
+            if x+1 >= len(path):
+                node_pair = {'break': False, 'from': path[x], 'to': None}
+            else:
+                node_pair = {'break': False, 'from': path[x], 'to': path[x+1]}
+                if path[x+1] not in self._graph.neighbors(path[x]):
+                    node_pair['break'] = True
+            trace.append(node_pair)
         return trace
 
     def find_undeclared_interfaces(self, interfaces=None):

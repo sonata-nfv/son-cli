@@ -2,6 +2,8 @@ import yaml
 import logging
 import os
 import pkg_resources
+import uuid
+from copy import deepcopy
 
 
 class EventLogger(object):
@@ -9,9 +11,7 @@ class EventLogger(object):
     def __init__(self, name):
         self._name = name
         self._log = logging.getLogger(name)
-        self._events = dict()
-        self.init_events()
-
+        self._events = list()
 
         # load events config
         configpath = pkg_resources.resource_filename(
@@ -21,23 +21,43 @@ class EventLogger(object):
 
     @property
     def errors(self):
-        return self._events['error']
+        return list(filter(lambda event: event['level'] == 'error',
+                           self._events))
 
     @property
     def warnings(self):
-        return self._events['warning']
+        return list(filter(lambda event: event['level'] == 'warning',
+                    self._events))
+
+    @staticmethod
+    def normalize(events):
+        norm_events = deepcopy(events)
+
+        idx = 0
+        while idx < len(norm_events):
+            event = norm_events[idx]
+            offset = idx+1
+            next_events = norm_events.copy()[offset:]
+
+            for n_idx, n_event in enumerate(next_events):
+                n_event = next_events[n_idx]
+
+                if (event['object_id'] == n_event['object_id'] and
+                        event['event_code'] == n_event['event_code'] and
+                        event['level'] == n_event['level'] and
+                        event['scope'] == n_event['scope']):
+                    event['messages'] += n_event['messages']
+                    norm_events.pop(n_idx+offset)
+
+            idx += 1
+
+        return norm_events
 
     def reset(self):
         self._events.clear()
-        self.init_events()
 
-    def init_events(self):
-        # initialize events logger
-        for l in ['error', 'warning', 'none']:
-            self._events[l] = dict()
-
-    def log(self, msg, id, event):
-        level = self._eventdict[event]
+    def log(self, msg, object_id, event_code, scope='single'):
+        level = self._eventdict[event_code]
 
         if level == 'error':
             self._log.error(msg)
@@ -46,12 +66,14 @@ class EventLogger(object):
         elif level == 'none':
             pass
 
-        if id not in self._events[level]:
-            node = self._events[level][id] = dict()
-            if event not in node:
-                node[event] = list()
-
-        self._events[level][id][event].append(msg)
+        event = dict()
+        event['object_id'] = object_id
+        event['level'] = level
+        event['event_code'] = event_code
+        event['scope'] = scope
+        event['messages'] = list()
+        event['messages'].append(msg)
+        self._events.append(event)
 
 
 class LoggerManager(object):
@@ -73,3 +95,7 @@ def get_logger(name):
     if not name:
         return
     return EventLogger.manager.get_logger(name)
+
+
+def generate_evt_id():
+    return str(uuid.uuid4())
