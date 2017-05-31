@@ -451,8 +451,9 @@ class AccessClient:
 
             url = self.workspace.get_service_platform(default_sp)['url'] + \
                   self.GK_API_VERSION + self.GK_URI_UPDT_PB_KEY + '/' + \
-                  self.username + '/' + self.GK_URI_UPDT_PB_KEY_II  # TODO: Connect to the real GK API url
+                  self.username + self.GK_URI_UPDT_PB_KEY_II  # TODO: Connect to the real GK API url
 
+            #url = 'http://sp.int3.sonata-nfv.eu:5600/api/v1/signatures/' + self.username
             print("url=", url)
 
             headers = {'Content-type': 'application/json',
@@ -466,7 +467,7 @@ class AccessClient:
 
             print("Updating User Public Key...")
             r = requests.patch(url, headers=headers, data=body)
-            # r = requests.put(url, headers=headers, data=body)
+            #r = requests.put(url, headers=headers, data=body)
 
             print("r.status_code=", r.status_code)
 
