@@ -35,6 +35,7 @@ from tabulate import tabulate
 from son.profile.experiment import ServiceExperiment, FunctionExperiment
 from son.profile.helper import read_yaml
 from son.monitor.profiler import Emu_Profiler as Passive_Emu_Profiler
+from son.profile.emulator import Emulator as Active_Emu_Profiler
 
 LOG = logging.getLogger(__name__)
 
@@ -121,9 +122,31 @@ class ProfileManager(object):
             if not self.args.no_display:
                 cgen.print_generation_and_packaging_statistics()
 
-            #
-            # @Edmaas dict 'gen_conf_list' holds the generation data you need.
-            #
+        #
+        # @Edmaas dict 'gen_conf_list' holds the generation data you need.
+        #
+        # Execute the generated packages
+        if not self.args.no_execution:
+
+            if not gen_conf_list:
+                LOG.error("No generated packages, stopping execution")
+                raise Exception("Cannot execute experiments: No generated packages")
+
+            # get config file and read remote hosts description
+            config_loc = self.args.config
+            if not os.path.isabs(config_loc):
+                config_loc = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        config_loc)
+            remote_hosts = read_yaml(config_loc).get("target_platforms")
+
+            # for now, set the timeout to 60 seconds, later on specified in ped
+            # currently specified individually for experiment groups, however only one timeout is accepted
+            timeout = 10  # TODO @edmaas remove this. time_limits are now available in gen_conf_list
+
+            # start the experiment series
+            profiler = Active_Emu_Profiler(remote_hosts)
+            profiler.do_experiment_series(gen_conf_list, runtime=timeout)
 
 
     @staticmethod

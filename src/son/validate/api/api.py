@@ -1,3 +1,4 @@
+import hashlib
 import os
 import json
 import logging
@@ -64,6 +65,7 @@ def initialize(debug=False):
     cache.clear()
     cache.add('debug', debug)
     cache.add('artifacts', list())
+    cache.add('validations', dict())
     cache.add('resources', dict())
     cache.add('latest', dict())
     cache.add('watches', dict())
@@ -158,67 +160,118 @@ def add_artifact_root():
     return artifact_root
 
 
-def update_latest(path, key):
-    log.debug("Updating latest validated resource for {0}: {1}"
-              .format(path, key))
+def update_latest(path, vid):
+    log.debug("Updating latest validation for {0}: {1}".format(path, vid))
     latest = cache.get('latest')
     if not latest:
         latest = dict()
 
-    latest[path] = key
+    latest[path] = vid
     cache.set('latest', latest)
 
 
-def set_resource(key, path, obj_type, syntax, integrity, topology,
-                 result=None, net_topology=None, net_fwgraph=None):
-    assert obj_type or syntax or topology or integrity or \
-           result or net_topology or net_fwgraph
+def get_resource(rid):
+    if not resource_exists(rid):
+        return
+    return cache.get('resources')[rid]
 
-    log.debug("Caching resource '{0}'".format(key))
+
+def resource_exists(rid):
+    if not cache.get('resources'):
+        return False
+    return rid in cache.get('resources').keys()
+
+
+def update_resource_validation(rid, vid):
+    if not validation_exists(vid):
+        log.error("Internal error: failed to update resource")
+        return
+
+    if not resource_exists(rid):
+        return
+
+    log.debug("Updating resource '{0}' to: '{1}'".format(rid, vid))
     resources = cache.get('resources')
+    resources[rid]['latest_vid'] = vid
+    cache.set('resources', resources)
 
+
+def set_resource(rid, path, obj_type, syntax, integrity, topology):
+    assert path and obj_type and syntax and integrity and topology
+
+    log.debug("Caching resource {0}".format(rid))
+    resources = cache.get('resources')
     if not resources:
         resources = dict()
 
-    if key not in resources.keys():
-        resources[key] = dict()
+    if not resource_exists(rid):
+        resources[rid] = dict()
 
-    resources[key]['path'] = path
-    resources[key]['type'] = obj_type
-    resources[key]['syntax'] = syntax
-    resources[key]['integrity'] = integrity
-    resources[key]['topology'] = topology
-
-    if result:
-        resources[key]['result'] = result
-    if net_topology:
-        resources[key]['net_topology'] = net_topology
-    if net_fwgraph:
-        resources[key]['net_fwgraph'] = net_fwgraph
+    resources[rid]['path'] = path
+    resources[rid]['type'] = obj_type
+    resources[rid]['syntax'] = syntax
+    resources[rid]['integrity'] = integrity
+    resources[rid]['topology'] = topology
 
     cache.set('resources', resources)
-    update_latest(path, key)
 
 
-def resource_exits(key):
-    if not cache.get('resources'):
+def set_validation(vid, result=None, net_topology=None, net_fwgraph=None):
+    assert result or net_topology or net_fwgraph
+
+    log.debug("Caching validation '{0}'".format(vid))
+    validations = cache.get('validations')
+
+    if not validations:
+        validations = dict()
+
+    if vid not in validations.keys():
+        validations[vid] = dict()
+
+    if result:
+        validations[vid]['result'] = result
+    if net_topology:
+        validations[vid]['net_topology'] = net_topology
+    if net_fwgraph:
+        validations[vid]['net_fwgraph'] = net_fwgraph
+
+    cache.set('validations', validations)
+
+
+def validation_exists(vid):
+    if not cache.get('validations'):
         return False
-    return key in cache.get('resources').keys()
+    return vid in cache.get('validations').keys()
 
 
-def get_resource(key):
-    if not resource_exits(key):
+def get_validation(vid):
+    if not validation_exists(vid):
         return
-    return cache.get('resources')[key]
+    return cache.get('validations')[vid]
 
 
-def get_resource_key(path):
+def gen_resource_key(path, otype, s, i, t):
+    assert (type(path) == str and type(otype) == str)
+
+    hash = hashlib.md5()
+    hash.update(path.encode('utf-8'))
+    hash.update(otype.encode('utf-8'))
+    if s:
+        hash.update('syntax'.encode('utf-8'))
+    if i:
+        hash.update('integrity'.encode('utf-8'))
+    if t:
+        hash.update('topology'.encode('utf-8'))
+
+    return hash.hexdigest()
+
+
+def gen_validation_key(path):
     return generate_hash(os.path.abspath(path))
 
 
 def process_request():
     source = request.form['source']
-
     if source == 'local' and 'path' in request.form:
         keypath = request.form['path']
         path = get_local(request.form['path'])
@@ -267,15 +320,20 @@ def _validate_object_from_request(object_type):
     if not keypath or not path:
         return render_errors(), 400
 
-    syntax = eval(request.form['syntax']) \
+    syntax = str2bool(request.form['syntax']) \
         if 'syntax' in request.form else True
-    integrity = eval(request.form['integrity']) \
+    integrity = str2bool(request.form['integrity']) \
         if 'integrity' in request.form else False
-    topology = eval(request.form['topology']) \
+    print(request.form['topology'])
+    topology = str2bool(request.form['topology']) \
         if 'topology' in request.form else False
 
     return _validate_object(keypath, path, object_type,
                             syntax, integrity, topology)
+
+
+def str2bool(v):
+    return v.lower() in ("yes", "true", "t", "1")
 
 
 def validate_parameters(obj_type, syntax, integrity, topology):
@@ -293,21 +351,25 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
     if perrors:
         return perrors, 400
 
-    key = get_resource_key(path)
-    log.info("Validating {0} '{1}' --> MD5 hash: {2}"
-             .format(obj_type, path, key))
+    rid = gen_resource_key(path, obj_type, syntax, integrity, topology)
+    vid = gen_validation_key(path)
 
-    resource = get_resource(key)
-    if resource and resource['type'] == obj_type and \
-                    resource['syntax'] == syntax and \
-                    resource['integrity'] == integrity and \
-                    resource['topology'] == topology:
-        log.info("Returning cached result for '{0}'".format(key))
-        set_resource(key, keypath, obj_type, syntax, integrity, topology)
-        return resource['result']
+    resource = get_resource(rid)
+    validation = get_validation(vid)
+
+    if resource and validation:
+        log.info("Returning cached result for '{0}'".format(vid))
+        update_resource_validation(rid, vid)
+        return validation['result']
+
+    log.info("Starting validation [type={}, path={}, flags={}"
+             "resource_id:={}, validation_id={}]"
+             .format(obj_type, path, get_flags(syntax, integrity, topology),
+                     rid, vid))
+
+    set_resource(rid, keypath, obj_type, syntax, integrity, topology)
 
     validator = Validator()
-
     validator.configure(syntax, integrity, topology, debug=app.config['DEBUG'])
     # remove default dpath
     validator.dpath = None
@@ -315,11 +377,13 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
 
     result = val_function(path)
     print_result(validator, result)
-    json_result = gen_report_result(key, validator)
+    json_result = gen_report_result(rid, validator)
     net_topology = gen_report_net_topology(validator)
-    # todo: missing topology and fwgraphs
-    set_resource(key, keypath, obj_type, syntax, integrity, topology,
-                 result=json_result, net_topology=net_topology)
+    net_fwgraph = gen_report_net_fwgraph(validator)
+
+    set_validation(vid, result=json_result, net_topology=net_topology,
+                   net_fwgraph=net_fwgraph)
+    update_resource_validation(rid, vid)
 
     return json_result
 
@@ -337,9 +401,9 @@ def root():
     return '', 204
 
 
-@app.route('/flush/resources', methods=['POST'])
-def flush_resources():
-    cache.set('resources', dict())
+@app.route('/flush/validations', methods=['POST'])
+def flush_validations():
+    cache.set('validations', dict())
     return 'ok', 200
 
 
@@ -369,15 +433,15 @@ def validate_function():
     return _validate_object_from_request('function')
 
 
-@app.route('/resources', methods=['GET'])
-def resources():
-    """ retrieve list of available resources in cache """
-    return gen_resources()
+@app.route('/validations', methods=['GET'])
+def validations():
+    """ retrieve list of available validations in cache """
+    return gen_validations()
 
 
 @app.route('/watches', methods=['GET'])
 def watches():
-    """ retrieve list of watched resources """
+    """ retrieve list of watched validations """
     return gen_watches()
 
 
@@ -389,26 +453,30 @@ def report():
 
 @app.route('/report/result/<string:resource_id>', methods=['GET'])
 def report_result(resource_id):
-    if not resource_exits(resource_id) or \
-                    'result' not in get_resource(resource_id).keys():
+    vid = get_resource(resource_id)['latest_vid']
+    if not validation_exists(vid) or \
+                    'result' not in get_validation(vid).keys():
         return '', 404
-    return get_resource(resource_id)['result']
+
+    return get_validation(vid)['result']
 
 
 @app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
-    if not resource_exits(resource_id) or \
-                    'net_topology' not in get_resource(resource_id).keys():
+    vid = get_resource(resource_id)['latest_vid']
+    if not validation_exists(vid) or \
+                    'net_topology' not in get_validation(vid).keys():
         return '', 404
-    return get_resource(resource_id)['net_topology']
+    return get_validation(vid)['net_topology']
 
 
 @app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
-    if not resource_exits(resource_id) or \
-                    'net_fwgraph' not in get_resource(resource_id).keys():
+    vid = get_resource(resource_id)['latest_vid']
+    if not validation_exists(vid) or \
+                    'net_fwgraph' not in get_validation(vid).keys():
         return '', 404
-    return get_resource(resource_id)['net_fwgraph']
+    return get_validation(vid)['net_fwgraph']
 
 
 def gen_watches():
@@ -429,52 +497,56 @@ def gen_watches():
                       indent=4, separators=(',', ': ')).encode('utf-8')
 
 
-def gen_resources():
-    # retrieve dictionary of cached resources, in the format:
-    # resource_id: { type | path | syntax | integrity | topology }
+def gen_validations():
+    # retrieve dictionary of cached validations, in the format:
+    # validation_id: { type | path | syntax | integrity | topology }
     report = dict()
-    resources = cache.get('resources')
-    if not resources:
+    validations = cache.get('validations')
+    if not validations:
         return '', 204
 
-    for resource_id, resource in resources.items():
-        report[resource_id] = dict()
-        report[resource_id]['type'] = resource['type']
-        report[resource_id]['path'] = resource['path']
-        report[resource_id]['syntax'] = resource['syntax']
-        report[resource_id]['integrity'] = resource['integrity']
-        report[resource_id]['topology'] = resource['topology']
+    for vid, validation in validations.items():
+        report[vid] = dict()
+        report[vid]['type'] = validation['type']
+        report[vid]['path'] = validation['path']
+        report[vid]['syntax'] = validation['syntax']
+        report[vid]['integrity'] = validation['integrity']
+        report[vid]['topology'] = validation['topology']
 
     return json.dumps(report, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def gen_report():
-    # retrieve dictionary of latest validated resources, in the format:
-    # resource_id: { type | path | syntax | integrity | topology }
+    # resource_id {type | path | syntax | integrity | topology }
     report = dict()
     resources = cache.get('resources')
-    latest = cache.get('latest')
+    validations = cache.get('validations')
 
-    if not resources or not latest:
+    if not resources or not validations:
         return '', 204
 
-    for path, key in latest.items():
-        resource = resources[key]
-        if path != resource['path']:
+    for rid, resource in resources.items():
+
+        # omit resources that don't have a validation available
+        vid = resource['latest_vid']
+        if not validation_exists(vid):
             continue
-        report[key] = dict()
-        report[key]['type'] = resource['type']
-        report[key]['path'] = resource['path']
-        report[key]['syntax'] = resource['syntax']
-        report[key]['integrity'] = resource['integrity']
-        report[key]['topology'] = resource['topology']
+
+        report[rid] = dict()
+        report[rid]['type'] = resource['type']
+        report[rid]['path'] = resource['path']
+        report[rid]['syntax'] = resource['syntax']
+        report[rid]['integrity'] = resource['integrity']
+        report[rid]['topology'] = resource['topology']
 
     return json.dumps(report, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def gen_report_result(resource_id, validator):
+
+    print("building result report for {0}".format(resource_id))
     report = dict()
     report['resource_id'] = resource_id
     report['error_count'] = validator.error_count
@@ -505,13 +577,21 @@ def gen_report_net_topology(validator):
         report = report[0]
         return report
 
-    return json.dumps(report)
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def gen_report_net_fwgraph(validator):
-    report = dict()
+    report = list()
     for sid, service in validator.storage.services.items():
-        pass
+        report.append(service.fw_graphs)
+
+    # TODO: temp patch for returning only the fwgraph of the first service
+    if len(report) > 0:
+        report = report[0]
+
+    return json.dumps(report, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def get_local(path):
@@ -568,6 +648,12 @@ def get_url(url):
 
 def remove_file(filepath):
     os.remove(filepath)
+
+
+def get_flags(syntax, integrity, topology):
+    return ('s' if syntax else '' +
+            'i' if integrity else '' +
+            't' if topology else '')
 
 
 @atexit.register

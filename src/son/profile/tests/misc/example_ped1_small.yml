@@ -28,12 +28,12 @@ service_experiments:
     measurement_points:
       - name: "mp.output"
         connection_point: "ns:serviceout"
-        container: "sonata-son-emu-sap:latest"
+        container: "mpeuster/p2-mp"
         cmd_start: ${"iperf -s"}
         cmd_stop: null
       - name: "mp.input"
         connection_point: "ns:servicein"
-        container: "sonata-son-emu-sap:latest"
+        container: "mpeuster/p2-mp"
         cmd_start: ${"iperf -c 1.1.1.1 -t 120", "iperf -c 1.1.1.1 -t 120 -u"}
         cmd_stop: null
     # resource configurations to be tested during profiling run (defined per VNF)
@@ -78,12 +78,12 @@ function_experiments:
     measurement_points:
       - name: "mp.output"
         connection_point: "fwout"
-        container: "sonata-son-emu-sap:latest"
+        container: "mpeuster/p2-mp"
         cmd_start: "iperf -s"
         cmd_stop: null
       - name: "mp.input"
         connection_point: "fwin"
-        container: "sonata-son-emu-sap:latest"
+        container: "mpeuster/p2-mp"
         cmd_start: "iperf -c 1.1.1.1 -t 120"
         cmd_stop: null
     # resource configurations to be tested during profiling run (defined per VNF)

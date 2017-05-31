@@ -210,7 +210,8 @@ class Packager(object):
 
             if errors:
                 log.error('Please define {} in the package section of {}'
-                          .format(', '.join(errors), Project.__descriptor_name__))
+                          .format(', '.join(errors),
+                                  Project.__descriptor_name__))
                 return
         else:
             #TODO: what properties to set in a custom package? TBD...
@@ -426,7 +427,7 @@ class Packager(object):
             log.info("Packaging VNF descriptors from external source...")
             pcs_ext = self.generate_external_vnfds(os.path.join(
                 self._workspace.workspace_root,
-                self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR]),
+                self._workspace.vnf_catalogue_dir),
                 unpack_vnfs)
 
             if not pcs_ext or len(pcs_ext) == 0:
@@ -495,7 +496,7 @@ class Packager(object):
             # >> First, check if this VNF is in the workspace catalogue
             catalogue_path = os.path.join(
                 self._workspace.ws_root,
-                self._workspace.dirs[Workspace.CONFIG_STR_CATALOGUE_VNF_DIR],
+                self._workspace.vnf_catalogue_dir,
                 vnf_id)
 
             if os.path.isdir(catalogue_path):
