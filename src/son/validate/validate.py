@@ -46,6 +46,8 @@ from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
     build_descriptor_id
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 
 log = logging.getLogger(__name__)
 evtlog = event.get_logger('validator.events')
@@ -214,7 +216,7 @@ class Validator(object):
 
         return True
 
-    def validate_package(self, package):
+    def validate_package(self, package, signature=None, pubkey=None):
         """
         Validate a SONATA package.
         By default, it performs the following validations: syntax, integrity
@@ -249,6 +251,16 @@ class Validator(object):
             evtlog.log("Invalid SONATA package structure '{}'".format(package),
                        self.evtid,
                        'evt_package_struct_invalid')
+            return
+
+        # validate package signature (optional)
+        if (signature and pubkey) and (
+                not self._validate_package_signature(package,
+                                                     signature,
+                                                     pubkey)):
+            evtlog.log("Invalid signature of package '{}'".format(package),
+                       self.evtid,
+                       'evt_package_signature_invalid')
             return
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
@@ -431,6 +443,19 @@ class Validator(object):
                 return
 
         return True
+
+    def _validate_package_signature(self, package, signature, pubkey):
+        """
+        Verifies with the public key from whom the package file came that is 
+        indeed signed by their private key
+        :param package: path to package file
+        :param signature: String signature to be verified
+        :param pubkey: String public key
+        :return: Boolean. True if valid signature, False otherwise. 
+        """
+        pkg_hash = SHA256.new(package).digest()
+        rsa_key = RSA.importKey(pubkey)
+        return rsa_key.verify(pkg_hash, signature)
 
     def _validate_package_syntax(self, package):
         """
