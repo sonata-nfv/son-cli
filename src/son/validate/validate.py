@@ -255,9 +255,9 @@ class Validator(object):
 
         # validate package signature (optional)
         if (signature and pubkey) and (
-                not self._validate_package_signature(package,
-                                                     signature,
-                                                     pubkey)):
+                not self.validate_package_signature(package,
+                                                    signature,
+                                                    pubkey)):
             evtlog.log("Invalid signature of package '{}'".format(package),
                        self.evtid,
                        'evt_package_signature_invalid')
@@ -444,7 +444,8 @@ class Validator(object):
 
         return True
 
-    def _validate_package_signature(self, package, signature, pubkey):
+    @staticmethod
+    def validate_package_signature(package, signature, pubkey):
         """
         Verifies with the public key from whom the package file came that is 
         indeed signed by their private key
@@ -453,7 +454,14 @@ class Validator(object):
         :param pubkey: String public key
         :return: Boolean. True if valid signature, False otherwise. 
         """
-        pkg_hash = SHA256.new(package).digest()
+        file_data = None
+        try:
+            with open(package, 'rb') as _file:
+                file_data = _file.read()
+        except IOError as err:
+            log.error("I/O error: {0}".format(err))
+
+        pkg_hash = SHA256.new(file_data).digest()
         rsa_key = RSA.importKey(pubkey)
         return rsa_key.verify(pkg_hash, signature)
 
