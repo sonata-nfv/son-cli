@@ -454,6 +454,7 @@ class Validator(object):
         :param pubkey: String public key
         :return: Boolean. True if valid signature, False otherwise. 
         """
+        log.info("Validating signature of package '{0}'".format(package))
         file_data = None
         try:
             with open(package, 'rb') as _file:
