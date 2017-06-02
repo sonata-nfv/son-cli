@@ -101,7 +101,7 @@ class UnitValidateTests(unittest.TestCase):
         except IOError as err:
             print("I/O error: {0}".format(err))
         pkg_hash = SHA256.new(file_data).digest()
-        signature = key.sign(pkg_hash, '')
+        signature = str(key.sign(pkg_hash, '')[0])
         pubkey = key.publickey().exportKey('DER')  # export in binary encoding
 
         # call signature validation function
