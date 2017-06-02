@@ -77,6 +77,10 @@ class Validator(object):
         self._dpath = '.'
         self._log_level = self._workspace.log_level
 
+        # for package signature validation
+        self._pkg_signature = None
+        self._pkg_pubkey = None
+
         # configure logs
         coloredlogs.install(level=self._log_level)
 
@@ -132,7 +136,8 @@ class Validator(object):
         self._dpath = value
 
     def configure(self, syntax=None, integrity=None, topology=None,
-                  dpath=None, dext=None, debug=None):
+                  dpath=None, dext=None, debug=None, pkg_signature=None,
+                  pkg_pubkey=None):
         """
         Configure parameters for validation. It is recommended to call this
         function before performing a validation.
@@ -142,6 +147,8 @@ class Validator(object):
         :param dpath: directory to search for function descriptors (VNFDs)
         :param dext: extension of descriptor files (default: 'yml')
         :param debug: increase verbosity level of logger
+        :param pkg_signature: String package signature to be validated
+        :param pkg_pubkey: String package public key to verify signature
         """
         # assign parameters
         if syntax is not None:
@@ -160,6 +167,10 @@ class Validator(object):
         if debug is False:
             self._workspace.log_level = 'info'
             coloredlogs.install(level='info')
+        if pkg_signature is not None:
+            self._pkg_signature = pkg_signature
+        if pkg_pubkey is not None:
+            self._pkg_pubkey = pkg_pubkey
 
     def _assert_configuration(self):
         """
@@ -216,7 +227,7 @@ class Validator(object):
 
         return True
 
-    def validate_package(self, package, signature=None, pubkey=None):
+    def validate_package(self, package):
         """
         Validate a SONATA package.
         By default, it performs the following validations: syntax, integrity
@@ -254,10 +265,10 @@ class Validator(object):
             return
 
         # validate package signature (optional)
-        if (signature and pubkey) and (
+        if (self._pkg_signature and self._pkg_pubkey) and (
                 not self.validate_package_signature(package,
-                                                    signature,
-                                                    pubkey)):
+                                                    self._pkg_signature,
+                                                    self._pkg_pubkey)):
             evtlog.log("Invalid signature of package '{}'".format(package),
                        self.evtid,
                        'evt_package_signature_invalid')
