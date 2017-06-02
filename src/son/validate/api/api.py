@@ -331,12 +331,15 @@ def _validate_object_from_request(object_type):
         if 'pkg_signature' in request.form else None
     pkg_pubkey = request.form['pkg_pubkey'] \
         if 'pkg_pubkey' in request.form else None
-    if not (pkg_signature and pkg_pubkey):
-        pkg_signature = pkg_pubkey = None
+    if not (pkg_signature and pkg_pubkey) and (pkg_signature or pkg_pubkey):
+        req_errors.append("For package signature validation both "
+                          "'pkg_signature' and 'pkg_pubkey' fields must be "
+                          "set")
+        return render_errors(), 400
 
-    return _validate_object(keypath, path, object_type,
-                            syntax, integrity, topology,
-                            pkg_signature, pkg_pubkey)
+    return _validate_object(keypath, path, object_type, syntax, integrity,
+                            topology, pkg_signature=pkg_signature,
+                            pkg_pubkey=pkg_pubkey)
 
 
 def str2bool(v):
@@ -353,7 +356,7 @@ def validate_parameters(obj_type, syntax, integrity, topology):
 
 
 def _validate_object(keypath, path, obj_type, syntax, integrity, topology,
-                     pkg_signature, pkg_pubkey):
+                     pkg_signature=None, pkg_pubkey=None):
     # protect against incorrect parameters
     perrors = validate_parameters(obj_type, syntax, integrity, topology)
     if perrors:

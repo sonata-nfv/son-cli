@@ -470,12 +470,21 @@ class Validator(object):
         try:
             with open(package, 'rb') as _file:
                 file_data = _file.read()
+            pkg_hash = SHA256.new(file_data).digest()
+            rsa_key = RSA.importKey(pubkey)
+            signature = (eval(signature), )
+            result = rsa_key.verify(pkg_hash, signature)
         except IOError as err:
             log.error("I/O error: {0}".format(err))
+            return False
+        except ValueError:
+            log.error("Invalid key format")
+            return False
+        except Exception as err:  # override, so validator doesn't crash
+            log.error("Exception error: {0}".format(err))
+            return False
 
-        pkg_hash = SHA256.new(file_data).digest()
-        rsa_key = RSA.importKey(pubkey)
-        return rsa_key.verify(pkg_hash, signature)
+        return result
 
     def _validate_package_syntax(self, package):
         """
