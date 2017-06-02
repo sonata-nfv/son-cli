@@ -46,6 +46,8 @@ from son.workspace.workspace import Workspace, Project
 from son.validate.storage import DescriptorStorage
 from son.validate.util import read_descriptor_files, list_files, strip_root, \
     build_descriptor_id
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 
 log = logging.getLogger(__name__)
 evtlog = event.get_logger('validator.events')
@@ -74,6 +76,10 @@ class Validator(object):
         self._dext = self._workspace.default_descriptor_extension
         self._dpath = '.'
         self._log_level = self._workspace.log_level
+
+        # for package signature validation
+        self._pkg_signature = None
+        self._pkg_pubkey = None
 
         # configure logs
         coloredlogs.install(level=self._log_level)
@@ -130,7 +136,8 @@ class Validator(object):
         self._dpath = value
 
     def configure(self, syntax=None, integrity=None, topology=None,
-                  dpath=None, dext=None, debug=None):
+                  dpath=None, dext=None, debug=None, pkg_signature=None,
+                  pkg_pubkey=None):
         """
         Configure parameters for validation. It is recommended to call this
         function before performing a validation.
@@ -140,6 +147,8 @@ class Validator(object):
         :param dpath: directory to search for function descriptors (VNFDs)
         :param dext: extension of descriptor files (default: 'yml')
         :param debug: increase verbosity level of logger
+        :param pkg_signature: String package signature to be validated
+        :param pkg_pubkey: String package public key to verify signature
         """
         # assign parameters
         if syntax is not None:
@@ -158,6 +167,10 @@ class Validator(object):
         if debug is False:
             self._workspace.log_level = 'info'
             coloredlogs.install(level='info')
+        if pkg_signature is not None:
+            self._pkg_signature = pkg_signature
+        if pkg_pubkey is not None:
+            self._pkg_pubkey = pkg_pubkey
 
     def _assert_configuration(self):
         """
@@ -249,6 +262,16 @@ class Validator(object):
             evtlog.log("Invalid SONATA package structure '{}'".format(package),
                        self.evtid,
                        'evt_package_struct_invalid')
+            return
+
+        # validate package signature (optional)
+        if (self._pkg_signature and self._pkg_pubkey) and (
+                not self.validate_package_signature(package,
+                                                    self._pkg_signature,
+                                                    self._pkg_pubkey)):
+            evtlog.log("Invalid signature of package '{}'".format(package),
+                       self.evtid,
+                       'evt_package_signature_invalid')
             return
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
@@ -431,6 +454,37 @@ class Validator(object):
                 return
 
         return True
+
+    @staticmethod
+    def validate_package_signature(package, signature, pubkey):
+        """
+        Verifies with the public key from whom the package file came that is 
+        indeed signed by their private key
+        :param package: path to package file
+        :param signature: String signature to be verified
+        :param pubkey: String public key
+        :return: Boolean. True if valid signature, False otherwise. 
+        """
+        log.info("Validating signature of package '{0}'".format(package))
+        file_data = None
+        try:
+            with open(package, 'rb') as _file:
+                file_data = _file.read()
+            pkg_hash = SHA256.new(file_data).digest()
+            rsa_key = RSA.importKey(pubkey)
+            signature = (eval(signature), )
+            result = rsa_key.verify(pkg_hash, signature)
+        except IOError as err:
+            log.error("I/O error: {0}".format(err))
+            return False
+        except ValueError:
+            log.error("Invalid key format")
+            return False
+        except Exception as err:  # override, so validator doesn't crash
+            log.error("Exception error: {0}".format(err))
+            return False
+
+        return result
 
     def _validate_package_syntax(self, package):
         """

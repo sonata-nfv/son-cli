@@ -22,6 +22,9 @@ evt_package_format_invalid: error
 # Package - bad internal file structure
 evt_package_struct_invalid: error
 
+# Package - invalid signature
+evt_package_signature_invalid: error
+
 # PD [syntax] - invalid schema syntax
 evt_pd_stx_invalid: error
 
@@ -131,5 +134,7 @@ evt_vnfd_top_topgraph_failed: error
 ### GENERAL
 
 # Duplicate declaration of connection point
-evt_invalid_descriptor: error
 evt_duplicate_cpoint: error
+
+# Not a SONATA descriptor
+evt_invalid_descriptor: error

@@ -197,6 +197,7 @@ The validation events are defined as follows:
 * Package related
     * invalid package file format: `evt_package_format_invalid`
     * invalid package file structure: `evt_package_struct_invalid`
+    * invalid package signature: `evt_package_signature_invalid`
     * invalid package descriptor (PD) syntax: `evt_pd_stx_invalid`
     * invalid references in PD: `evt_pd_itg_invalid_reference`
     * invalid file MD5 checksums: `evt_pd_itg_invalid_md5`
@@ -218,6 +219,8 @@ The validation events are defined as follows:
     * number of connection points in forwarding graph is odd: `evt_nsd_top_fwgraph_cpoints_odd`
     * forwarding path incompatible with defined topology: `evt_nsd_top_fwpath_invalid`
     * cycles found in forwarding path: `evt_nsd_top_fwpath_cycles`
+    * direct path linking interfaces of the same VNF: `evt_nsd_top_fwpath_inside_vnf`
+    * disrupted forwarding path: `evt_nsd_top_fwpath_disrupted`
 * Function related:
     * invalid function descriptor file: `evt_function_invalid_descriptor`
     * invalid function descriptor (VNFD) syntax: `evt_vnfd_stx_invalid`
@@ -229,3 +232,7 @@ The validation events are defined as follows:
     * unused connection point: `evt_vnfd_itg_unused_cpoint`
     * undefined connection point: `evt_vnfd_itg_undefined_cpoint`
     * failure on building topology graph: `evt_vnfd_top_topgraph_failed`
+* Generic:
+    * duplicate connection point: `evt_duplicate_cpoint`
+    * invalid SONATA descriptor: `evt_invalid_descriptor`
+    
