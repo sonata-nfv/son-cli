@@ -901,10 +901,10 @@ class Validator(object):
                                        event_id=evtid,
                                        detail_event_id=fw_path['fp_id'])
                             fw_path['event_id'] = evtid
-                            
-                            # reset trace and leave
+
+                            # reset trace
                             fw_path['trace'] = []
-                            return
+                            continue
 
                         fpg.add_edge(prev_node, node,
                                      attr_dict={'from': prev_iface,
@@ -928,6 +928,9 @@ class Validator(object):
 
                     prev_node = node
                     prev_iface = interface
+
+                # remove 'path' from fw_path (not needed anymore)
+                fw_path.pop('path')
 
             # find cycles
             complete_cycles = list(nx.simple_cycles(fpg))
@@ -1168,8 +1171,6 @@ def print_result(validator, result):
 
     if not result:
         log.critical("VALIDATION FAILED")
-    else:
-        log.info("VALIDATION SUCCEEDED")
 
     print("==== Statistics: {0} error(s) and {1} warning(s) ===="
           .format(validator.error_count, validator.warning_count))
