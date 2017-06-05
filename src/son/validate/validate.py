@@ -93,7 +93,7 @@ class Validator(object):
         # reset event logger
         evtlog.reset()
 
-        self.evtid = None
+        self.source_id = None
 
         self._fwgraphs = dict()
 
@@ -238,14 +238,14 @@ class Validator(object):
         if not self._assert_configuration():
             return
 
-        self.evtid = package
+        self.source_id = package
         log.info("Validating package '{0}'".format(os.path.abspath(package)))
 
         # check if package is packed in the correct format
         if not zipfile.is_zipfile(package):
             evtlog.log("Invalid package format",
                        "Invalid SONATA package '{}'".format(package),
-                       self.evtid,
+                       self.source_id,
                        'evt_package_format_invalid')
             return
 
@@ -261,7 +261,7 @@ class Validator(object):
         if not self._validate_package_struct(package_dir):
             evtlog.log("Invalid package structure",
                        "Invalid SONATA package structure '{}'".format(package),
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -272,7 +272,7 @@ class Validator(object):
                                                     self._pkg_pubkey)):
             evtlog.log("Invalid package signature",
                        "Invalid signature of package '{}'".format(package),
-                       self.evtid,
+                       self.source_id,
                        'evt_package_signature_invalid')
             return
 
@@ -420,7 +420,7 @@ class Validator(object):
             evtlog.log("Invalid package structure",
                        "A directory named 'META-INF' must exist, "
                        "located at the root of the package",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -428,7 +428,7 @@ class Validator(object):
             evtlog.log("Invalid package structure",
                        "The 'META-INF' directory must only contain the file "
                        "'MANIFEST.MF'",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -436,7 +436,7 @@ class Validator(object):
             evtlog.log("Invalid package structure",
                        "A file named 'MANIFEST.MF' must exist in directory "
                        "'META-INF'",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -447,7 +447,7 @@ class Validator(object):
                 evtlog.log("Invalid package structure",
                            "The 'service_descriptors' directory must contain "
                            "at least one service descriptor file",
-                           self.evtid,
+                           self.source_id,
                            'evt_package_struct_invalid')
                 return
 
@@ -458,7 +458,7 @@ class Validator(object):
                 evtlog.log("Invalid package structure",
                            "The 'function_descriptors' directory must contain "
                            "at least one function descriptor file",
-                           self.evtid,
+                           self.source_id,
                            'evt_package_struct_invalid')
                 return
 
@@ -819,6 +819,8 @@ class Validator(object):
 
             for fw_path in fw_graph['fw_paths']:
 
+                evtid = event.generate_evt_id()
+
                 # check if number of connection points is odd
                 if len(fw_path['path']) % 2 != 0:
                     evtlog.log("Odd number of connection points",
@@ -826,12 +828,14 @@ class Validator(object):
                                "has an odd number of connection points".
                                format(fw_graph['fg_id'], fw_path['fp_id']),
                                source_id,
-                               'evt_nsd_top_fwgraph_cpoints_odd')
+                               'evt_nsd_top_fwgraph_cpoints_odd',
+                               event_id=evtid,
+                               detail_event_id=fw_path['fp_id'])
+                    fw_path['event_id'] = evtid
 
                 fw_path['trace'] = service.trace_path_pairs(fw_path['path'])
 
                 if any(pair['break'] is True for pair in fw_path['trace']):
-                    evtid = event.generate_evt_id()
                     evtlog.log("Invalid forwarding path ({0} breakpoint(s))"
                                .format(sum(pair['break'] is True
                                            for pair in fw_path['trace'])),
