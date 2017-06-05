@@ -888,6 +888,7 @@ class Validator(object):
 
                     if pair_complete:
                         if prev_node and prev_node == node:
+                            evtid = event.generate_evt_id()
                             evtlog.log("Path within the same VNF",
                                        "The forwarding path fg_id='{0}', "
                                        "fp_id='{1}' contains a path within the"
@@ -897,8 +898,10 @@ class Validator(object):
                                                node),
                                        source_id,
                                        'evt_nsd_top_fwpath_inside_vnf',
-                                       event_id=func.id)
-
+                                       event_id=evtid,
+                                       detail_event_id=fw_path['fp_id'])
+                            fw_path['event_id'] = evtid
+                            
                             # reset trace and leave
                             fw_path['trace'] = []
                             return
