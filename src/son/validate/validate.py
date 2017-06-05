@@ -88,7 +88,7 @@ class Validator(object):
         self._storage = DescriptorStorage()
 
         # syntax validation
-        self._schema_validator = SchemaValidator(self._workspace)
+        self._schema_validator = SchemaValidator(self._workspace, preload=True)
 
         # reset event logger
         evtlog.reset()
