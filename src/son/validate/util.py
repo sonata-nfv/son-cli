@@ -67,13 +67,15 @@ def read_descriptor_file(file):
             descriptor = yaml.load(_file)
 
         except yaml.YAMLError as exc:
-            evtlog.log("Error parsing descriptor file: {0}".format(exc),
+            evtlog.log("Invalid descriptor",
+                       "Error parsing descriptor file: {0}".format(exc),
                        file,
                        'evt_invalid_descriptor')
             return
 
         if not descriptor:
-            evtlog.log("Couldn't read descriptor file: '{0}'".format(file),
+            evtlog.log("Invalid descriptor",
+                       "Couldn't read descriptor file: '{0}'".format(file),
                        file,
                        'evt_invalid_descriptor')
             return
