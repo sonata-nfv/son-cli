@@ -179,6 +179,39 @@ The service API accepts the following requests:
         ```
         The number of contained services (in a project or package) is equal to the list size N.
 
+* `/fwgraphs` [GET]: provides the validated forwarding graphs structure of <resource_id>
+    * Returns a list of dictionaries, one for each forwarding graph, in the format:
+    ```yaml
+    "fg_id":  # forwarding graph ID
+    "event_id:"  # event ID correlated with validation events
+    "fw_paths:"  # structure for each forwarding path, indicating invalid links
+        [ {
+            "fp_id:"  # forwarding path ID
+            "trace:"  # forwading path trace, containing a list of connection point pairs
+                [ {
+                    "from:"  # origin of link interface
+                    "to:"  # destination of link interface
+                    "break:"  true | false  # indicates if link is defined in the topology
+                  },
+                  ...
+                ]
+          },
+          ...
+        ]
+    "cycles:"  # structure to hold the found cycles within the forwarding graph
+        [ {
+            "cycle_id:"  # cycle ID
+            "cycle_path":  # contains the links that compose the cycle
+                [ {
+                    "from:"  # origin of link interface
+                    "to:"  # destination of link interface
+                  },
+                  ...
+                ]
+         },
+        ]
+    ```
+
 * `/resources` [GET]: retrieves the cached validation resources
     * Returns a dictionary of cached resources, in the format:
         ```yaml
