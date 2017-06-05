@@ -842,7 +842,7 @@ class Validator(object):
                                source_id,
                                'evt_nsd_top_fwpath_invalid',
                                event_id=evtid,
-                               inner_event_id=fw_path['fp_id'])
+                               detail_event_id=fw_path['fp_id'])
                     fw_path['event_id'] = evtid
 
                     # skip further analysis
@@ -974,7 +974,7 @@ class Validator(object):
                                source_id,
                                'evt_nsd_top_fwgraph_cycles',
                                event_id=evtid,
-                               inner_event_id=cycle['cycle_id'])
+                               detail_event_id=cycle['cycle_id'])
                 fw_graph['cycles'] = cycles_list
                 fw_graph['event_id'] = evtid
 

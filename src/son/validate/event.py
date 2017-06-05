@@ -33,7 +33,7 @@ class EventLogger(object):
         self._events.clear()
 
     def log(self, header, msg, source_id, event_code, event_id=None,
-            inner_event_id=None):
+            detail_event_id=None):
         level = self._eventdict[event_code]
         key = self.get_key(source_id, event_code, level)
 
@@ -44,7 +44,7 @@ class EventLogger(object):
             event['level'] = level
             event['event_id'] = event_id if event_id else source_id
             event['header'] = header
-            event['messages'] = list()
+            event['detail'] = list()
 
             # log header upon new key
             if level == 'error':
@@ -70,9 +70,9 @@ class EventLogger(object):
 
         msg_dict = dict()
         msg_dict['message'] = msg
-        msg_dict['inner_event_id'] = inner_event_id \
-            if inner_event_id else event['event_id']
-        event['messages'].append(msg_dict)
+        msg_dict['detail_event_id'] = detail_event_id \
+            if detail_event_id else event['event_id']
+        event['detail'].append(msg_dict)
 
     @staticmethod
     def get_key(source_id, event_code, level):
