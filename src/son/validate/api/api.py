@@ -1,5 +1,6 @@
 import hashlib
 import os
+import sys
 import json
 import logging
 import coloredlogs
@@ -23,8 +24,29 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 app.config.from_pyfile('settings.py')
-cache = Cache(app, config={'CACHE_TYPE': 'redis',
-                           'CACHE_DEFAULT_TIMEOUT': 0})
+
+
+# config cache
+if app.config['CACHE_TYPE'] == 'redis':
+    redis_auth = app.config['REDIS_USER'] + ':' + app.config[
+        'REDIS_PASSWD'] \
+        if app.config['REDIS_USER'] and app.config['REDIS_PASSWD'] else ''
+    redis_url = 'redis://' + redis_auth + '@' + app.config['REDIS_HOST'] + \
+                ':' + app.config['REDIS_PORT']
+
+    cache = Cache(app, config={'CACHE_TYPE': 'redis',
+                               'CACHE_DEFAULT_TIMEOUT': 0,
+                               'CACHE_REDIS_URL': redis_url})
+
+
+elif app.config['CACHE_TYPE'] == 'simple':
+    cache = Cache(app, config={'CACHE_TYPE': 'simple',
+                               'CACHE_DEFAULT_TIMEOUT': 0})
+
+else:
+    print("Invalid cache type.")
+    sys.exit(1)
+
 
 # keep temporary request errors
 req_errors = []
@@ -62,7 +84,12 @@ class ValidateWatcher(FileSystemEventHandler):
 
 def initialize(debug=False):
     log.info("Initializing validator service")
-    cache.clear()
+
+    try:
+        cache.clear()
+    except:
+        sys.exit(1)
+
     cache.add('debug', debug)
     cache.add('artifacts', list())
     cache.add('validations', dict())
