@@ -59,9 +59,6 @@ Some usage examples are as follows:
 * validate multiple functions: `son-validate --function ./vnfds/ --dext yml`
 
 
-
-
-
 ## son-validate Service
 son-validate can be executed as a service, providing a RESTful interface to validate objects and retrieve validation reports. son-validate API service can be executed in two distinct modes: `stateless` or `local`. Stateless mode will run as a stateless service only and can be instantiated at any remote location. Local mode is designed to run in the developer OS, providing additional functionalities. It aims to provide automatic monitoring and validation of local SDK projects, packages, services and functions. Automatic monitoring and validation can be enabled in workspace configuration, specifying the type of validation and which objects to validate. This functionallity watches for changes in the specified objects automatically triggering the validation process as required.
 
@@ -125,7 +122,7 @@ validate_watchers:
 ```
 ### API
 The service API accepts the following requests:
-* `/validate/<object_type>` [POST]: validate an SDK project, a package, a service or a function specified by <object_type>
+* `/validate/<object_type>` [POST]: validate an SDK `project`, a `package`, a `service` or a `function` specified by <object_type>
     * Mandatory request parameters:
         * `source`: local | url | embedded
         Specifies the origin of the object to validate. Local to retrieve object from local filesystem, url to download from remote location and embedded means that the object is included in the request.
@@ -140,13 +137,19 @@ The service API accepts the following requests:
         Requires integrity validation.
         * `topology`: True | False (default: False)
         Requires topology validation.
+        * `pkg_signature`: String
+        Signature of the package (only applicable for package validation)
+        * `pkg_pubkey`: String
+        Public key of the package signer (only applicable for package validation)
     * Returns dictionary of validation results as described further in `/report/result/` including the `resource_id` associated with the validation
 * `/report` [GET]: provides a dictionary of available validated objects
     * Returns dictionary in the format:
         ```yaml
         "resource_id":
-            flags: "S" | "SI" | "SIT"
             path: "/some/local/path"
+            syntax: true | false
+            topology: true | false
+            integrity: true | false
             type: "project" | "package" | "service" | "function"
         ```
 * `/report/result/<resource_id>` [GET]: provides validation results of <resource_id>
@@ -156,13 +159,18 @@ The service API accepts the following requests:
         error_count: <number of errors>
         warning_count: <number of warnings>
         errors:  # only present if error_count not zero
-            "object_id":  # object to whom the error is associated
-                <event_code>:  # event code as configured in eventcfg.yaml (see further for details)
-                    [msg1, msg2]  # list of messages associated with event
-        warnings:  # only present if warning_count not zero
-            "object_id":  # object to whom the warning is associated
-                <event_code>:  # event code as configured in eventcfg.yaml (see further for details)
-                    [msg1, msg2]  # list of messages associated with event
+            "source_id":  # object where the error occurred
+            "event_id":  # generated event identification associated with the error
+            "event_code":  # event code as configured in eventcfg.yaml (see further for details)
+            "header":  # general message describing the error
+            "detail:"  # list of error details
+                [  {
+                      "detail_event_id:"  # generated event ID associated with error detail
+                      "message:"  # specific message describing the error detail
+                   },
+                  ...
+                ]
+        warnings:  (Same format of the errors' structure)
         ```
 * `/report/topology/<resource_id>`[GET]: provides the validated network topology graph of <resource_id>
     * Returns a list of network topologies in the graphml format:
@@ -170,6 +178,39 @@ The service API accepts the following requests:
         [<graphml_network_topology_1, ..., graphml_network_topology_N]
         ```
         The number of contained services (in a project or package) is equal to the list size N.
+
+* `/fwgraphs` [GET]: provides the validated forwarding graphs structure of <resource_id>
+    * Returns a list of dictionaries, one for each forwarding graph, in the format:
+    ```yaml
+    "fg_id":  # forwarding graph ID
+    "event_id:"  # event ID correlated with validation events
+    "fw_paths:"  # structure for each forwarding path, indicating invalid links
+        [ {
+            "fp_id:"  # forwarding path ID
+            "trace:"  # forwading path trace, containing a list of connection point pairs
+                [ {
+                    "from:"  # origin of link interface
+                    "to:"  # destination of link interface
+                    "break:"  true | false  # indicates if link is defined in the topology
+                  },
+                  ...
+                ]
+          },
+          ...
+        ]
+    "cycles:"  # structure to hold the found cycles within the forwarding graph
+        [ {
+            "cycle_id:"  # cycle ID
+            "cycle_path":  # contains the links that compose the cycle
+                [ {
+                    "from:"  # origin of link interface
+                    "to:"  # destination of link interface
+                  },
+                  ...
+                ]
+         },
+        ]
+    ```
 
 * `/resources` [GET]: retrieves the cached validation resources
     * Returns a dictionary of cached resources, in the format:

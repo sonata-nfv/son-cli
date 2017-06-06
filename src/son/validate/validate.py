@@ -88,18 +88,18 @@ class Validator(object):
         self._storage = DescriptorStorage()
 
         # syntax validation
-        self._schema_validator = SchemaValidator(self._workspace)
+        self._schema_validator = SchemaValidator(self._workspace, preload=True)
 
         # reset event logger
         evtlog.reset()
 
-        self.evtid = None
+        self.source_id = None
 
         self._fwgraphs = dict()
 
     @property
     def errors(self):
-        return EventLogger.normalize(evtlog.errors)
+        return evtlog.errors
 
     @property
     def error_count(self):
@@ -110,7 +110,7 @@ class Validator(object):
 
     @property
     def warnings(self):
-        return EventLogger.normalize(evtlog.warnings)
+        return evtlog.warnings
 
     @property
     def warning_count(self):
@@ -238,14 +238,14 @@ class Validator(object):
         if not self._assert_configuration():
             return
 
-        self.evtid = package
-
+        self.source_id = package
         log.info("Validating package '{0}'".format(os.path.abspath(package)))
 
         # check if package is packed in the correct format
         if not zipfile.is_zipfile(package):
-            evtlog.log("Invalid SONATA package '{}'".format(package),
-                       self.evtid,
+            evtlog.log("Invalid package format",
+                       "Invalid SONATA package '{}'".format(package),
+                       self.source_id,
                        'evt_package_format_invalid')
             return
 
@@ -259,8 +259,9 @@ class Validator(object):
 
         # validate package file structure
         if not self._validate_package_struct(package_dir):
-            evtlog.log("Invalid SONATA package structure '{}'".format(package),
-                       self.evtid,
+            evtlog.log("Invalid package structure",
+                       "Invalid SONATA package structure '{}'".format(package),
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -269,8 +270,9 @@ class Validator(object):
                 not self.validate_package_signature(package,
                                                     self._pkg_signature,
                                                     self._pkg_pubkey)):
-            evtlog.log("Invalid signature of package '{}'".format(package),
-                       self.evtid,
+            evtlog.log("Invalid package signature",
+                       "Invalid signature of package '{}'".format(package),
+                       self.source_id,
                        'evt_package_signature_invalid')
             return
 
@@ -342,7 +344,8 @@ class Validator(object):
 
         service = self._storage.create_service(nsd_file)
         if not service:
-            evtlog.log("Failed to read the service descriptor of file '{}'"
+            evtlog.log("Invalid service descriptor",
+                       "Failed to read the service descriptor of file '{}'"
                        .format(nsd_file),
                        nsd_file,
                        'evt_service_invalid_descriptor')
@@ -388,7 +391,8 @@ class Validator(object):
 
         function = self._storage.create_function(vnfd_path)
         if not function:
-            evtlog.log("Couldn't store VNF of file '{0}'".format(vnfd_path),
+            evtlog.log("Invalid function descriptor",
+                       "Couldn't store VNF of file '{0}'".format(vnfd_path),
                        vnfd_path,
                        'evt_function_invalid_descriptor')
             return
@@ -413,23 +417,26 @@ class Validator(object):
         # validate directory 'META-INF'
         meta_dir = os.path.join(package_dir, 'META-INF')
         if not os.path.isdir(meta_dir):
-            evtlog.log("A directory named 'META-INF' must exist, "
+            evtlog.log("Invalid package structure",
+                       "A directory named 'META-INF' must exist, "
                        "located at the root of the package",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
         if len(os.listdir(meta_dir)) > 1:
-            evtlog.log("The 'META-INF' directory must only contain the file "
+            evtlog.log("Invalid package structure",
+                       "The 'META-INF' directory must only contain the file "
                        "'MANIFEST.MF'",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
         if not os.path.exists(os.path.join(meta_dir, 'MANIFEST.MF')):
-            evtlog.log("A file named 'MANIFEST.MF' must exist in directory "
+            evtlog.log("Invalid package structure",
+                       "A file named 'MANIFEST.MF' must exist in directory "
                        "'META-INF'",
-                       self.evtid,
+                       self.source_id,
                        'evt_package_struct_invalid')
             return
 
@@ -437,9 +444,10 @@ class Validator(object):
         services_dir = os.path.join(package_dir, 'service_descriptors')
         if os.path.isdir(services_dir):
             if len(os.listdir(services_dir)) == 0:
-                evtlog.log("The 'service_descriptors' directory must contain "
+                evtlog.log("Invalid package structure",
+                           "The 'service_descriptors' directory must contain "
                            "at least one service descriptor file",
-                           self.evtid,
+                           self.source_id,
                            'evt_package_struct_invalid')
                 return
 
@@ -447,9 +455,10 @@ class Validator(object):
         functions_dir = os.path.join(package_dir, 'function_descriptors')
         if os.path.isdir(functions_dir):
             if len(os.listdir(functions_dir)) == 0:
-                evtlog.log("The 'function_descriptors' directory must contain "
+                evtlog.log("Invalid package structure",
+                           "The 'function_descriptors' directory must contain "
                            "at least one function descriptor file",
-                           self.evtid,
+                           self.source_id,
                            'evt_package_struct_invalid')
                 return
 
@@ -497,7 +506,8 @@ class Validator(object):
                  .format(package.id))
         if not self._schema_validator.validate(
               package.content, SchemaValidator.SCHEMA_PACKAGE_DESCRIPTOR):
-            evtlog.log("Invalid syntax in MANIFEST of package '{0}': {1}"
+            evtlog.log("Invalid PD syntax",
+                       "Invalid syntax in MANIFEST of package '{0}': {1}"
                        .format(package.id, self._schema_validator.error_msg),
                        package.id,
                        'evt_pd_stx_invalid')
@@ -513,7 +523,8 @@ class Validator(object):
         log.info("Validating syntax of service '{0}'".format(service.id))
         if not self._schema_validator.validate(
               service.content, SchemaValidator.SCHEMA_SERVICE_DESCRIPTOR):
-            evtlog.log("Invalid syntax in service '{0}': {1}"
+            evtlog.log("Invalid NSD syntax",
+                       "Invalid syntax in service '{0}': {1}"
                        .format(service.id, self._schema_validator.error_msg),
                        service.id,
                        'evt_nsd_stx_invalid')
@@ -529,7 +540,8 @@ class Validator(object):
         log.info("Validating syntax of function '{0}'".format(function.id))
         if not self._schema_validator.validate(
               function.content, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
-            evtlog.log("Invalid syntax in function '{0}': {1}"
+            evtlog.log("Invalid VNFD syntax",
+                       "Invalid syntax in function '{0}': {1}"
                        .format(function.id, self._schema_validator.error_msg),
                        function.id,
                        'evt_vnfd_stx_invalid')
@@ -551,7 +563,8 @@ class Validator(object):
             filename = os.path.join(root_dir, strip_root(f))
             log.debug("Verifying file '{0}'".format(f))
             if not os.path.isfile(filename):
-                evtlog.log("Referenced descriptor file '{0}' is not "
+                evtlog.log("Invalid descriptor reference",
+                           "Referenced descriptor file '{0}' is not "
                            "packaged.".format(f),
                            package.id,
                            'evt_pd_itg_invalid_reference')
@@ -560,7 +573,8 @@ class Validator(object):
             gen_md5 = generate_hash(filename)
             manif_md5 = package.md5(strip_root(f))
             if manif_md5 and gen_md5 != manif_md5:
-                evtlog.log("MD5 hash of file '{0}' is not equal to the "
+                evtlog.log("Invalid MD5 in PD",
+                           "MD5 hash of file '{0}' is not equal to the "
                            "defined in package descriptor. Gen MD5: {1}. "
                            "MANIF MD5: {2}"
                            .format(f, gen_md5, manif_md5),
@@ -590,7 +604,8 @@ class Validator(object):
 
         # get referenced function descriptors (VNFDs)
         if not self._load_service_functions(service):
-            evtlog.log("Failed to read service function descriptors",
+            evtlog.log("Function not available",
+                       "Failed to read service function descriptors",
                        service.id,
                        'evt_nsd_itg_function_unavailable')
             return
@@ -598,7 +613,8 @@ class Validator(object):
         # validate service function descriptors (VNFDs)
         for fid, function in service.functions.items():
             if not self.validate_function(function.filename):
-                evtlog.log("Failed to validate function descriptor '{0}'"
+                evtlog.log("Invalid function",
+                           "Failed to validate function descriptor '{0}'"
                            .format(function.filename),
                            service.id,
                            'evt_nsd_itg_function_invalid')
@@ -606,7 +622,8 @@ class Validator(object):
 
         # load service interfaces
         if not service.load_interfaces():
-            evtlog.log("Couldn't load the connection points of service id='{0}'"
+            evtlog.log("Missing 'connection_points'",
+                       "Couldn't load the connection points of service id='{0}'"
                        .format(service.id),
                        service.id,
                        'evt_nsd_itg_badsection_cpoints')
@@ -614,7 +631,8 @@ class Validator(object):
 
         # load service links
         if not service.load_virtual_links():
-            evtlog.log("Couldn't load virtual links of service id='{0}'"
+            evtlog.log("Missing 'virtual_links'",
+                       "Couldn't load virtual links of service id='{0}'"
                        .format(service.id),
                        service.id,
                        'evt_nsd_itg_badsection_vlinks')
@@ -622,19 +640,25 @@ class Validator(object):
 
         undeclared = service.find_undeclared_interfaces()
         if undeclared:
-            evtlog.log("Virtual links section has undeclared connection "
-                       "points: {0}".format(undeclared),
-                       service.id,
-                       'evt_nsd_itg_undeclared_cpoint')
+            for cxpoint in undeclared:
+                evtlog.log("{0} Undeclared connection point(s)"
+                           .format(len(undeclared)),
+                           "Virtual links section has undeclared connection "
+                           "point: {0}".format(cxpoint),
+                           service.id,
+                           'evt_nsd_itg_undeclared_cpoint')
             return
 
         # check for unused interfaces
         unused_ifaces = service.find_unused_interfaces()
         if unused_ifaces:
-            evtlog.log("Service has unused connection points: {0}"
-                       .format(unused_ifaces),
-                       service.id,
-                       'evt_nsd_itg_unused_cpoint')
+            for cxpoint in unused_ifaces:
+                evtlog.log("{0} Unused connection point(s)"
+                           .format(len(unused_ifaces)),
+                           "Unused connection point: {0}"
+                           .format(cxpoint),
+                           service.id,
+                           'evt_nsd_itg_unused_cpoint')
 
         # verify integrity between vnf_ids and links
         for lid, link in service.links.items():
@@ -642,7 +666,8 @@ class Validator(object):
                 if iface not in service.interfaces:
                     iface_tokens = iface.split(':')
                     if len(iface_tokens) != 2:
-                        evtlog.log("Connection point '{0}' in virtual link "
+                        evtlog.log("Undefined connection point",
+                                   "Connection point '{0}' in virtual link "
                                    "'{1}' is not defined"
                                    .format(iface, lid),
                                    service.id,
@@ -651,14 +676,14 @@ class Validator(object):
                     vnf_id = iface_tokens[0]
                     function = service.mapped_function(vnf_id)
                     if not function:
-                        evtlog.log("Function (VNF) of vnf_id='{0}' declared "
+                        evtlog.log("Undefined connection point",
+                                   "Function (VNF) of vnf_id='{0}' declared "
                                    "in connection point '{0}' in virtual link "
                                    "'{1}' is not defined"
                                    .format(vnf_id, iface, lid),
                                    service.id,
                                    'evt_nsd_itg_undefined_cpoint')
                         return
-
         return True
 
     def _validate_function_integrity(self, function):
@@ -674,7 +699,8 @@ class Validator(object):
 
         # load function interfaces
         if not function.load_interfaces():
-            evtlog.log("Couldn't load the interfaces of function id='{0}'"
+            evtlog.log("Missing 'connection_points'",
+                       "Couldn't load the connection points of function id='{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_itg_badsection_cpoints')
@@ -682,7 +708,8 @@ class Validator(object):
 
         # load units
         if not function.load_units():
-            evtlog.log("Couldn't load the units of function id='{0}'"
+            evtlog.log("Missing 'virtual_deployment_units'",
+                       "Couldn't load the units of function id='{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_itg_badsection_vdus')
@@ -690,7 +717,9 @@ class Validator(object):
 
         # load interfaces of units
         if not function.load_unit_interfaces():
-            evtlog.log("Couldn't load unit interfaces of function id='{0}'"
+            evtlog.log("Missing 'connection_points'",
+                       "Couldn't load VDU connection points of "
+                       "function id='{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_itg_vdu_badsection_cpoints')
@@ -698,7 +727,8 @@ class Validator(object):
 
         # load function links
         if not function.load_virtual_links():
-            evtlog.log("Couldn't load the links of function id='{0}'"
+            evtlog.log("Missing 'virtual_links'",
+                       "Couldn't load the links of function id='{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_itg_badsection_vlinks')
@@ -707,19 +737,25 @@ class Validator(object):
         # check for undeclared interfaces
         undeclared = function.find_undeclared_interfaces()
         if undeclared:
-            evtlog.log("Virtual links section has undeclared connection "
-                       "points: {0}".format(undeclared),
-                       function.id,
-                       'evt_vnfd_itg_undeclared_cpoint')
+            for cxpoint in undeclared:
+                evtlog.log("{0} Undeclared connection point(s)"
+                           .format(len(undeclared)),
+                           "Virtual links section has undeclared connection "
+                           "points: {0}".format(cxpoint),
+                           function.id,
+                           'evt_vnfd_itg_undeclared_cpoint')
             return
 
         # check for unused interfaces
         unused_ifaces = function.find_unused_interfaces()
         if unused_ifaces:
-            evtlog.log("Function has unused connection points: {0}"
-                       .format(unused_ifaces),
-                       function.id,
-                       'evt_vnfd_itg_unused_cpoint')
+            for cxpoint in unused_ifaces:
+                evtlog.log("{0} Unused connection point(s)"
+                           .format(len(unused_ifaces)),
+                           "Function has unused connection points: {0}"
+                           .format(cxpoint),
+                           function.id,
+                           'evt_vnfd_itg_unused_cpoint')
 
         # verify integrity between unit interfaces and units
         for lid, link in function.links.items():
@@ -727,7 +763,8 @@ class Validator(object):
                 iface_tokens = iface.split(':')
                 if len(iface_tokens) > 1:
                     if iface_tokens[0] not in function.units.keys():
-                        evtlog.log("Invalid interface id='{0}' of link "
+                        evtlog.log("Undefined connection point(s)",
+                                   "Invalid interface id='{0}' of link "
                                    "id='{1}': Unit id='{2}' is not defined"
                                    .format(iface, lid, iface_tokens[0]),
                                    function.id,
@@ -745,7 +782,8 @@ class Validator(object):
         # build service topology graph with VNF interfaces
         service.graph = service.build_topology_graph(level=1, bridges=False)
         if not service.graph:
-            evtlog.log("Couldn't build topology graph of service '{0}'"
+            evtlog.log("Invalid topology",
+                       "Couldn't build topology graph of service '{0}'"
                        .format(service.id),
                        service.id,
                        'evt_nsd_top_topgraph_failed')
@@ -761,47 +799,54 @@ class Validator(object):
             log.debug("Topology graph of service '{0}' is connected"
                       .format(service.id))
         else:
-            evtlog.log("Topology graph of service '{0}' is disconnected"
+            evtlog.log("Disconnected topology",
+                       "Topology graph of service '{0}' is disconnected"
                        .format(service.id),
                        service.id,
                        'evt_nsd_top_topgraph_disconnected')
 
         # load forwarding graphs
         if not service.load_forwarding_graphs():
-            evtlog.log("Couldn't load service forwarding graphs. ",
+            evtlog.log("Bad section: 'forwarding_graphs'",
+                       "Couldn't load service forwarding graphs. ",
                        service.id,
                        'evt_nsd_top_badsection_fwgraph')
             return
 
         # analyse forwarding paths
         for fw_graph in service.fw_graphs:
+            source_id = service.id + ":" + fw_graph['fg_id']
 
             for fw_path in fw_graph['fw_paths']:
 
+                evtid = event.generate_evt_id()
+
                 # check if number of connection points is odd
                 if len(fw_path['path']) % 2 != 0:
-                    evtlog.log("The forwarding path fg_id='{0}', fp_id='{1}' "
+                    evtlog.log("Odd number of connection points",
+                               "The forwarding path fg_id='{0}', fp_id='{1}' "
                                "has an odd number of connection points".
                                format(fw_graph['fg_id'], fw_path['fp_id']),
-                               service.id,
-                               'evt_nsd_top_fwgraph_cpoints_odd')
+                               source_id,
+                               'evt_nsd_top_fwgraph_cpoints_odd',
+                               event_id=evtid,
+                               detail_event_id=fw_path['fp_id'])
+                    fw_path['event_id'] = evtid
 
                 fw_path['trace'] = service.trace_path_pairs(fw_path['path'])
 
                 if any(pair['break'] is True for pair in fw_path['trace']):
-                    evtid = event.generate_evt_id()
-                    evtlog.log("The forwarding path fg_id='{0}', fp_id='{1}' "
-                               "is invalid for the specified topology. "
-                               "{2} breakpoint(s) found the path: \n{3}"
-                               .format(fw_graph['fg_id'],
-                                       fw_path['fp_id'],
-                                       sum(pair['break'] is True for pair in
-                                           fw_path['trace']),
-                                       yaml.dump(fw_path['trace'],
-                                                 default_flow_style=False)),
-                               evtid,
+                    evtlog.log("Invalid forwarding path ({0} breakpoint(s))"
+                               .format(sum(pair['break'] is True
+                                           for pair in fw_path['trace'])),
+                               "fp_id='{0}':\n{1}"
+                               .format(fw_path['fp_id'],
+                                       yaml.dump(
+                                           service.trace_path(fw_path['path']))),
+                               source_id,
                                'evt_nsd_top_fwpath_invalid',
-                               scope='multi')
+                               event_id=evtid,
+                               detail_event_id=fw_path['fp_id'])
                     fw_path['event_id'] = evtid
 
                     # skip further analysis
@@ -847,18 +892,23 @@ class Validator(object):
 
                     if pair_complete:
                         if prev_node and prev_node == node:
-                            evtlog.log("The forwarding path fg_id='{0}', "
+                            evtid = event.generate_evt_id()
+                            evtlog.log("Path within the same VNF",
+                                       "The forwarding path fg_id='{0}', "
                                        "fp_id='{1}' contains a path within the"
                                        " same VNF id='{2}'"
                                        .format(fw_graph['fg_id'],
                                                fw_path['fp_id'],
                                                node),
-                                       func.id,
-                                       'evt_nsd_top_fwpath_inside_vnf')
+                                       source_id,
+                                       'evt_nsd_top_fwpath_inside_vnf',
+                                       event_id=evtid,
+                                       detail_event_id=fw_path['fp_id'])
+                            fw_path['event_id'] = evtid
 
-                            # reset trace and leave
+                            # reset trace
                             fw_path['trace'] = []
-                            return
+                            continue
 
                         fpg.add_edge(prev_node, node,
                                      attr_dict={'from': prev_iface,
@@ -867,19 +917,24 @@ class Validator(object):
 
                     else:
                         if prev_node and prev_node != node:
-                            evtlog.log("The forwarding path fg_id='{0}', "
+                            evtlog.log("Disrupted forwarding path",
+                                       "The forwarding path fg_id='{0}', "
                                        "fp_id='{1}' is disrupted at the "
                                        "connection point: '{2}'"
                                        .format(fw_graph['fg_id'],
                                                fw_path['fp_id'],
                                                interface),
-                                       service.id,
-                                       'evt_nsd_top_fwpath_disrupted')
+                                       source_id,
+                                       'evt_nsd_top_fwpath_disrupted',
+                                       event_id=func.id)
 
                         pair_complete = True
 
                     prev_node = node
                     prev_iface = interface
+
+                # remove 'path' from fw_path (not needed anymore)
+                fw_path.pop('path')
 
             # find cycles
             complete_cycles = list(nx.simple_cycles(fpg))
@@ -920,15 +975,16 @@ class Validator(object):
             # report cycles
             if cycles_list and len(cycles_list) > 0:
                 evtid = event.generate_evt_id()
-                evtlog.log("Found {0} cycle(s) in forwarding graph "
-                           "fg_id='{1}': \n{2}"
-                           .format(len(cycles_list),
-                                   fw_graph['fg_id'],
-                                   yaml.dump(cycles_list,
-                                             default_flow_style=False)),
-                           evtid,
-                           'evt_nsd_top_fwgraph_cycles',
-                           scope='multi')
+                for cycle in cycles_list:
+                    evtlog.log("Found {0} cycle(s) (fg_id='{1}')"
+                               .format(len(cycles_list), fw_graph['fg_id']),
+                               "{0}"
+                               .format(yaml.dump(cycle['cycle_path'],
+                                       default_flow_style=False)),
+                               source_id,
+                               'evt_nsd_top_fwgraph_cycles',
+                               event_id=evtid,
+                               detail_event_id=cycle['cycle_id'])
                 fw_graph['cycles'] = cycles_list
                 fw_graph['event_id'] = evtid
 
@@ -948,7 +1004,8 @@ class Validator(object):
         # build function topology graph
         function.graph = function.build_topology_graph(bridges=True)
         if not function.graph:
-            evtlog.log("Couldn't build topology graph of function '{0}'"
+            evtlog.log("Invalid topology graph",
+                       "Couldn't build topology graph of function '{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_top_topgraph_failed')
@@ -994,7 +1051,8 @@ class Validator(object):
 
         functions = service.content['network_functions']
         if functions and not path_vnfs:
-            evtlog.log("Service references VNFs but none could be found in "
+            evtlog.log("VNF not found",
+                       "Service references VNFs but none could be found in "
                        "'{0}'. Please specify another '--dpath'"
                        .format(self._dpath),
                        service.id,
@@ -1007,7 +1065,8 @@ class Validator(object):
                                       function['vnf_name'],
                                       function['vnf_version'])
             if fid not in path_vnfs.keys():
-                evtlog.log("Referenced function descriptor id='{0}' couldn't "
+                evtlog.log("VNF not found",
+                           "Referenced function descriptor id='{0}' couldn't "
                            "be loaded".format(fid),
                            service.id,
                            'evt_nsd_itg_function_unavailable')
@@ -1030,14 +1089,16 @@ class Validator(object):
         # load project service descriptor (NSD)
         nsd_files = project.get_ns_descriptor()
         if not nsd_files:
-            evtlog.log("Couldn't find a service descriptor in project '[0}'"
+            evtlog.log("NSD not found",
+                       "Couldn't find a service descriptor in project '[0}'"
                        .format(project.project_root),
                        project.project_root,
                        'evt_project_service_invalid')
             return False
 
         if len(nsd_files) > 1:
-            evtlog.log("Found multiple service descriptors in project "
+            evtlog.log("Multiple NSDs",
+                       "Found multiple service descriptors in project "
                        "'{0}': {1}"
                        .format(project.project_root, nsd_files),
                        project.project_root,
@@ -1114,8 +1175,6 @@ def print_result(validator, result):
 
     if not result:
         log.critical("VALIDATION FAILED")
-    else:
-        log.info("VALIDATION SUCCEEDED")
 
     print("==== Statistics: {0} error(s) and {1} warning(s) ===="
           .format(validator.error_count, validator.warning_count))
