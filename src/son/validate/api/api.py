@@ -25,13 +25,13 @@ app = Flask(__name__)
 CORS(app)
 app.config.from_pyfile('settings.py')
 
-
 # config cache
 if app.config['CACHE_TYPE'] == 'redis':
+
     redis_auth = app.config['REDIS_USER'] + ':' + app.config[
-        'REDIS_PASSWD'] \
+        'REDIS_PASSWD'] + '@' \
         if app.config['REDIS_USER'] and app.config['REDIS_PASSWD'] else ''
-    redis_url = 'redis://' + redis_auth + '@' + app.config['REDIS_HOST'] + \
+    redis_url = 'redis://' + redis_auth + app.config['REDIS_HOST'] + \
                 ':' + app.config['REDIS_PORT']
 
     cache = Cache(app, config={'CACHE_TYPE': 'redis',
