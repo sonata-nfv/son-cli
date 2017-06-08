@@ -25,13 +25,13 @@ app = Flask(__name__)
 CORS(app)
 app.config.from_pyfile('settings.py')
 
-
 # config cache
 if app.config['CACHE_TYPE'] == 'redis':
+
     redis_auth = app.config['REDIS_USER'] + ':' + app.config[
-        'REDIS_PASSWD'] \
+        'REDIS_PASSWD'] + '@' \
         if app.config['REDIS_USER'] and app.config['REDIS_PASSWD'] else ''
-    redis_url = 'redis://' + redis_auth + '@' + app.config['REDIS_HOST'] + \
+    redis_url = 'redis://' + redis_auth + app.config['REDIS_HOST'] + \
                 ':' + app.config['REDIS_PORT']
 
     cache = Cache(app, config={'CACHE_TYPE': 'redis',
@@ -340,6 +340,9 @@ def _validate_object_from_watch(path):
 
 
 def _validate_object_from_request(object_type):
+    log.debug("Request data: {0}".format(request.data))
+    log.debug("Request form: {0}".format(request.form))
+
     assert object_type == 'project' or object_type == 'package' or \
            object_type == 'service' or object_type == 'function'
 

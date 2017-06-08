@@ -42,4 +42,4 @@ RUN cd /ansible \
 ENV SON_CLI_IN_DOCKER 1
 
 # Run validator service
-CMD ["son-validate-api", "--host", "0.0.0.0", "--port", "5001", "--debug"]
+CMD ["son-validate-api"]
