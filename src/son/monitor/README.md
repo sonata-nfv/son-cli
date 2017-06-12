@@ -10,95 +10,92 @@ Below figure shows the architecture of the son-monitor tools inside the total SO
 
 ![son-monitor](../../../figures/Son-monitor-architecturev3.png)
 
-
+### Initialize the monitoring framework
+The monitoring framework can be initialized with this command. It starts several Docker containers in the SDK environment (cAdvisor and Prometheus DB).
 ```
-usage: son-monitor [-h] [--vnf_names [VNF_NAMES [VNF_NAMES ...]]] [--vim VIM]
-                   [--vnf_name VNF_NAME] [--datacenter DATACENTER]
-                   [--image IMAGE] [--dcmd DOCKER_COMMAND] [--net NETWORK]
-                   [--query QUERY] [--input INPUT] [--output OUTPUT]
-                   [--source SOURCE] [--destination DESTINATION]
-                   [--weight WEIGHT] [--match MATCH] [--priority PRIORITY]
-                   [--bidirectional] [--metric METRIC] [--cookie COOKIE]
-                   [--file FILE]
-                   {init,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
-                   [{start,stop}]
+usage: son-monitor init [-h] [{start,stop}]
 
-    Install monitor features or get monitor data from the SONATA platform/emulator.
-    
+start(default)/stop the monitoring framework
 
 positional arguments:
-  {init,query,interface,flow_mon,flow_entry,flow_total,msd,dump,xterm}
-                        Monitoring feature to be executed:
-                                 interface: export interface metric (tx/rx bytes/packets)
-                                 flow_entry : (un)set the flow entry
-                                 flow_mon : export flow_entry metric (tx/rx bytes/packets)
-                                 flow_total : flow_entry + flow_mon
-                                 init : start/stop the monitoring framework
-                                 msd :  start/stop monitoring metrics from the msd (monitoring descriptor file)
-                                 dump: start tcpdump for specified interface (save as .pcap)
-                                 xterm: start an x-terminal for specific vnf(s)
-                                 
-  {start,stop}          Action for interface, flow_mon, flow_entry, flow_total:
-                                  start: install the flowentry and/or export the metric
-                                  stop: delete the flowentry and/or stop exporting the metric
-                                  Action for init:
-                                  start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
-                                  stop: stop the monitoring framework
-                                  Action for msd:
-                                  start: start exporting the monitoring metrics from the msd
-                                  stop: stop exporting the monitoring metrics from the msd
-                                  
+  {start,stop}  start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
+                stop: stop the monitoring framework
+
+optional arguments:
+  -h, --help    show this help message and exit
+```
+
+### Export metrics through the MSD file
+```
+usage: son-monitor msd [-h] --file FILE [{start,stop}]
+
+start(default)/stop monitoring metrics from the msd (monitoring descriptor file)
+
+positional arguments:
+  {start,stop}          start/stop monitoring metrics from the msd (monitoring descriptor file)
 
 optional arguments:
   -h, --help            show this help message and exit
-  --vnf_names [VNF_NAMES [VNF_NAMES ...]], -n [VNF_NAMES [VNF_NAMES ...]]
-                        vnf names to open an xterm for
-  --vim VIM, -v VIM     VIM where the command should be executed (emu/sp)
-  --vnf_name VNF_NAME, -vnf VNF_NAME
-                        vnf name:interface to be monitored
-  --datacenter DATACENTER, -d DATACENTER
-                        Data center where the vnf is deployed
-  --image IMAGE, -i IMAGE
-                        Name of container image to be used e.g. 'ubuntu:trusty'
-  --dcmd DOCKER_COMMAND, -cmd DOCKER_COMMAND
-                        Startup command of the container e.g. './start.sh'
-  --net NETWORK         Network properties of a compute instance e.g.           '(id=input,ip=10.0.10.3/24),(id=output,ip=10.0.10.4/24)' for multiple interfaces.
-  --query QUERY, -q QUERY
-                        prometheus query
-  --input INPUT, -in INPUT
-                        input interface of the vnf to profile
-  --output OUTPUT, -out OUTPUT
-                        output interface of the vnf to profile
-  --source SOURCE, -src SOURCE
-                        vnf name:interface of the source of the chain
-  --destination DESTINATION, -dst DESTINATION
-                        vnf name:interface of the destination of the chain
-  --weight WEIGHT, -w WEIGHT
-                        weight edge attribute to calculate the path
-  --match MATCH, -ma MATCH
-                        string to specify how to match the monitored flow
-  --priority PRIORITY, -p PRIORITY
-                        priority of the flow match entry, installed to get counter metrics for the monitored flow.
-  --bidirectional, -b   add/remove the flow entries from src to dst and back
+  --file FILE, -f FILE  Monitoring Service Descriptor file (MSD) describing the monitoring rules
+```
+This command installs the metrics defined in a monitoring specific descriptor file 
+and starts all the related docker files (Grafana, Prometheus DB). A new Grafana dashboard is started where the defined metrics are shown.
+This is the recommended usage for son-monitor. More info on the [msd file](https://github.com/sonata-nfv/son-cli/wiki/son-monitor:-msd-file) documentation on the wiki.
+```
+son-monitor msd -f file.yml
+```
+### Stream metrics from the SONATA Service Platform
+```
+usage: son-monitor stream [-h] [--metric METRIC] [--vnf_id VNF_NAME]
+                          [--service SERVICE] [--sp SP]
+                          [{start,stop}]
+
+Stream monitor data from the SONATA Service Platform. (Authentication must be configured first via son-access)
+
+positional arguments:
+  {start,stop}          start/stop streaming metrics
+
+optional arguments:
+  -h, --help            show this help message and exit
   --metric METRIC, -me METRIC
-                        tx_bytes, rx_bytes, tx_packets, rx_packets
-  --cookie COOKIE, -c COOKIE
-                        integer value to identify this flow monitor rule
-  --file FILE, -f FILE  service descriptor file describing monitoring rules or pcap dump file
-
-General usage:
-    son-monitor init
-    son-monitor msd -f msd_example.yml
-    son-monitor init stop
-    son-monitor xterm -n vnf1 vnf2
-
-Specialized usage:
-    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
-    son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
-
+                        SP metric
+  --vnf_id VNF_NAME, -vnf VNF_NAME
+                        vnf_id to be monitored
+  --service SERVICE, -s SERVICE
+                        Service name that includes the VNT to be monitored
+  --sp SP, -sp SP       Service Platform ID where the service is instantiated
 ```
 
+### Query metrics
+Metrics can be queried from both the emulator in the SDK and the SONATA Service Platform.
+```
+usage: son-monitor query [-h] [--vim VIM] [--datacenter DATACENTER]
+                         [--vnf_id VNF_NAME] [--service SERVICE]
+                         [--metric METRIC] [--query QUERY]
 
+query monitored metrics from the Prometheus DB in the SDK or the Service Platform
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --vim VIM, -vim VIM   Emulator or Service Platform ID where the service is instantiated (default = emulator)
+  --datacenter DATACENTER, -d DATACENTER
+                        Data center where the vnf is deployed (if not given, the datacenter will be looked up first)
+  --vnf_id VNF_NAME, -vnf VNF_NAME
+                        vnf name:interface to be monitored
+  --service SERVICE, -s SERVICE
+                        Service name that includes the VNT to be monitored
+  --metric METRIC, -me METRIC
+                        The metric in the SDK or SP to query
+  --query QUERY, -q QUERY
+                        raw prometheus query
+```
+*Example*:  Send a query to the prometheus DB to retrieve the earlier exposed metrics, or default metric exposed by cAdvisor.
+The Prometheus query language can be used.
+```
+son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
+```
+
+### Other features
 This command starts an xterm for all deployed docker VNFs in son-emu (if no names are specified, xterms for all vnfs are started)
 ```
 son-monitor xterm [-n vnf_names]
@@ -114,14 +111,9 @@ son-monitor dump -vnf vnf_name:interface [-f filename.pcap]
 son-monitor dump stop
 ```
 
-This command installs the metrics defined in a monitoring specific descriptor file 
-and starts all the related docker files (Grafana, Prometheus DB). A new Grafana dashboard is started where the defined metrics are shown.
-This is the recommended usage for son-monitor. More info on the [msd file](https://github.com/sonata-nfv/son-cli/wiki/son-monitor:-msd-file) documentation on the wiki.
-```
-son-monitor msd -f file.yml
-```
 
-The commands executed in this file can also be executed separately:
+### Manual metrics export
+The commands executed in the MSD file can also be executed separately:
 
 *Example1*: Expose the tx_packets metric from son-emu network switch-port where vnf1 (default 1st interface) is connected.
 The metric is exposed to the Prometheus DB.
@@ -135,8 +127,4 @@ The metric is exposed to the Prometheus DB.
 son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
 ```
 
-*Example3*:  Send a query to the prometheus DB to retrieve the earlier exposed metrics, or default metric exposed by cAdvisor.
-The Prometheus query language can be used.
-```
-son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
-```
+
