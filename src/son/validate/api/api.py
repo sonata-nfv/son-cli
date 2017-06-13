@@ -339,9 +339,13 @@ def _validate_object_from_watch(path):
     log.debug(result)
 
 
+@app.before_request
+def before():
+    log.debug('headers: {0}'.format(request.headers))
+    log.debug('body: {0}'.format(request.get_data()))
+
+
 def _validate_object_from_request(object_type):
-    log.debug("Request data: {0}".format(request.data))
-    log.debug("Request form: {0}".format(request.form))
 
     assert object_type == 'project' or object_type == 'package' or \
            object_type == 'service' or object_type == 'function'
