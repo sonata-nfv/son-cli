@@ -224,7 +224,6 @@ def update_resource_validation(rid, vid):
 
 
 def set_resource(rid, path, obj_type, syntax, integrity, topology):
-    assert path and obj_type and syntax and integrity and topology
 
     log.debug("Caching resource {0}".format(rid))
     resources = cache.get('resources')
