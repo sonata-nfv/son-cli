@@ -140,13 +140,9 @@ class ProfileManager(object):
                         config_loc)
             remote_hosts = read_yaml(config_loc).get("target_platforms")
 
-            # for now, set the timeout to 60 seconds, later on specified in ped
-            # currently specified individually for experiment groups, however only one timeout is accepted
-            timeout = 10  # TODO @edmaas remove this. time_limits are now available in gen_conf_list
-
             # start the experiment series
             profiler = Active_Emu_Profiler(remote_hosts)
-            profiler.do_experiment_series(gen_conf_list, runtime=timeout)
+            profiler.do_experiment_series(gen_conf_list)
 
 
     @staticmethod
