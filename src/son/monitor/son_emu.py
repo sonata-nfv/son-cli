@@ -23,7 +23,8 @@ partner consortium (www.sonata-nfv.eu).
 
 from requests import get, put, delete, Session
 from son.monitor.utils import *
-from son.monitor.prometheus_lib import query_Prometheus
+from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery, network2vnfquery, test2vnfquery, \
+    nsdlink_metrics, network_metrics, testvnf_metrics, compute_metrics
 from subprocess import Popen
 import paramiko
 import shlex
@@ -325,21 +326,42 @@ class Emu():
         return_value = "flow-entry:\n{0}".format(ret1)
         return return_value
 
-    def query(self, vnf_name, query, datacenter=None, **kwargs):
+    def query(self, vnf_name, **kwargs):
+
         vnf_name2 = parse_vnf_name(vnf_name)
         vnf_interface = parse_vnf_interface(vnf_name)
+        metric = kwargs.get("metric")
+        query = kwargs.get("query")
+        datacenter = kwargs.get("datacenter")
+
+        # Classify this type of metric
+        metric_test = metric
+        if metric[0:3] == 'tx_' or metric[0:3] == 'rx_':
+            metric_test = metric[3:]
+
+        if metric_test in testvnf_metrics:
+            query = test2vnfquery[metric].query_template.format(vnf_name2)
+        elif metric_test in compute_metrics:
+            query = compute2vnfquery[metric].query_template.format(vnf_name2)
+        elif metric_test in network_metrics:
+            query = network2vnfquery[metric].query_template.format(vnf_name2, vnf_interface)
+        elif not query:
+            return 'metric is not suppported by the emulator, or a raw metric should be given'
 
         if datacenter is None:
             datacenter = self._find_dc(vnf_name2)
         dc_label = datacenter
-        query = query
-        vnf_status = get("{0}/restapi/compute/{1}/{2}".format(
-                         self.url,
-                         dc_label,
-                         vnf_name2)).json()
-        uuid = vnf_status['id']
-        query = query.replace('<uuid>', uuid)
 
+        # Check if any replacements are needed in the raw query
+        if '<uuid>' in query:
+            vnf_status = get("{0}/restapi/compute/{1}/{2}".format(
+                             self.url,
+                             dc_label,
+                             vnf_name2)).json()
+            uuid = vnf_status['id']
+            query = query.replace('<uuid>', uuid)
+
+        LOG.info("query: {0} ".format(query))
         r = query_Prometheus(query)
         return r
 

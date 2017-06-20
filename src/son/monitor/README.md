@@ -46,48 +46,64 @@ son-monitor msd -f file.yml
 ```
 ### Stream metrics from the SONATA Service Platform
 ```
-usage: son-monitor stream [-h] [--metric METRIC] [--vnf_id VNF_NAME]
-                          [--service SERVICE] [--sp SP]
+usage: son-monitor stream [-h] [--metric METRIC] [--service SERVICE]
+                          [--vnf_name VNF_NAME] [--vdu VDU_ID]
+                          [--vnfc VNFC_ID] [--sp SP]
                           [{start,stop}]
 
 Stream monitor data from the SONATA Service Platform. (Authentication must be configured first via son-access)
 
 positional arguments:
-  {start,stop}          start/stop streaming metrics
+  {start,stop}          start/stop streaming metrics from the SONATA Service Platform
 
 optional arguments:
   -h, --help            show this help message and exit
   --metric METRIC, -me METRIC
                         SP metric
-  --vnf_id VNF_NAME, -vnf VNF_NAME
-                        vnf_id to be monitored
   --service SERVICE, -s SERVICE
-                        Service name that includes the VNT to be monitored
+                        Service name that includes the VNF to be monitored
+  --vnf_name VNF_NAME, -vnf VNF_NAME
+                        vnf to be monitored
+  --vdu VDU_ID, -vdu VDU_ID
+                        vdu_id to be monitored (optional, picks the first vdu if not given)
+  --vnfc VNFC_ID, -vnfc VNFC_ID
+                        vnfc_id to be monitored (optional, picks the first vnfc instance if not given)
   --sp SP, -sp SP       Service Platform ID where the service is instantiated
 ```
 
 ### Query metrics
 Metrics can be queried from both the emulator in the SDK and the SONATA Service Platform.
 ```
-usage: son-monitor query [-h] [--vim VIM] [--datacenter DATACENTER]
-                         [--vnf_id VNF_NAME] [--service SERVICE]
-                         [--metric METRIC] [--query QUERY]
+usage: son-monitor query [-h] [--vim VIM] [--service SERVICE]
+                         [--vnf_name VNF_NAME] [--vdu VDU_ID] [--vnfc VNFC_ID]
+                         [--metric METRIC] [--since START] [--until STOP]
+                         [--query QUERY] [--datacenter DATACENTER]
 
-query monitored metrics from the Prometheus DB in the SDK or the Service Platform
+Query monitored metrics from the Prometheus DB in the SDK or the Service Platform
+(For querying the Service Platform, Authentication must be configured first via son-access)
 
 optional arguments:
   -h, --help            show this help message and exit
   --vim VIM, -vim VIM   Emulator or Service Platform ID where the service is instantiated (default = emulator)
-  --datacenter DATACENTER, -d DATACENTER
-                        Data center where the vnf is deployed (if not given, the datacenter will be looked up first)
-  --vnf_id VNF_NAME, -vnf VNF_NAME
-                        vnf name:interface to be monitored
   --service SERVICE, -s SERVICE
-                        Service name that includes the VNT to be monitored
+                        Service name that includes the VNF to be monitored
+  --vnf_name VNF_NAME, -vnf VNF_NAME
+                        vnf to be monitored
+  --vdu VDU_ID, -vdu VDU_ID
+                        vdu_id to be monitored in the Service Platform (optional, picks the first vdu if not given)
+  --vnfc VNFC_ID, -vnfc VNFC_ID
+                        vnfc_id to be monitored in the Service Platform (optional, picks the first vnfc instance if not given)
   --metric METRIC, -me METRIC
                         The metric in the SDK or SP to query
+  --since START, -si START
+                        Retrieve the metric values since this start time (eg. 2017-05-05T17:10:22Z)
+  --until STOP, -u STOP
+                        Retrieve the metric values until this stop time (eg. 2017-05-05T17:31:11Z)
   --query QUERY, -q QUERY
-                        raw prometheus query
+                        raw Prometheus query for the emulator
+  --datacenter DATACENTER, -d DATACENTER
+                        Data center where the vnf is deployed in the emulator 
+                        (if not given, the datacenter will be looked up first)
 ```
 *Example*:  Send a query to the prometheus DB to retrieve the earlier exposed metrics, or default metric exposed by cAdvisor.
 The Prometheus query language can be used.

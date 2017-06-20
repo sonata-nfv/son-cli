@@ -286,6 +286,8 @@ usage: son-monitor [-h]
 
 optional arguments:
   -h, --help            show this help message and exit
+  --verbose, -v         print extra logging
+
 
 son-monitor subcommands:
   init : start/stop the monitoring framework
@@ -306,9 +308,10 @@ General usage:
     son-monitor msd -f msd_example.yml
     son-monitor init stop
     son-monitor xterm -n vnf1 vnf2
+    son-monitor dump -vnf vnf1:port0
 
-Specialized usage:
-    son-monitor flow_total start -src vnf1  -dst vnf2  -ma "dl_type=0x0800,nw_proto=17,udp_dst=5001"  -b -c 11 -me tx_bytes
+Gathering metrics:
+    son-monitor stream -sp sp2 -s example_service -vnf vnf1 -me metric_name
     son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 ```
 
@@ -332,7 +335,7 @@ son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_
 ```
 *Example3*: Stream metrics from the SONATA service platform to the SDK. The specified metrics are send to the SDK via a websocket connection. In the SDK the received metrics are stored in the local Prometheus DB for further analysis.
 ```
-son-monitor stream -sp sp1 -s sonata-demo-1 -vnf vtc-vnf -me vm_cpu_perc
+son-monitor stream -sp sp1 -s demo_service -vnf vnf1 -me metric_name1
 ```
 
 ### son-profile

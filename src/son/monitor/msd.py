@@ -27,7 +27,8 @@ partner consortium (www.sonata-nfv.eu).
 """
 
 from son.monitor.utils import *
-from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery, network2vnfquery, test2vnfquery, metric2flowquery, Metric
+from son.monitor.prometheus_lib import query_Prometheus, compute2vnfquery, network2vnfquery, test2vnfquery, metric2flowquery, Metric, \
+    nsdlink_metrics, network_metrics, testvnf_metrics, compute_metrics
 
 from son.monitor.grafana_lib import Grafana
 
@@ -145,14 +146,10 @@ class msd():
     # execute the correct function to start/stop the metric_type
     def vnfmetric_classifier(self, metric_group, action):
         compute_metric_dict = {'start': self.start_compute_metric}
-        compute_metrics = ['cpu', 'mem', 'host_cpu']
 
         testvnf_metric_dict = {'start': self.start_testvnf_metric}
-        testvnf_metrics = ['packet_loss', 'jitter', 'throughput']
 
         network_metric_dict = {'start': self.start_network_metric, 'stop': self.stop_network_metric}
-        network_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
-                           'packet_rate_cadv', 'byte_rate_cadv', 'packet_count_cadv', 'byte_count_cadv']
 
         metric_type = metric_group['metric_type']
         LOG.info('metric_type:{0}'.format(metric_type))
@@ -265,8 +262,6 @@ class msd():
     # execute the correct function tto start/stop the metric_type
     def nsdlink_classifier(self, metric_group, action):
         nsdlink_metric_dict = {'start': self.start_nsdlink_metric, 'stop': self.stop_nsdlink_metric}
-        nsdlink_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
-                           'packet_rate_cadv', 'byte_rate_cadv', 'packet_count_cadv', 'byte_count_cadv']
 
         metric_list = []
 

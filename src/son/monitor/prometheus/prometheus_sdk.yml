@@ -8,19 +8,18 @@ global:
 scrape_configs:
 # cAdvsior and PushGateway are started in son-emu
   - job_name: 'cAdvisor'
-
     scrape_interval: 1s
-
     static_configs:
       - targets: ['172.17.0.1:8081']
 
-# Pushgateway started in SP
+# Pushgateway started in son-emu
   - job_name: 'PushGateway'
-
     scrape_interval: 1s
-
     static_configs:
       - targets: ['172.17.0.1:9091']
 
-
-
+# server exporting the streamed metrics from the SP
+#  - job_name: 'SP_stream'
+#    scrape_interval: 1s
+#    static_configs:
+#      - targets: ['172.17.0.1:8082']
