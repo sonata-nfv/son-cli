@@ -184,7 +184,8 @@ class Node:
         :param interface: interface id
         """
         if interface in self.interfaces:
-            evtlog.log("The interface id='{0}' is already stored in node "
+            evtlog.log("Duplicate connection point",
+                       "The interface id='{0}' is already stored in node "
                        "id='{1}'".format(interface, self.id),
                        self.id,
                        'evt_duplicate_cpoint')
@@ -826,7 +827,8 @@ class Service(Descriptor):
         service content.
         """
         if 'forwarding_graphs' not in self.content:
-            evtlog.log("No forwarding graphs available in service id='{0}'"
+            evtlog.log("Forwarding graphs not available",
+                       "No forwarding graphs available in service id='{0}'"
                        .format(self.id),
                        self.id,
                        'evt_nsd_top_fwgraph_unavailable')
@@ -847,14 +849,16 @@ class Service(Descriptor):
                     pos = cxpt['position']
                     if iface not in self.interfaces and \
                        not self._interface_in_functions(iface):
-                        evtlog.log("Connection point '{0}' of forwarding path "
+                        evtlog.log("Undefined connection point",
+                                   "Connection point '{0}' of forwarding path "
                                    "'{1}' is not defined"
                                    .format(iface, fpath['fp_id']),
                                    self.id,
                                    'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
                     if pos in path_dict:
-                        evtlog.log("Duplicate referenced position '{0}' "
+                        evtlog.log("Duplicate reference in FG",
+                                   "Duplicate referenced position '{0}' "
                                    "in forwarding path id='{1}'. Ignoring "
                                    "connection point: '{2}'"
                                    .format(pos, fpath['fp_id'],

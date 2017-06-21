@@ -27,6 +27,7 @@
         - pkg-config
         - libfreetype6-dev
         - libpng-dev
+        - libpng-dev
         - python3-numpy
         - python3-scipy
         - python3-matplotlib
@@ -56,3 +57,9 @@
 
     - name: install docker python api (son-monitor dependency)
       pip: name=docker version=2.0.2 executable=pip3
+
+    - name: install prometheus client (son-monitor dependency)
+      pip: name=prometheus_client state=latest executable=pip3
+
+    - name: install PyJWT (son-access dependency)
+      pip: name=PyJWT state=latest executable=pip3

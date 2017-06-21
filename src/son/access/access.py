@@ -189,7 +189,7 @@ class AccessClient:
         self.pull = dict()
         self.push = dict()
         for p_id, platform in self.workspace.service_platforms.items():
-            self.pull[p_id] = Pull(platform['url'])
+            self.pull[p_id] = Pull(platform['url'], self.access_token)
             self.push[p_id] = Push(platform['url'], pb_key=self.dev_public_key,
                                    pr_key=self.dev_private_key,
                                    cert=self.dev_certificate)
@@ -373,9 +373,13 @@ class AccessClient:
             except:
                 return True
 
+        print('Public_key=', self.platform_public_key)
+
         if self.platform_public_key is None:
             return True
 
+        # Some old PyJWT versions crash with public key binary string, instead add
+        # self.platform_public_key.decode('utf-8')
         try:
             decoded = jwt.decode(self.access_token, self.platform_public_key,
                                  True, algorithms='RS256', audience='adapter')
@@ -600,7 +604,6 @@ class AccessClient:
             log.error("Service Platform not defined. Aborting")
             return
 
-        # TODO: Implement token expiry evaluation
         result = self.check_token_status()
         if not result:
             print("Access session expired, log-in again")

@@ -49,9 +49,6 @@ prometheus_ip = 'localhost'
 prometheus_port = '9090'
 prometheus_REST_api = 'http://{0}:{1}'.format(prometheus_ip, prometheus_port)
 
-# translate metric names to the prometheus query
-
-# TODO read this from eg. a yaml file
 class Metric(object):
 
     def __init__(self, **definition):
@@ -101,7 +98,7 @@ class Metric(object):
         self.CI = (float('nan'), float('nan'))
 
 
-
+# translate metric names to the prometheus query
 class MetricTemplate(object):
 
     def __init__(self, **definition):
@@ -116,6 +113,14 @@ class MetricTemplate(object):
 src_path = os.path.join('prometheus', 'prometheus_queries.yml')
 srcfile = pkg_resources.resource_filename(__name__, src_path)
 prometheus_metrics = read_yaml(srcfile)
+
+# All metric types in the prometheus config file
+nsdlink_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
+                   'packet_rate_cadv', 'byte_rate_cadv', 'packet_count_cadv', 'byte_count_cadv']
+network_metrics = ['packet_rate', 'byte_rate', 'packet_count', 'byte_count',
+                   'packet_rate_cadv', 'byte_rate_cadv', 'packet_count_cadv', 'byte_count_cadv']
+testvnf_metrics = ['packet_loss', 'jitter', 'throughput']
+compute_metrics = ['cpu', 'mem', 'host_cpu']
 
 metric2flowquery = {}
 for metric in prometheus_metrics['flowquery']:

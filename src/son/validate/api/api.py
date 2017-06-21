@@ -1,5 +1,6 @@
 import hashlib
 import os
+import sys
 import json
 import logging
 import coloredlogs
@@ -23,8 +24,29 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 app.config.from_pyfile('settings.py')
-cache = Cache(app, config={'CACHE_TYPE': 'redis',
-                           'CACHE_DEFAULT_TIMEOUT': 0})
+
+# config cache
+if app.config['CACHE_TYPE'] == 'redis':
+
+    redis_auth = app.config['REDIS_USER'] + ':' + app.config[
+        'REDIS_PASSWD'] + '@' \
+        if app.config['REDIS_USER'] and app.config['REDIS_PASSWD'] else ''
+    redis_url = 'redis://' + redis_auth + app.config['REDIS_HOST'] + \
+                ':' + app.config['REDIS_PORT']
+
+    cache = Cache(app, config={'CACHE_TYPE': 'redis',
+                               'CACHE_DEFAULT_TIMEOUT': 0,
+                               'CACHE_REDIS_URL': redis_url})
+
+
+elif app.config['CACHE_TYPE'] == 'simple':
+    cache = Cache(app, config={'CACHE_TYPE': 'simple',
+                               'CACHE_DEFAULT_TIMEOUT': 0})
+
+else:
+    print("Invalid cache type.")
+    sys.exit(1)
+
 
 # keep temporary request errors
 req_errors = []
@@ -62,7 +84,12 @@ class ValidateWatcher(FileSystemEventHandler):
 
 def initialize(debug=False):
     log.info("Initializing validator service")
-    cache.clear()
+
+    try:
+        cache.clear()
+    except:
+        sys.exit(1)
+
     cache.add('debug', debug)
     cache.add('artifacts', list())
     cache.add('validations', dict())
@@ -197,7 +224,6 @@ def update_resource_validation(rid, vid):
 
 
 def set_resource(rid, path, obj_type, syntax, integrity, topology):
-    assert path and obj_type and syntax and integrity and topology
 
     log.debug("Caching resource {0}".format(rid))
     resources = cache.get('resources')
@@ -312,7 +338,14 @@ def _validate_object_from_watch(path):
     log.debug(result)
 
 
+@app.before_request
+def before():
+    log.debug('headers: {0}'.format(request.headers))
+    log.debug('body: {0}'.format(request.get_data()))
+
+
 def _validate_object_from_request(object_type):
+
     assert object_type == 'project' or object_type == 'package' or \
            object_type == 'service' or object_type == 'function'
 
@@ -324,12 +357,22 @@ def _validate_object_from_request(object_type):
         if 'syntax' in request.form else True
     integrity = str2bool(request.form['integrity']) \
         if 'integrity' in request.form else False
-    print(request.form['topology'])
     topology = str2bool(request.form['topology']) \
         if 'topology' in request.form else False
 
-    return _validate_object(keypath, path, object_type,
-                            syntax, integrity, topology)
+    pkg_signature = request.form['pkg_signature'] \
+        if 'pkg_signature' in request.form else None
+    pkg_pubkey = request.form['pkg_pubkey'] \
+        if 'pkg_pubkey' in request.form else None
+    if not (pkg_signature and pkg_pubkey) and (pkg_signature or pkg_pubkey):
+        req_errors.append("For package signature validation both "
+                          "'pkg_signature' and 'pkg_pubkey' fields must be "
+                          "set")
+        return render_errors(), 400
+
+    return _validate_object(keypath, path, object_type, syntax, integrity,
+                            topology, pkg_signature=pkg_signature,
+                            pkg_pubkey=pkg_pubkey)
 
 
 def str2bool(v):
@@ -345,7 +388,8 @@ def validate_parameters(obj_type, syntax, integrity, topology):
                "topology of a standalone service"
 
 
-def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
+def _validate_object(keypath, path, obj_type, syntax, integrity, topology,
+                     pkg_signature=None, pkg_pubkey=None):
     # protect against incorrect parameters
     perrors = validate_parameters(obj_type, syntax, integrity, topology)
     if perrors:
@@ -370,7 +414,8 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology):
     set_resource(rid, keypath, obj_type, syntax, integrity, topology)
 
     validator = Validator()
-    validator.configure(syntax, integrity, topology, debug=app.config['DEBUG'])
+    validator.configure(syntax, integrity, topology, debug=app.config['DEBUG'],
+                        pkg_signature=pkg_signature, pkg_pubkey=pkg_pubkey)
     # remove default dpath
     validator.dpath = None
     val_function = getattr(validator, 'validate_' + obj_type)

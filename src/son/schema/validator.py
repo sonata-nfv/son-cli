@@ -49,7 +49,7 @@ class SchemaValidator(object):
     SCHEMA_SERVICE_DESCRIPTOR = 'NSD'
     SCHEMA_FUNCTION_DESCRIPTOR = 'VNFD'
 
-    def __init__(self, workspace):
+    def __init__(self, workspace, preload=False):
         # Assign parameters
         coloredlogs.install(level=workspace.log_level)
         self._workspace = workspace
@@ -65,6 +65,10 @@ class SchemaValidator(object):
         self._schemas_library = dict()
 
         self._error_msg = ''
+
+        # if preload, load local cached schema files
+        if preload:
+            self.preload_local_schemas()
 
     def config_schema_locations(self):
         self._schemas = {
@@ -115,6 +119,26 @@ class SchemaValidator(object):
         :return: the schema filename
         """
         return self._schemas[descriptor]['local']
+
+    def preload_local_schemas(self):
+        """
+        Pre-loads local available schemas to _schemas_library,
+        avoiding to request them later from remote locations.
+        When this is invoked upon object creation, the local schema cache files
+        should be erased when remote object reloading is necessary.
+        """
+        schemas = [self.SCHEMA_PACKAGE_DESCRIPTOR,
+                   self.SCHEMA_SERVICE_DESCRIPTOR,
+                   self.SCHEMA_FUNCTION_DESCRIPTOR]
+
+        for schema in schemas:
+            schema_file = self._schemas[schema]['local']
+            if not os.path.isfile(schema_file):
+                continue
+            try:
+                self._schemas_library[schema] = load_local_schema(schema_file)
+            except FileNotFoundError:
+                continue
 
     def load_schema(self, template, reload=False):
         """
