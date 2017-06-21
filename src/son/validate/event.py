@@ -11,7 +11,7 @@ class EventLogger(object):
     def __init__(self, name):
         self._name = name
         self._log = logging.getLogger(name)
-        self._events = list()
+        self._events = dict()
 
         # load events config
         configpath = pkg_resources.resource_filename(
@@ -22,43 +22,45 @@ class EventLogger(object):
     @property
     def errors(self):
         return list(filter(lambda event: event['level'] == 'error',
-                           self._events))
+                           self._events.values()))
 
     @property
     def warnings(self):
         return list(filter(lambda event: event['level'] == 'warning',
-                    self._events))
-
-    @staticmethod
-    def normalize(events):
-        norm_events = deepcopy(events)
-
-        idx = 0
-        while idx < len(norm_events):
-            event = norm_events[idx]
-            offset = idx+1
-            next_events = norm_events.copy()[offset:]
-
-            for n_idx, n_event in enumerate(next_events):
-                n_event = next_events[n_idx]
-
-                if (event['object_id'] == n_event['object_id'] and
-                        event['event_code'] == n_event['event_code'] and
-                        event['level'] == n_event['level'] and
-                        event['scope'] == n_event['scope']):
-                    event['messages'] += n_event['messages']
-                    norm_events.pop(n_idx+offset)
-
-            idx += 1
-
-        return norm_events
+                    self._events.values()))
 
     def reset(self):
         self._events.clear()
 
-    def log(self, msg, object_id, event_code, scope='single'):
+    def log(self, header, msg, source_id, event_code, event_id=None,
+            detail_event_id=None):
         level = self._eventdict[event_code]
+        key = self.get_key(source_id, event_code, level)
 
+        if key not in self._events.keys():
+            event = self._events[key] = dict()
+            event['source_id'] = source_id
+            event['event_code'] = event_code
+            event['level'] = level
+            event['event_id'] = event_id if event_id else source_id
+            event['header'] = header
+            event['detail'] = list()
+
+            # log header upon new key
+            if level == 'error':
+                self._log.error(header)
+            elif level == 'warning':
+                self._log.warning(header)
+            elif level == 'none':
+                pass
+
+        else:
+            event = self._events[key]
+
+        if not msg:
+            return
+
+        # log message
         if level == 'error':
             self._log.error(msg)
         elif level == 'warning':
@@ -66,14 +68,15 @@ class EventLogger(object):
         elif level == 'none':
             pass
 
-        event = dict()
-        event['object_id'] = object_id
-        event['level'] = level
-        event['event_code'] = event_code
-        event['scope'] = scope
-        event['messages'] = list()
-        event['messages'].append(msg)
-        self._events.append(event)
+        msg_dict = dict()
+        msg_dict['message'] = msg
+        msg_dict['detail_event_id'] = detail_event_id \
+            if detail_event_id else event['event_id']
+        event['detail'].append(msg_dict)
+
+    @staticmethod
+    def get_key(source_id, event_code, level):
+        return source_id + '-' + event_code + '-' + level
 
 
 class LoggerManager(object):

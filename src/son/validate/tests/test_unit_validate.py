@@ -28,6 +28,9 @@ import unittest
 import os
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
+from Crypto.PublicKey import RSA
+from Crypto import Random
+from Crypto.Hash import SHA256
 
 SAMPLES_DIR = os.path.join('src', 'son', 'validate', 'tests', 'samples')
 
@@ -71,6 +74,53 @@ class UnitValidateTests(unittest.TestCase):
         validator = Validator(workspace=self._workspace)
         validator.validate_package(pkg_path)
         self.assertEqual(validator.error_count, 1)
+
+    def test_validate_package_signature(self):
+        """
+        Tests the package signature validation function of son-validate.
+        To accomplish this:
+            1) a private/public key pair is generated
+            2) a signature is created based on a private key and a package file
+            3) the signature validation function is called with the generated
+               signature and the public key
+        """
+        # generate private/public key pair
+        random_generator = Random.new().read
+        key = RSA.generate(1024, random_generator)
+        self.assertTrue(key.can_encrypt())
+        self.assertTrue(key.can_sign())
+        self.assertTrue(key.has_private())
+
+        # create signature of a file
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-valid.son')
+        file_data = None
+        try:
+            with open(pkg_path, 'rb') as _file:
+                file_data = _file.read()
+        except IOError as err:
+            print("I/O error: {0}".format(err))
+        pkg_hash = SHA256.new(file_data).digest()
+        signature = str(key.sign(pkg_hash, '')[0])
+        pubkey = key.publickey().exportKey('DER')  # export in binary encoding
+
+        # call signature validation function
+        validator = Validator(workspace=self._workspace)
+        result = validator.validate_package_signature(pkg_path,
+                                                      signature,
+                                                      pubkey)
+        # signature must be valid
+        self.assertTrue(result)
+
+        # call signature validation with a different file
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        result = validator.validate_package_signature(pkg_path,
+                                                      signature,
+                                                      pubkey)
+        # signature must be invalid
+        self.assertFalse(result)
 
     def test_validate_package_invalid_md5(self):
         """
