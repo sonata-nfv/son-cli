@@ -7,7 +7,7 @@ set -xe
 
 echo "==== Build packages and instantiate debian repository ===="
 
-export DOCKER_HOST="unix:///var/run/docker.sock"
+#export DOCKER_HOST="tcp://sp.int3.sonata-nfv.eu:2375"
 
 # ====== Build packages for ubuntu 14.04 ======
 echo "--> Building packages for Ubuntu 14.04 LTS"
@@ -18,8 +18,7 @@ mkdir -p packages-ubuntu14.04
 docker rm -f ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
-    ubuntu14.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
+    ubuntu14.04.build-deb
 
 ## Patch to FIX conflicting versions of setuptools in Ubuntu 14.04
 #docker rm -f tmp_ubuntu16.04 || true
@@ -36,10 +35,12 @@ docker build -t ubuntu16.04.build-deb -f tools/distribute/ubuntu16.04.build-deb.
 mkdir -p packages-ubuntu16.04
 
 docker rm -f ubuntu16.04.build-deb || true
+
+## run container to build deb packages
+## some packages don't support bdist, use debian package instead
 docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
-    ubuntu16.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli .
+    ubuntu16.04.build-deb
 
 # rm -f deb-packages/python3-setuptools*.deb;" # no longer necessary!
 # Patch to Fix conflicts in setuptools after packaging
@@ -53,14 +54,17 @@ docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo \
 
 #echo DOCKER_OPTS=\"--insecure-registry registry.sonata-nfv.eu:5000 -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\" | sudo tee /etc/default/docker
 #sudo service docker restart
-#docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
 
-export DOCKER_HOST="unix:///var/run/docker.sock"
+## for local tests only
+docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
+
+#export DOCKER_HOST="unix:///var/run/docker.sock"
 docker push registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 # ====== Instantiate remote container for debian repository ======
 echo "--> Creating debian repository container"
 
+export RESTORE_DOCKER_HOST=$DOCKER_HOST
 export DOCKER_HOST="tcp://registry.sonata-nfv.eu:2375"
 
 # check if container is running and stop/remove it
@@ -84,7 +88,7 @@ docker run --name=son-cli-debrepo -dit \
     -e URI=http://registry.sonata-nfv.eu:8080 \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
-    -v /home/sonata/son-cli-dist:/.gnupg \
+    -v /home/sonata/son-cli-dist/.gnupg:/.gnupg \
     --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 
@@ -107,5 +111,5 @@ echo "______________________________________________________________"
 docker exec son-cli-debrepo cat /root/.aptly/public/go
 echo "______________________________________________________________"
 
-export DOCKER_HOST="unix:///var/run/docker.sock"
+export DOCKER_HOST=$RESTORE_DOCKER_HOST
 echo "-->Done."

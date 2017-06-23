@@ -1,27 +1,33 @@
 FROM    ubuntu:16.04
 
+        ## install son-cli package dependencies
+        ## (system-wide for avoiding problems with py2deb)
 RUN     apt-get update \
-        ## install required packages
-        && apt-get install -y python3-pip dpkg-dev fakeroot \
-        && apt-get install -y python3-dev python3-pycparser \
-        && apt-get install -y build-essential libssl-dev libffi-dev \
-        && pip3 install --upgrade pip
+        && apt-get install -y software-properties-common apt-transport-https \
+        ca-certificates wget libffi-dev libssl-dev tcpdump gfortran \
+        libopenblas-dev liblapack-dev python3-dev libyaml-dev curl \
+        python3.pip python3-pycparser python3-matplotlib python3-numpy \
+        python3-scipy libpng-dev libfreetype6-dev gfortran libatlas-base-dev
 
-        ## Installing setuptools (now in >v34.0.0 dependencies must be installed in advance)
-RUN     pip3 install wincertstore==0.2 certifi==2016.9.26 six>=1.10.0 packaging>=16.8 appdirs>=1.4.0 \
-        && pip3 install setuptools==34.0.2
+        ## install dependencies for py2deb build
+RUN     apt-get update \
+        && apt-get install -y pkg-config locales dpkg-dev fakeroot
 
         ## install py2deb package converter
 RUN     pip3 install py2deb \
-        ## generate utf8 locale, otherwise py2deb will result in error!
+        # generate utf8 locale, otherwise py2deb will result in error!
         && locale-gen en_US.UTF-8 \
         && mkdir -p /son-cli/deb-packages
 
 COPY    . /son-cli
+COPY    tools/distribute/entrypoint.sh /sbin/entrypoint.sh
+RUN     chmod 755 /sbin/entrypoint.sh
 
 WORKDIR /son-cli
 
-## set locale env vars pointing to utf8
+        ## set locale env vars pointing to utf8
 ENV     LANG en_US.UTF-8
 ENV     LANGUAGE en_US:en
 ENV     LC_ALL en_US.UTF-8
+
+ENTRYPOINT ["/sbin/entrypoint.sh"]
