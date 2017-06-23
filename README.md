@@ -75,7 +75,7 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
 
 1. Add the new GPG key
 	```sh
-	sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D0DF34A30A4FE3F8
+	sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8EC0731023C1F15B
 	```
     
 2. Add a source entry for your Ubuntu OS.

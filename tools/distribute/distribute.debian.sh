@@ -54,7 +54,9 @@ docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo \
 
 #echo DOCKER_OPTS=\"--insecure-registry registry.sonata-nfv.eu:5000 -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\" | sudo tee /etc/default/docker
 #sudo service docker restart
-#docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
+
+## for local tests only
+docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
 
 #export DOCKER_HOST="unix:///var/run/docker.sock"
 docker push registry.sonata-nfv.eu:5000/son-cli-debrepo
@@ -86,7 +88,7 @@ docker run --name=son-cli-debrepo -dit \
     -e URI=http://registry.sonata-nfv.eu:8080 \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
-    -v /home/sonata/son-cli-dist:/.gnupg \
+    -v /home/sonata/son-cli-dist/.gnupg:/.gnupg \
     --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 
