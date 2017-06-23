@@ -18,11 +18,7 @@ mkdir -p packages-ubuntu14.04
 docker rm -f ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
-    ubuntu14.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli \
-    --use-system-package=numpy,python3-numpy \
-    --use-system-package=scipy,python3-scipy \
-    -- .
+    ubuntu14.04.build-deb
 
 ## Patch to FIX conflicting versions of setuptools in Ubuntu 14.04
 #docker rm -f tmp_ubuntu16.04 || true
@@ -44,11 +40,7 @@ docker rm -f ubuntu16.04.build-deb || true
 ## some packages don't support bdist, use debian package instead
 docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
-    ubuntu16.04.build-deb \
-    py2deb -r deb-packages --name-prefix=python3 --no-name-prefix=sonata-cli \
-    --use-system-package=numpy,python3-numpy \
-    --use-system-package=scipy,python3-scipy \
-    -- .
+    ubuntu16.04.build-deb
 
 # rm -f deb-packages/python3-setuptools*.deb;" # no longer necessary!
 # Patch to Fix conflicts in setuptools after packaging

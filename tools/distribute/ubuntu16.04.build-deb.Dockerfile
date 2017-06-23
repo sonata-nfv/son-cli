@@ -10,7 +10,8 @@ RUN     apt-get update \
         python3-scipy libpng-dev libfreetype6-dev gfortran libatlas-base-dev
 
         ## install dependencies for py2deb build
-RUN     apt-get install -y pkg-config locales dpkg-dev fakeroot lintian
+RUN     apt-get update \
+        && apt-get install -y pkg-config locales dpkg-dev fakeroot
 
         ## install py2deb package converter
 RUN     pip3 install py2deb \
@@ -19,10 +20,14 @@ RUN     pip3 install py2deb \
         && mkdir -p /son-cli/deb-packages
 
 COPY    . /son-cli
+COPY    tools/distribute/entrypoint.sh /sbin/entrypoint.sh
+RUN     chmod 755 /sbin/entrypoint.sh
 
 WORKDIR /son-cli
 
-## set locale env vars pointing to utf8
+        ## set locale env vars pointing to utf8
 ENV     LANG en_US.UTF-8
 ENV     LANGUAGE en_US:en
 ENV     LC_ALL en_US.UTF-8
+
+ENTRYPOINT ["/sbin/entrypoint.sh"]
