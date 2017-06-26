@@ -220,6 +220,7 @@ class Push(object):
                     headers = {}
                 if signature:
                     # Including signature header in case it's passed as param
+                    print("SIGNATURE= ", signature)
                     headers['signature'] = signature
                 r = requests.post(url, headers=headers, files=payload)
                 if r.status_code == 201:
@@ -305,7 +306,7 @@ class Push(object):
 
         :returns: text response message of the server
         """
-        # TODO: TO BE IMPLEMENTED
+        # TODO: WORK IN PROGRESS
         try:
             # if len(service_uuid) == 0:
             #     service_uuid = package_list(platform_url)[0]
@@ -317,7 +318,7 @@ class Push(object):
 
             url = self._base_url + self.GK_API_VERSION + self.GK_URI_INST
 
-            # url = platform_url+"/instantiations"
+            log.info("Deployment URL='{}'".format(url))
 
             r = requests.post(url, json={"service_uuid": service_uuid})
             return r.text

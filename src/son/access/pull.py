@@ -135,8 +135,7 @@ class Pull(object):
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
         # print("url", url)
         # print("headers", self._headers)
-        response = requests.get(url,    # auth=self._auth,
-                                headers=self._headers)
+        response = requests.get(url, headers=self._headers)
         # print("response_code", response.status_code)
         # print("response_text", response.text)
         if not response.status_code == requests.codes.ok:
