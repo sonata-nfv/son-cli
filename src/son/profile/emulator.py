@@ -136,6 +136,7 @@ class Emulator:
                 time.sleep(1)
             node_name = self.available_nodes.pop()
         LOG.debug("Run %r: Node name for this experiment is %s"%(run_id, node_name))
+
         # check whether the specified worker exists
         if not node_name in self.emulator_nodes:
             LOG.critical("Run %r: Specified node does not exist."%run_id)
@@ -144,16 +145,21 @@ class Emulator:
 
         # get neccessary information from (un-)specified worker
         LOG.info("Run %r: Running package for %r seconds on emulator node %r."%(run_id, runtime, node_name))
+
         address = node["address"]
         LOG.debug("Run %r: Remote address is %r."%(run_id, address))
+
         # get the port to upload the packages to, if not specified, default to 5000
         package_port = node.get("package_port", 5000)
         LOG.debug("Run %r: Port for packages is %r."%(run_id, package_port))
+
         # get the ssh port, if not specified, default to 22
         ssh_port = node.get("ssh_port", 22)
         LOG.debug("Run %r: SSH port is %r."%(run_id, ssh_port))
+
         username = node["ssh_user"]
         LOG.debug("Run %r: Username for ssh connection is %r."%(run_id, username))
+
         key_loc = os.path.expanduser(node["ssh_key_loc"])
         LOG.debug("Run %r: Location of ssh key is %r."%(run_id, key_loc))
 
@@ -209,6 +215,24 @@ class Emulator:
         sftp = ssh.open_sftp()
         # switch to directory containing relevant files
         sftp.chdir("/tmp/results/%s/"%service_uuid)
+
+        self._copy_files_from_remote(sftp=sftp, run_id=run_id)
+
+        # remove all temporary files and directories from the remote host
+        LOG.info("Run %r: Removing results on remote host."%run_id)
+        self._exec_command(ssh, "sudo rm -r /tmp/results/%s"%service_uuid)
+
+        LOG.info("Run %r: Closing connections."%run_id)
+        # close the sftp connection
+        sftp.close()
+
+        # close the ssh connection
+        ssh.close()
+
+        # make the current worker available again
+        self.available_nodes.append(node_name)
+
+    def _copy_files_from_remote(self, sftp, run_id):
         # the path to which the files will be copied
         local_path = "result/%r"%run_id
 
@@ -239,19 +263,7 @@ class Emulator:
                 # skip it
                 LOG.debug("Run %r: Skipping %s: Neither file nor directory"%(run_id, file_path))
 
-        # remove all temporary files and directories from the remote host
-        LOG.info("Run %r: Removing results on remote host."%run_id)
-        self._exec_command(ssh, "sudo rm -r /tmp/results/%s"%service_uuid)
 
-        LOG.info("Run %r: Closing connections."%run_id)
-        # close the sftp connection
-        sftp.close()
-
-        # close the ssh connection
-        ssh.close()
-
-        # make the current worker available again
-        self.available_nodes.append(node_name)
 
     """
     Helper method to be called in a thread
