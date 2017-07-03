@@ -1,0 +1,12 @@
+<section class="sv-viewer">
+    <div class="sv-viewer__container">
+        <div viewer-svg class="sv-viewer__draw-area"></div>
+    </div>
+    <div class="sv-viewer__loader" ng-class="{ 'sv-viewer__loader--hidden': !$ctrl.isLoading }">
+        <span class="loader__animation"></span>
+        <span class="loader__text">
+            <div class="loader__title">Loading...</div>
+            <div class="loader__message">please wait</div>
+        </span>
+    </div>
+</section>
