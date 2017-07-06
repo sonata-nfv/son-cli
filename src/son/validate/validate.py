@@ -760,16 +760,17 @@ class Validator(object):
         # verify integrity between unit interfaces and units
         for lid, link in function.links.items():
             for iface in link.interfaces:
-                iface_tokens = iface.split(':')
-                if len(iface_tokens) > 1:
-                    if iface_tokens[0] not in function.units.keys():
-                        evtlog.log("Undefined connection point(s)",
-                                   "Invalid interface id='{0}' of link "
-                                   "id='{1}': Unit id='{2}' is not defined"
-                                   .format(iface, lid, iface_tokens[0]),
-                                   function.id,
-                                   'evt_vnfd_itg_undefined_cpoint')
-                        return
+                if iface not in function.interfaces:
+                    iface_tokens = iface.split(':')
+                    if len(iface_tokens) > 1:
+                        if iface_tokens[0] not in function.units.keys():
+                            evtlog.log("Undefined connection point(s)",
+                                       "Invalid interface id='{0}' of link "
+                                       "id='{1}': Unit id='{2}' is not defined"
+                                       .format(iface, lid, iface_tokens[0]),
+                                       function.id,
+                                       'evt_vnfd_itg_undefined_cpoint')
+                            return
         return True
 
     def _validate_service_topology(self, service):
