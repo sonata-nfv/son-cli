@@ -7,7 +7,7 @@ A visualization tool to view all errors and warnings resulting from a validation
 To start, clone the repository [sonata-validator-gui](https://something). Enter the repository's folder
 and run `npm install` to install the needed dependencies.
 
-### Prerequesites
+### Prerequisites
 
 To build the validator GUI a few tools are necessary:
   * Node
@@ -34,13 +34,13 @@ To deploy the application run the following set of commands
 First build the docker image with:
 
 ```shell-session
-docker build -t sonata-viewer .
+docker build -t son-validate-gui .
 ```
 
 Then run the image with:
 
 ```shell-session
-docker run -it -p 8080:8080 -p 5050:5050 --name son-validate-gui sonata-viewer /bin/bash
+docker run -d -p 8080:8080 -p 5050:5050 --name son-validate-gui son-validate-gui
 ```
 
 To check if everything went accordingly visit [localhost:8080]()

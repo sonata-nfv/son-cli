@@ -15,5 +15,3 @@ rm deb-packages/python3-decorator_*.deb || true
 rm deb-packages/python3-matplotlib_*.deb || true
 rm deb-packages/python3-six_*.deb || true
 ls deb-packages/
-
-#rm deb-packages/python3-six_*.deb
