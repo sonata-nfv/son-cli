@@ -1,0 +1,105 @@
+/*
+  $blue-navy
+*/
+
+.sv-menu-card {
+  border-radius: 4px;
+  border: 1px solid $grey3;
+  background-color: $grey2;
+  margin: 6px 0 6px 0;
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__header {
+    background-color: rgba($blue-navy, 0.1);
+    color: $blue-navy;
+    font-family: OpenSans;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px;
+    box-sizing: border-box;
+    height: 35px;
+    border-bottom: 1px solid $grey3;
+
+    .header__title {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        direction: rtl;
+        cursor: pointer;
+        width: 90%;
+        display: inline-block;
+    }
+
+    .header__icon {
+      font-style: normal;
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-right: 3px solid $blue-navy;
+      border-top: 3px solid $blue-navy;
+      transform: rotate(45deg);
+      top: 3px;
+      right: 1px;
+      float: right;
+      transition: transform 0.2s;
+    }
+
+    .header__icon--open {
+      transform: rotate(135deg);
+    }
+  }
+
+  &__events {
+    padding: 10px;
+    font-family: OpenSans;
+    font-size: 12px;
+    font-weight: 700;
+
+    .events__detail + .events__detail {
+      margin-top: 10px;
+    }
+
+    .events__label {
+      color:  $black;
+      line-height: 18px;
+      min-width: 78px;
+      display: table-cell;
+    }
+
+    .events__text {
+        color: $grey4;
+        word-wrap: break-word;
+    }
+
+    .events__text--hovered {
+      cursor: pointer;
+    }
+
+    .events__sub-title {
+      color: $blue-navy;
+      cursor: pointer;
+
+      .sub-title__icon {
+        font-size: 20px;
+        float: right;
+        line-height: 16px;
+      }
+
+      .sub-title__text {
+        display: inline-block;
+        max-width: 85%;
+      }
+    }
+  }
+
+  .events--collapsed {
+      height: 0;
+      overflow: hidden;
+      padding: 0;
+  }
+}

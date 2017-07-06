@@ -1,0 +1,38 @@
+<article class="sv-menu-card">
+  <header class="sv-menu-card__header" ng-click="$ctrl.collapsed = !$ctrl.collapsed">
+    <span class="header__title">{{::$ctrl.item.sourceId}}</span>
+    <div class="header__icon" ng-class="{ 'header__icon--open': !$ctrl.collapsed }"></div>
+  </header>
+  <section class="sv-menu-card__events" ng-class="{ 'events--collapsed': $ctrl.collapsed }">
+    <ul>
+      <li ng-repeat="event in $ctrl.item.events">
+        <div class="row">
+          <div class="col-xs-3">
+            <span class="events__label">Type:</span>
+          </div>
+          <div class="col-xs-9">
+            <span class="events__text">{{::event.eventCode}}</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-xs-12">
+            <span class="events__text">{{::event.header}}</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-xs-3">
+            <span class="events__label">Details:</span>
+          </div>
+          <div class="col-xs-9">
+            <ul>
+              <li class="events__detail" ng-repeat="detail in event.details" ng-mouseover="$ctrl.highlightElement(detail.eventId, true)" ng-mouseleave="$ctrl.highlightElement(detail.eventId, false)">
+                <div class="events__sub-title"><span class="sub-title__text">{{::detail.eventId}}</span> <span class="sub-title__icon">&#9678</span> </div>
+                <div class="events__text events__text--hovered">{{::detail.message}}</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </section>
+</article>

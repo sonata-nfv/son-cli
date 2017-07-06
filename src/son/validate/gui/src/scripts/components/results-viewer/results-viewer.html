@@ -1,0 +1,20 @@
+<section ng-class="{ 'sv-resviewer--closed': !$ctrl.scope.isOpen }" class="sv-resviewer">
+  <div class="sv-resviewer__drawer-puller" ng-click="$ctrl.toggleDrawer()">
+    <div class="drawer-puller__icon"></div>
+  </div>
+  <div class="sv-resviewer__drawer">
+    <div class="sv-resviewer__section--closed">
+      <span class="list__header">
+        <span class="header__text--warning">warnings ({{$ctrl.warnings.length}})</span>
+      <span class="header__text--error">errors ({{$ctrl.errors.length}})</span>
+      </span>
+    </div>
+    <div class="sv-resviewer__section sv-resviewer__section--bordered">
+      <sv-search-input on-search="$ctrl.searchTopology($event.search)"></sv-search-input>
+    </div>
+    <div class="sv-resviewer__section sv-resviewer__section--scrollable">
+      <sv-res-list type="'error'" items="$ctrl.errors" fwgraphs="$ctrl.fwgraphs"></sv-res-list>
+      <sv-res-list type="'warning'" items="$ctrl.warnings" fwgraphs="$ctrl.fwgraphs"></sv-res-list> 
+    </div>
+  </div>
+</section>

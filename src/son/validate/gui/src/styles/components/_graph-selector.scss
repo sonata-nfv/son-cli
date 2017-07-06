@@ -1,0 +1,81 @@
+/*
+  $grey3
+  $black
+  $yellow
+  $red
+  $blue-sky
+  $white
+*/
+
+.sv-fwg-selector {
+  border: 1px solid $grey3;
+  border-radius: 4px;
+  box-sizing: border-box;
+  background-color: $white;
+  overflow: hidden;
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__path-list {
+    list-style: none;
+    padding-left: 15px;
+  }
+
+  &__item {
+    padding:15px;
+    color: $black;
+    font-family: OpenSans;
+    cursor: pointer;
+
+    .item__title {
+      font-weight: 700;
+      font-size: 12px;
+      top: -2px;
+      position: relative;
+    }
+
+    .item__text {
+      font-weight: 400;
+      font-size: 12px;
+    }
+
+     .item__icon {
+          border-radius: 18px;
+          height: 18px;
+          width: 18px;
+          text-align: center;
+          line-height: 18px;
+          font-weight: 700;
+          float: right;
+        }
+
+        .item__icon + .item__icon {
+          margin-right: 5px;
+        }
+
+        .item__icon--error {
+          background-color: lighten($red, 15%);
+          border: 1px solid $red;
+          color: $white;
+        }
+
+        .item__icon--warn {
+          background-color: lighten($yellow, 15%);
+          border: 1px solid $yellow;
+          color: $black;
+        }
+  }
+
+  &__item + &__item {
+    border-top: 1px solid $grey3;
+  }
+
+  &__item--selected {
+    background-color: $blue-sky;
+    color: $white;
+  }
+}

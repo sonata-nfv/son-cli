@@ -1,0 +1,9 @@
+@mixin font-face($path, $family, $weight) {
+
+    @font-face{
+        font-family: quote($family);
+        font-weight: $weight;
+        src: url($base-font-path + $path);
+    }
+
+}
