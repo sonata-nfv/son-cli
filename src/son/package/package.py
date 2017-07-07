@@ -495,7 +495,7 @@ class Packager(object):
 
             # >> First, check if this VNF is in the workspace catalogue
             catalogue_path = os.path.join(
-                self._workspace.ws_root,
+                self._workspace.workspace_root,
                 self._workspace.vnf_catalogue_dir,
                 vnf_id)
 

@@ -99,7 +99,7 @@ class Workspace:
 
     @property
     def catalogues_dir(self):
-        return self.config['catalogues']
+        return self.config['catalogues_dir']
 
     @property
     def configuration_dir(self):
