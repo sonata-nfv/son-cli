@@ -1,0 +1,77 @@
+.sv-input {
+    font-family: OpenSans;
+    position: relative;
+
+    &__label {
+        color:  $grey4;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    &__input{
+        display: inline-block;
+        width: 100%;
+        border: 1px solid $grey3;
+        border-radius: 4px;
+        box-sizing: border-box;
+        background-color: $white;
+        padding: 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    &__icon {
+        background-image: url('./../assets/icons/ic-search.svg');
+        background-repeat: no-repeat;
+        width: 16px;
+        height: 16px;
+        position: absolute;
+        right: 10px;
+        top: 11px;
+    }
+
+    &__icon--clear {
+        background-image: url('./../assets/icons/ic-close.svg');
+        width: 14px;
+        height: 14px;
+        top: 11px;
+        right: 11px;
+        background-position: -1px -1px;
+        cursor: pointer;
+    }
+}
+
+.sv-check-input {
+    font-family: OpenSans;
+    color:  $black;
+    font-size: 14px;
+    font-weight: 600;
+    
+    &__label {
+        cursor: pointer;
+    }
+
+   &__label:before {
+        border-radius: 3px;
+        border: 1px solid $grey3;
+        content: "";
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-right: 10px;
+        background-color: $white;
+        vertical-align: middle;
+        font-size: 18px;
+        line-height: 15px;
+    }
+
+    &__input:checked + &__label:before {
+        content: "\2713";
+        color: $blue-sky;
+    }
+
+    &__input {
+        display: none;
+    }
+}

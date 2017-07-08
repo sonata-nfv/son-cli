@@ -1,0 +1,6 @@
+<div class="sv-input">
+  <label class="sv-input__label">
+    <input type="text" ng-model="$ctrl.searchTerm" ng-keyup="$ctrl.searchTopology()" class="sv-input__input" placeholder="Search by ID or label...">
+    <div class="sv-input__icon" ng-click="$ctrl.clearInput()" ng-class="{'sv-input__icon--clear': $ctrl.searchTerm}" ></div>
+  </label>
+</div>
