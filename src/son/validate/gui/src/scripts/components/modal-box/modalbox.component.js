@@ -31,11 +31,19 @@ export const ModalBoxComponent = {
         options: ['project', 'package', 'service', 'function'],
         sources: ['local', 'url', 'embedded'],
       };
+      this.scope.files = [];
     }
 
     $onInit() {
       this.validation.source = this.strings.sources[0];
       this.type = this.strings.options[0];
+
+      this.scope.$watchCollection('files', (value) => {
+        //  this.enableButton = (value.length > 0);
+        if (value && value.length > 0) {
+          this.validation.file = value[0];
+        }
+      });
     }
 
     $onChanges(changesObj) {
@@ -81,6 +89,7 @@ export const ModalBoxComponent = {
     }
 
     validate(isValid) {
+      console.log(this.validation)
       this.hasErrors = false;
       if (isValid) {
         this.validatorService.postValidate(this.type, this.validation)
