@@ -52,11 +52,11 @@ service_specific_managers:
 ## outside world.
 ##
 connection_points:
-  - id: "ns:mgmt"
+  - id: "mgmt"
     type: "interface"
-  - id: "ns:input"
+  - id: "input"
     type: "interface"
-  - id: "ns:output"
+  - id: "output"
     type: "interface"
 
 ##
@@ -70,11 +70,11 @@ virtual_links:
       - "vnf_iperf:mgmt"
       - "vnf_firewall:mgmt"
       - "vnf_tcpdump:mgmt"
-      - "ns:mgmt"
+      - "mgmt"
   - id: "input-2-iperf"
     connectivity_type: "E-Line"
     connection_points_reference:
-      - "ns:input"
+      - "input"
       - "vnf_iperf:input"
   - id: "iperf-2-firewall"
     connectivity_type: "E-Line"
@@ -97,13 +97,13 @@ virtual_links:
     connectivity_type: "E-Line"
     connection_points_reference:
       - "vnf_tcpdump:output"
-      - "ns:output"
+      - "output"
 
 ##
 ## The forwarding graphs.
 ##
 forwarding_graphs:
-  - fg_id: "ns:fg01"
+  - fg_id: "fg01"
     number_of_endpoints: 2
     number_of_virtual_links: 4
     constituent_virtual_links: 
@@ -117,10 +117,10 @@ forwarding_graphs:
       - "vnf_firewall"
       - "vnf_tcpdump"
     network_forwarding_paths:
-      - fp_id: "ns:fg01:fp01"
+      - fp_id: "fg01:fp01"
         policy: "none"
         connection_points:
-          - connection_point_ref: "nsx:input"  # modified here
+          - connection_point_ref: "inputx"  # modified here
             position: 1
           - connection_point_ref: "vnf_iperf:input"
             position: 2
@@ -134,6 +134,6 @@ forwarding_graphs:
             position: 6
           - connection_point_ref: "vnf_tcpdump:output"
             position: 7
-          - connection_point_ref: "ns:output"
+          - connection_point_ref: "output"
             position: 8
 

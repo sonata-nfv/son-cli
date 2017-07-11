@@ -599,6 +599,7 @@ class Validator(object):
         :param service:
         :return:
         """
+
         log.info("Validating integrity of service '{0}'".format(service.id))
 
         # get referenced function descriptors (VNFDs)
@@ -619,7 +620,7 @@ class Validator(object):
                            'evt_nsd_itg_function_invalid')
                 return
 
-        # load service interfaces
+        # load service connection points
         if not service.load_connection_points():
             evtlog.log("Missing 'connection_points'",
                        "Couldn't load the connection points of service id='{0}'"
@@ -660,7 +661,7 @@ class Validator(object):
                            'evt_nsd_itg_unused_cpoint')
 
         # verify integrity between vnf_ids and vlinks
-        for vl_id, vl in service.links.items():
+        for vl_id, vl in service.vlinks.items():
             for cpr in vl.connection_point_refs:
                 s_cpr = cpr.split(':')
                 if len(s_cpr) == 1 and cpr not in service.connection_points:
@@ -671,7 +672,7 @@ class Validator(object):
                                service.id,
                                'evt_nsd_itg_undefined_cpoint')
                     return
-                else:
+                elif len(s_cpr) == 2:
                     func = service.mapped_function(s_cpr[0])
                     if not func or s_cpr[1] not in func.connection_points:
                         evtlog.log("Undefined connection point",
@@ -695,8 +696,8 @@ class Validator(object):
         log.info("Validating integrity of function descriptor '{0}'"
                  .format(function.id))
 
-        # load function interfaces
-        if not function.load_interfaces():
+        # load function connection points
+        if not function.load_connection_points():
             evtlog.log("Missing 'connection_points'",
                        "Couldn't load the connection points of function id='{0}'"
                        .format(function.id),
@@ -713,7 +714,7 @@ class Validator(object):
                        'evt_vnfd_itg_badsection_vdus')
             return
 
-        # load interfaces of units
+        # load connection points of units
         if not function.load_unit_connection_points():
             evtlog.log("Missing 'connection_points'",
                        "Couldn't load VDU connection points of "
@@ -732,7 +733,7 @@ class Validator(object):
                        'evt_vnfd_itg_badsection_vlinks')
             return
 
-        # check for undeclared interfaces
+        # check for undeclared connection points
         undeclared = function.undeclared_connection_points()
         if undeclared:
             for cxpoint in undeclared:
@@ -744,7 +745,7 @@ class Validator(object):
                            'evt_vnfd_itg_undeclared_cpoint')
             return
 
-        # check for unused interfaces
+        # check for unused connection points
         unused_ifaces = function.unused_connection_points()
         if unused_ifaces:
             for cxpoint in unused_ifaces:
@@ -755,7 +756,7 @@ class Validator(object):
                            function.id,
                            'evt_vnfd_itg_unused_cpoint')
 
-        # verify integrity between unit interfaces and units
+        # verify integrity between unit connection points and units
         for vl_id, vl in function.vlinks.items():
             for cpr in vl.connection_point_refs:
                 s_cpr = cpr.split(':')
@@ -767,7 +768,7 @@ class Validator(object):
                                function.id,
                                'evt_nsd_itg_undefined_cpoint')
                     return
-                else:
+                elif len(s_cpr) == 2:
                     unit = function.units[s_cpr[0]]
                     if not unit or s_cpr[1] not in unit.connection_points:
 
@@ -789,7 +790,7 @@ class Validator(object):
         """
         log.info("Validating topology of service '{0}'".format(service.id))
 
-        # build service topology graph with VNF interfaces
+        # build service topology graph with VNF connection points
         service.graph = service.build_topology_graph(level=1, bridges=False)
         if not service.graph:
             evtlog.log("Invalid topology",
@@ -866,14 +867,14 @@ class Validator(object):
                           .format(fw_graph['fg_id'], fw_path['fp_id'],
                                   fw_path['trace']))
 
-            # cycles must be analysed at the vnf level, not interface level.
+            # cycles must be analysed at the vnf level, not cp level.
             # here, a directed graph between vnfs must be created,
-            # containing the interfaces of each node and edges between nodes.
-            # Each edge must contain the pair of interfaces that links the
+            # containing the cps of each node and edges between nodes.
+            # Each edge must contain the pair of cps that links the
             # two nodes.
             # Having this structure is possible to find cycles between vnfs
             # and more importantly, identify which are the links
-            #  (interface pair) that integrate a particular cycle.
+            #  (cp pair) that integrate a particular cycle.
 
             fpg = nx.DiGraph()
             for fw_path in fw_graph['fw_paths']:
@@ -881,12 +882,13 @@ class Validator(object):
                 prev_iface = None
                 pair_complete = False
 
-                # convert 'interface' path into vnf path
-                for interface in fw_path['path']:
-                    # find vnf_id of interface
+                # convert 'connection point' path into vnf path
+                for cp in fw_path['path']:
+                    # find vnf_id of connection point
                     func = None
-                    if interface in service.all_function_interfaces:
-                        func = service.function_of_interface(interface)
+                    s_cp = cp.split(':')
+                    if len(s_cp) == 2:
+                        func = service.mapped_function(s_cp[0])
                         if not func:
                             log.error(
                                 "Internal error: couldn't find corresponding"
@@ -896,8 +898,7 @@ class Validator(object):
                         node = service.vnf_id(func)
 
                     else:
-                        node = interface
-
+                        node = cp
                         fpg.add_node(node)
 
                     if pair_complete:
@@ -922,7 +923,7 @@ class Validator(object):
 
                         fpg.add_edge(prev_node, node,
                                      attr_dict={'from': prev_iface,
-                                                'to': interface})
+                                                'to': cp})
                         pair_complete = False
 
                     else:
@@ -933,7 +934,7 @@ class Validator(object):
                                        "connection point: '{2}'"
                                        .format(fw_graph['fg_id'],
                                                fw_path['fp_id'],
-                                               interface),
+                                               cp),
                                        source_id,
                                        'evt_nsd_top_fwpath_disrupted',
                                        event_id=func.id)
@@ -941,7 +942,7 @@ class Validator(object):
                         pair_complete = True
 
                     prev_node = node
-                    prev_iface = interface
+                    prev_iface = cp
 
                 # remove 'path' from fw_path (not needed anymore)
                 fw_path.pop('path')
@@ -955,7 +956,7 @@ class Validator(object):
                 if len(cycle) > 2:
                     cycles.append(cycle)
 
-            # build cycles representative interface structure
+            # build cycles representative connection point structure
             cycles_list = []
             for cycle in cycles:
                 cycle_dict = {'cycle_id': str(uuid.uuid4()), 'cycle_path': []}
@@ -1084,6 +1085,7 @@ class Validator(object):
 
             vnf_id = function['vnf_id']
             new_func = self._storage.create_function(path_vnfs[fid])
+
             service.associate_function(new_func, vnf_id)
 
         return True
@@ -1119,8 +1121,6 @@ class Validator(object):
 
     @staticmethod
     def _find_graph_cycles(graph, node, prev_node=None, backtrace=None):
-
-        print(". {} <-- {}".format(node, backtrace))
 
         if not backtrace:
             backtrace = []

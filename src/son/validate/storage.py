@@ -192,6 +192,7 @@ class Node:
             return
         log.debug("Node id='{0}': adding connection point '{1}'"
                   .format(self.id, cp))
+
         self._connection_points.append(cp)
 
         return True
@@ -357,22 +358,15 @@ class Descriptor(Node):
     def vlink_cp_refs(self):
         vlink_cps = []
         for vl_id, vl in self.vlinks.items():
-            vlink_cps += vl.connection_points
+            vlink_cps += vl.connection_point_refs
         return vlink_cps
 
     @property
     def vbridge_cp_refs(self):
         vbridge_cp_references = []
         for vb_id, vb in self.vbridges.items():
-            vbridge_cp_references += vb.connection_points
+            vbridge_cp_references += vb.connection_point_refs
         return vbridge_cp_references
-
-    @property
-    def connection_points(self):
-        cx_points = []
-        for cxpt in self.content['connection_points']:
-            cx_points.append(cxpt['id'])
-        return cx_points
 
     @property
     def graph(self):
@@ -557,14 +551,10 @@ class Service(Descriptor):
         """
         return self._fw_graphs
 
-
     @property
-    def function_connection_points(self, function_id=None):
-
+    def all_function_connection_points(self):
         func_cps = []
         for fid, f in self.functions.items():
-            if function_id and fid != function_id:
-                continue
             func_cps += f.connection_points
 
         return func_cps
@@ -642,6 +632,7 @@ class Service(Descriptor):
         self._functions[function.id] = function
         self._vnf_id_map[vnf_id] = function.id
 
+
     def build_topology_graph(self, level=1, bridges=False,
                              vdu_inner_connections=True):
         """
@@ -669,7 +660,7 @@ class Service(Descriptor):
                           'type': ''  # 'iface' | 'br-iface' | 'vdu_in'
                           }
 
-        # assign nodes from service interfaces
+        # assign nodes from service connection points
         connection_point_refs = self.vlink_cp_refs
         if bridges:
             connection_point_refs += self.vbridge_cp_refs
@@ -719,10 +710,11 @@ class Service(Descriptor):
                                                                bridges=bridges,
                                                                level=1,
                                                                vdu_inner_connections=vdu_inner_connections)
+
             if level == 0:
                 for node in function.graph.nodes():
                     node_tokens = node.split(':')
-                    if len(node_tokens) > 1:
+                    if len(node_tokens) > 1 and node in graph.nodes():
                         graph.remove_node(node)
                     else:
                         pn = prefix + ':' + node
@@ -733,11 +725,25 @@ class Service(Descriptor):
             elif level == 1:
                 prefixes.append(prefix)
 
-            elif level >= 2:
-
+            elif level == 2:
+                print(function.graph.nodes())
                 for node in function.graph.nodes():
-                    node_tokens = node.split(':')
-                    if node in function.connection_points and len(node_tokens) > 1:
+                    s_node = node.split(':')
+                    if len(s_node) > 1:
+                        prefix_map[node] = prefix + ':' + s_node[0]
+                    else:
+                        prefix_map[node] = prefix + ':' + node
+
+                re_f_graph = nx.relabel_nodes(function.graph, prefix_map,
+                                              copy=True)
+                graph.add_nodes_from(re_f_graph.nodes(data=True))
+                graph.add_edges_from(re_f_graph.edges(data=True))
+
+            elif level == 3:
+                print(function.graph.nodes())
+                for node in function.graph.nodes():
+                    s_node = node.split(':')
+                    if node in function.connection_points and len(s_node) > 1:
                         prefix_map[node] = node
                     else:
                         prefix_map[node] = prefix + ':' + node
@@ -745,8 +751,6 @@ class Service(Descriptor):
                 re_f_graph = nx.relabel_nodes(function.graph, prefix_map, copy=True)
                 graph.add_nodes_from(re_f_graph.nodes(data=True))
                 graph.add_edges_from(re_f_graph.edges(data=True))
-
-
 
         # build vlinks topology graph
         if not self.vlinks and not self.vbridges:
@@ -760,7 +764,7 @@ class Service(Descriptor):
 
             elif level == 0:
                 cpr_u = vl.cpr_u.split(':')
-                cpr_v = vl.iface_v.split(':')
+                cpr_v = vl.cpr_v.split(':')
 
                 if len(cpr_u) > 1 and cpr_u[0] in prefixes:
                     cpr_u = cpr_u[0]
@@ -876,8 +880,8 @@ class Service(Descriptor):
                     cpr = cp['connection_point_ref']
                     s_cpr = cpr.split(':')
                     pos = cp['position']
-                    if cpr not in self.connection_points and \
-                       s_cpr not in self.function_connection_points():
+
+                    if len(s_cpr) == 1 and cpr not in self.connection_points:
                         evtlog.log("Undefined connection point",
                                    "Connection point '{0}' of forwarding path "
                                    "'{1}' is not defined"
@@ -885,6 +889,16 @@ class Service(Descriptor):
                                    self.id,
                                    'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
+                    elif len(s_cpr) == 2 and s_cpr[1] not in \
+                            self.all_function_connection_points:
+                        evtlog.log("Undefined connection point",
+                                   "Connection point '{0}' of forwarding path "
+                                   "'{1}' is not defined"
+                                   .format(cpr, fpath['fp_id']),
+                                   self.id,
+                                   'evt_nsd_top_fwgraph_cpoint_undefined')
+                        return
+
                     if pos in path_dict:
                         evtlog.log("Duplicate reference in FG",
                                    "Duplicate referenced position '{0}' "
@@ -973,7 +987,7 @@ class Service(Descriptor):
                 undeclared_cps.append(cpr)
             else:
                 f = self.mapped_function(cpr_split[0])
-                if cpr_split[1] not in f.connection_points:
+                if f and cpr_split[1] not in f.connection_points:
                     undeclared_cps.append(cpr)
 
         return undeclared_cps
@@ -1043,7 +1057,6 @@ class Function(Descriptor):
 
             for cp in vdu['connection_points']:
                 unit.add_connection_point(cp['id'])
-                self.add_connection_point(cp['id'])
 
         return True
 
@@ -1093,12 +1106,12 @@ class Function(Descriptor):
 
             node_attrs['label'] = s_cpr[1] if len(s_cpr) > 1 else cpr
 
-            if iface in self.vlink_cp_refs:
+            if cpr in self.vlink_cp_refs:
                 node_attrs['type'] = 'iface'
-            elif iface in self.vbridge_cp_refs:
+            elif cpr in self.vbridge_cp_refs:
                 node_attrs['type'] = 'br-iface'
 
-            graph.add_node(iface, attr_dict=node_attrs)
+            graph.add_node(cpr, attr_dict=node_attrs)
 
         # build link topology graph
         for vl_id, vl in self.vlinks.items():
@@ -1125,8 +1138,8 @@ class Function(Descriptor):
 
             elif level == 1:
                 # unit interfaces are nodes
-                iface_u = vl.cpr_u
-                iface_v = vl.cpr_v
+                cpr_u = vl.cpr_u
+                cpr_v = vl.cpr_v
                 edge_attrs['level'] = 2
 
             edge_attrs['type'] = 'iface'
@@ -1142,7 +1155,7 @@ class Function(Descriptor):
                     join_cps = []
                     for cp in unit.connection_points:
                         # patch for faulty descriptors regarding sep ':'
-                        s_cp = iface.split(':')
+                        s_cp = cp.split(':')
                         if len(s_cp) > 1:
                             join_cps.append(cp)
                         else:
@@ -1175,7 +1188,7 @@ class Function(Descriptor):
                 graph.add_node(brnode, attr_dict=node_attrs)
 
                 for cpr in vb.connection_point_refs:
-                    s_cpr = iface.split(':')
+                    s_cpr = cpr.split(':')
                     if level == 0 and len(s_cpr) > 1:
                         s_cpr = s_cpr[0]
                     else:
@@ -1191,7 +1204,6 @@ class Function(Descriptor):
         section but not declared in 'connection_points' of the Function and its
         Units.
         """
-
         target_cp_refs = self.vlink_cp_refs + self.vbridge_cp_refs
 
         undeclared_cps = []
@@ -1199,10 +1211,13 @@ class Function(Descriptor):
             cpr_split = cpr.split(':')
             if len(cpr_split) == 1 and cpr not in self.connection_points:
                 undeclared_cps.append(cpr)
-            else:
-                vdu = self.units[cpr_split[0]]
-                if cpr_split[1] not in vdu.connection_points:
+            elif len(cpr_split) == 2:
+                if not cpr_split[0] in self.units:
                     undeclared_cps.append(cpr)
+                else:
+                    vdu = self.units[cpr_split[0]]
+                    if cpr_split[1] not in vdu.connection_points:
+                        undeclared_cps.append(cpr)
 
         return undeclared_cps
 
