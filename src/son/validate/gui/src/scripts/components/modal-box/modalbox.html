@@ -5,16 +5,14 @@
             <span class="header__title">New Validation</span>
             <div class="header__close" ng-click="$ctrl.closeModal()"></div>
         </header>
+        <div  class="container__content--error" ng-show="$ctrl.hasErrors">
+            <div class="container__error-box">
+                <span class="error-box__text">{{$ctrl.errorMessage}}</span>
+                <div class="error-box__icon">!</div>
+            </div>
+        </div>
         <div class="container__wrapper">
             <section class="container__content">
-                <div class="row">
-                    <div class="col-xs-12">
-                        <div class="container__error-box" ng-show="$ctrl.hasErrors">
-                            <span class="error-box__text">{{$ctrl.errorMessage}}</span>
-                            <div class="error-box__icon">!</div>
-                        </div>
-                    </div>
-                </div>
                 <div class="content__validation-list">
                     <div class="row">
                         <div class="col-xs-12">
@@ -128,7 +126,7 @@
                             <div class="col-xs-12">
                                 <div class="sv-input">
                                     <span class="sv-input__label">file upload
-                                    <input class="sv-input__input" type="file">
+                                    <input class="sv-input__input" sv-file-upload type="file">
                                 </span>
                                 </div>
                             </div>

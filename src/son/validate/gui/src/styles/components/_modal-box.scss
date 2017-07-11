@@ -49,7 +49,6 @@
         }
 
         .container__wrapper {
-            max-height: 90vh;
             overflow-y: auto;
         }
 
@@ -120,6 +119,10 @@
             }
         }
 
+        .container__content--error {
+            padding: 10px 15px 0;
+        }
+
         .container__footer {
             padding: 15px;
         }
@@ -157,4 +160,16 @@
 
 .sv-modal--hidden {
   display: none;
+}
+
+@mixin modal--sm() {
+    .container__wrapper {
+        max-height: 73vh;
+    }
+}
+
+@mixin modal--lg() {
+    .container__wrapper {
+        max-height: 90vh;
+    }
 }
