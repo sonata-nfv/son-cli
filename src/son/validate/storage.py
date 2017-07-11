@@ -726,7 +726,6 @@ class Service(Descriptor):
                 prefixes.append(prefix)
 
             elif level == 2:
-                print(function.graph.nodes())
                 for node in function.graph.nodes():
                     s_node = node.split(':')
                     if len(s_node) > 1:
@@ -740,7 +739,6 @@ class Service(Descriptor):
                 graph.add_edges_from(re_f_graph.edges(data=True))
 
             elif level == 3:
-                print(function.graph.nodes())
                 for node in function.graph.nodes():
                     s_node = node.split(':')
                     if node in function.connection_points and len(s_node) > 1:
