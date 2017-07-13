@@ -277,6 +277,8 @@ class Validator(object):
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
         package = self._storage.create_package(pd_filename)
+        if not package.id:
+            return
 
         if self._syntax and not self._validate_package_syntax(package):
             return
