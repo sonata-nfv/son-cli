@@ -887,15 +887,17 @@ class Service(Descriptor):
                                    self.id,
                                    'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
-                    elif len(s_cpr) == 2 and s_cpr[1] not in \
-                            self.all_function_connection_points:
-                        evtlog.log("Undefined connection point",
-                                   "Connection point '{0}' of forwarding path "
-                                   "'{1}' is not defined"
-                                   .format(cpr, fpath['fp_id']),
-                                   self.id,
-                                   'evt_nsd_top_fwgraph_cpoint_undefined')
-                        return
+                    elif len(s_cpr) == 2:
+                        # get corresponding function
+                        func = self.mapped_function(s_cpr[0])
+                        if not func or s_cpr[1] not in func.connection_points:
+                            evtlog.log("Undefined connection point",
+                                       "Connection point '{0}' of forwarding "
+                                       "path '{1}' is not defined"
+                                       .format(cpr, fpath['fp_id']),
+                                       self.id,
+                                       'evt_nsd_top_fwgraph_cpoint_undefined')
+                            return
 
                     if pos in path_dict:
                         evtlog.log("Duplicate reference in FG",
