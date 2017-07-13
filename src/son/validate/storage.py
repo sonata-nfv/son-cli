@@ -474,7 +474,8 @@ class Package(Descriptor):
         Provides the entry point service of the package.
         :return: service id
         """
-        return self.content['entry_service_template']
+        return self.content['entry_service_template'] if \
+            'entry_service_template' in self.content else None
 
     @property
     def service_descriptors(self):
