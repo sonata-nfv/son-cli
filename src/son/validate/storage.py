@@ -893,7 +893,7 @@ class Service(Descriptor):
                     elif len(s_cpr) == 2:
                         # get corresponding function
                         func = self.mapped_function(s_cpr[0])
-                        if not func or s_cpr[1] not in func.connection_points:
+                        if not func or (func and s_cpr[1] not in func.connection_points):
                             evtlog.log("Undefined connection point",
                                        "Connection point '{0}' of forwarding "
                                        "path '{1}' is not defined"
@@ -970,7 +970,9 @@ class Service(Descriptor):
                 node_pair = {'break': False, 'from': path[x], 'to': None}
             else:
                 node_pair = {'break': False, 'from': path[x], 'to': path[x+1]}
-                if path[x+1] not in self._graph.neighbors(path[x]):
+                
+                if path[x] not in self.graph.nodes() or \
+                        path[x+1] not in self._graph.neighbors(path[x]):
                     node_pair['break'] = True
             trace.append(node_pair)
         return trace
