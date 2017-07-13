@@ -398,6 +398,8 @@ class Descriptor(Node):
         Load connection points of the descriptor.
         It reads the section 'connection_points' of the descriptor contents.
         """
+        if 'connection_points' not in self.content:
+            return
         for cp in self.content['connection_points']:
             if not self.add_connection_point(cp['id']):
                 return
