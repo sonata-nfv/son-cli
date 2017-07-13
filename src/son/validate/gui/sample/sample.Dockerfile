@@ -16,7 +16,8 @@ COPY    . /usr/son-validate-gui/
 
 # build web gui
 WORKDIR /usr/son-validate-gui
-RUN     npm install \
+RUN     npm install request \
+        && npm install \
         && npm install -g http-server \
         && npm run build:prod
 
@@ -24,7 +25,7 @@ EXPOSE 8080
 
 WORKDIR /usr/son-validate-gui/dist
 
-COPY  sample.entrypoint.sh /sbin/entrypoint.sh
+COPY  sample/entrypoint.sh /sbin/entrypoint.sh
 RUN   chmod 755 /sbin/entrypoint.sh
 
 ENTRYPOINT ["/sbin/entrypoint.sh"]
