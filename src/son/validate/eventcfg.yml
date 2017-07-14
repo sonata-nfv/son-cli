@@ -34,6 +34,9 @@ evt_pd_itg_invalid_reference: error
 # PD [integrity] - bad MD5 checksum
 evt_pd_itg_invalid_md5: warning
 
+# PD [integrity] - missing entry service template
+evt_pd_itg_missing_entry_service: error
+
 
 ### SERVICE
 

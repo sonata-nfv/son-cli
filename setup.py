@@ -73,7 +73,6 @@ setup(
                 'son-profile=son.profile.profile:main',
                 'son-validate=son.validate.validate:main',
                 'son-validate-api=son.validate.api.api:main',
-                'son-validate-watchdog=son.validate.api.watchdog:main',
                 'son-access=son.access.access:main'
             ],
         },

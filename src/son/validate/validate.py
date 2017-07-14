@@ -277,6 +277,8 @@ class Validator(object):
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
         package = self._storage.create_package(pd_filename)
+        if not package.id:
+            return
 
         if self._syntax and not self._validate_package_syntax(package):
             return
@@ -584,6 +586,13 @@ class Validator(object):
         self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
 
         # finally, validate the package entry service file
+        if not package.entry_service_file:
+            evtlog.log("Entry service not found",
+                       "'entry_service_template' is not defined in package "
+                       "descriptor",
+                       package.id,
+                       'evt_pd_itg_missing_entry_service')
+            return
         entry_service_file = os.path.join(
             root_dir, strip_root(package.entry_service_file))
 
