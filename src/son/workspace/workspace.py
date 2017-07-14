@@ -99,7 +99,7 @@ class Workspace:
 
     @property
     def catalogues_dir(self):
-        return self.config['catalogues']
+        return self.config['catalogues_dir']
 
     @property
     def configuration_dir(self):
@@ -293,6 +293,7 @@ class Workspace:
 
     def get_service_platform(self, sp_id):
         if sp_id not in self.service_platforms.keys():
+            print("nah")
             return
         return self.service_platforms[sp_id]
 

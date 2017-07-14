@@ -38,7 +38,6 @@ import atexit
 import errno
 import yaml
 from son.validate import event
-from son.validate.event import EventLogger
 from contextlib import closing
 from son.package.md5 import generate_hash
 from son.schema.validator import SchemaValidator
@@ -278,6 +277,8 @@ class Validator(object):
 
         pd_filename = os.path.join(package_dir, 'META-INF', 'MANIFEST.MF')
         package = self._storage.create_package(pd_filename)
+        if not package.id:
+            return
 
         if self._syntax and not self._validate_package_syntax(package):
             return
@@ -585,6 +586,13 @@ class Validator(object):
         self.configure(dpath=os.path.join(root_dir, 'function_descriptors'))
 
         # finally, validate the package entry service file
+        if not package.entry_service_file:
+            evtlog.log("Entry service not found",
+                       "'entry_service_template' is not defined in package "
+                       "descriptor",
+                       package.id,
+                       'evt_pd_itg_missing_entry_service')
+            return
         entry_service_file = os.path.join(
             root_dir, strip_root(package.entry_service_file))
 
@@ -600,6 +608,7 @@ class Validator(object):
         :param service:
         :return:
         """
+
         log.info("Validating integrity of service '{0}'".format(service.id))
 
         # get referenced function descriptors (VNFDs)
@@ -611,18 +620,18 @@ class Validator(object):
             return
 
         # validate service function descriptors (VNFDs)
-        for fid, function in service.functions.items():
-            if not self.validate_function(function.filename):
+        for fid, f in service.functions.items():
+            if not self.validate_function(f.filename):
                 evtlog.log("Invalid function",
                            "Failed to validate function descriptor '{0}'"
-                           .format(function.filename),
+                           .format(f.filename),
                            service.id,
                            'evt_nsd_itg_function_invalid')
                 return
 
-        # load service interfaces
-        if not service.load_interfaces():
-            evtlog.log("Missing 'connection_points'",
+        # load service connection points
+        if not service.load_connection_points():
+            evtlog.log("Bad section 'connection_points'",
                        "Couldn't load the connection points of service id='{0}'"
                        .format(service.id),
                        service.id,
@@ -631,14 +640,14 @@ class Validator(object):
 
         # load service links
         if not service.load_virtual_links():
-            evtlog.log("Missing 'virtual_links'",
+            evtlog.log("Bad section 'virtual_links'",
                        "Couldn't load virtual links of service id='{0}'"
                        .format(service.id),
                        service.id,
                        'evt_nsd_itg_badsection_vlinks')
             return
 
-        undeclared = service.find_undeclared_interfaces()
+        undeclared = service.undeclared_connection_points()
         if undeclared:
             for cxpoint in undeclared:
                 evtlog.log("{0} Undeclared connection point(s)"
@@ -649,8 +658,8 @@ class Validator(object):
                            'evt_nsd_itg_undeclared_cpoint')
             return
 
-        # check for unused interfaces
-        unused_ifaces = service.find_unused_interfaces()
+        # check for unused connection points
+        unused_ifaces = service.unused_connection_points()
         if unused_ifaces:
             for cxpoint in unused_ifaces:
                 evtlog.log("{0} Unused connection point(s)"
@@ -660,27 +669,26 @@ class Validator(object):
                            service.id,
                            'evt_nsd_itg_unused_cpoint')
 
-        # verify integrity between vnf_ids and links
-        for lid, link in service.links.items():
-            for iface in link.interfaces:
-                if iface not in service.interfaces:
-                    iface_tokens = iface.split(':')
-                    if len(iface_tokens) != 2:
-                        evtlog.log("Undefined connection point",
-                                   "Connection point '{0}' in virtual link "
-                                   "'{1}' is not defined"
-                                   .format(iface, lid),
-                                   service.id,
-                                   'evt_nsd_itg_undefined_cpoint')
-                        return
-                    vnf_id = iface_tokens[0]
-                    function = service.mapped_function(vnf_id)
-                    if not function:
+        # verify integrity between vnf_ids and vlinks
+        for vl_id, vl in service.vlinks.items():
+            for cpr in vl.connection_point_refs:
+                s_cpr = cpr.split(':')
+                if len(s_cpr) == 1 and cpr not in service.connection_points:
+                    evtlog.log("Undefined connection point",
+                               "Connection point '{0}' in virtual link "
+                               "'{1}' is not defined"
+                               .format(cpr, vl_id),
+                               service.id,
+                               'evt_nsd_itg_undefined_cpoint')
+                    return
+                elif len(s_cpr) == 2:
+                    func = service.mapped_function(s_cpr[0])
+                    if not func or s_cpr[1] not in func.connection_points:
                         evtlog.log("Undefined connection point",
                                    "Function (VNF) of vnf_id='{0}' declared "
                                    "in connection point '{0}' in virtual link "
                                    "'{1}' is not defined"
-                                   .format(vnf_id, iface, lid),
+                                   .format(s_cpr[0], s_cpr[1], vl_id),
                                    service.id,
                                    'evt_nsd_itg_undefined_cpoint')
                         return
@@ -697,8 +705,8 @@ class Validator(object):
         log.info("Validating integrity of function descriptor '{0}'"
                  .format(function.id))
 
-        # load function interfaces
-        if not function.load_interfaces():
+        # load function connection points
+        if not function.load_connection_points():
             evtlog.log("Missing 'connection_points'",
                        "Couldn't load the connection points of function id='{0}'"
                        .format(function.id),
@@ -715,9 +723,9 @@ class Validator(object):
                        'evt_vnfd_itg_badsection_vdus')
             return
 
-        # load interfaces of units
-        if not function.load_unit_interfaces():
-            evtlog.log("Missing 'connection_points'",
+        # load connection points of units
+        if not function.load_unit_connection_points():
+            evtlog.log("Bad section 'connection_points'",
                        "Couldn't load VDU connection points of "
                        "function id='{0}'"
                        .format(function.id),
@@ -727,15 +735,15 @@ class Validator(object):
 
         # load function links
         if not function.load_virtual_links():
-            evtlog.log("Missing 'virtual_links'",
+            evtlog.log("Bad section 'virtual_links'",
                        "Couldn't load the links of function id='{0}'"
                        .format(function.id),
                        function.id,
                        'evt_vnfd_itg_badsection_vlinks')
             return
 
-        # check for undeclared interfaces
-        undeclared = function.find_undeclared_interfaces()
+        # check for undeclared connection points
+        undeclared = function.undeclared_connection_points()
         if undeclared:
             for cxpoint in undeclared:
                 evtlog.log("{0} Undeclared connection point(s)"
@@ -746,8 +754,8 @@ class Validator(object):
                            'evt_vnfd_itg_undeclared_cpoint')
             return
 
-        # check for unused interfaces
-        unused_ifaces = function.find_unused_interfaces()
+        # check for unused connection points
+        unused_ifaces = function.unused_connection_points()
         if unused_ifaces:
             for cxpoint in unused_ifaces:
                 evtlog.log("{0} Unused connection point(s)"
@@ -757,20 +765,31 @@ class Validator(object):
                            function.id,
                            'evt_vnfd_itg_unused_cpoint')
 
-        # verify integrity between unit interfaces and units
-        for lid, link in function.links.items():
-            for iface in link.interfaces:
-                if iface not in function.interfaces:
-                    iface_tokens = iface.split(':')
-                    if len(iface_tokens) > 1:
-                        if iface_tokens[0] not in function.units.keys():
-                            evtlog.log("Undefined connection point(s)",
-                                       "Invalid interface id='{0}' of link "
-                                       "id='{1}': Unit id='{2}' is not defined"
-                                       .format(iface, lid, iface_tokens[0]),
-                                       function.id,
-                                       'evt_vnfd_itg_undefined_cpoint')
-                            return
+        # verify integrity between unit connection points and units
+        for vl_id, vl in function.vlinks.items():
+            for cpr in vl.connection_point_refs:
+                s_cpr = cpr.split(':')
+                if len(s_cpr) == 1 and cpr not in function.connection_points:
+                    evtlog.log("Undefined connection point",
+                               "Connection point '{0}' in virtual link "
+                               "'{1}' is not defined"
+                               .format(cpr, vl_id),
+                               function.id,
+                               'evt_nsd_itg_undefined_cpoint')
+                    return
+                elif len(s_cpr) == 2:
+                    unit = function.units[s_cpr[0]]
+                    if not unit or s_cpr[1] not in unit.connection_points:
+
+                        evtlog.log("Undefined connection point(s)",
+                                   "Invalid connection point id='{0}' "
+                                   "of virtual link id='{1}': Unit id='{2}' "
+                                   "is not defined"
+                                   .format(s_cpr[1], vl_id, s_cpr[0]),
+                                   function.id,
+                                   'evt_vnfd_itg_undefined_cpoint')
+                        return
+
         return True
 
     def _validate_service_topology(self, service):
@@ -780,7 +799,7 @@ class Validator(object):
         """
         log.info("Validating topology of service '{0}'".format(service.id))
 
-        # build service topology graph with VNF interfaces
+        # build service topology graph with VNF connection points
         service.graph = service.build_topology_graph(level=1, bridges=False)
         if not service.graph:
             evtlog.log("Invalid topology",
@@ -857,14 +876,14 @@ class Validator(object):
                           .format(fw_graph['fg_id'], fw_path['fp_id'],
                                   fw_path['trace']))
 
-            # cycles must be analysed at the vnf level, not interface level.
+            # cycles must be analysed at the vnf level, not cp level.
             # here, a directed graph between vnfs must be created,
-            # containing the interfaces of each node and edges between nodes.
-            # Each edge must contain the pair of interfaces that links the
+            # containing the cps of each node and edges between nodes.
+            # Each edge must contain the pair of cps that links the
             # two nodes.
             # Having this structure is possible to find cycles between vnfs
             # and more importantly, identify which are the links
-            #  (interface pair) that integrate a particular cycle.
+            #  (cp pair) that integrate a particular cycle.
 
             fpg = nx.DiGraph()
             for fw_path in fw_graph['fw_paths']:
@@ -872,12 +891,13 @@ class Validator(object):
                 prev_iface = None
                 pair_complete = False
 
-                # convert 'interface' path into vnf path
-                for interface in fw_path['path']:
-                    # find vnf_id of interface
+                # convert 'connection point' path into vnf path
+                for cp in fw_path['path']:
+                    # find vnf_id of connection point
                     func = None
-                    if interface in service.all_function_interfaces:
-                        func = service.function_of_interface(interface)
+                    s_cp = cp.split(':')
+                    if len(s_cp) == 2:
+                        func = service.mapped_function(s_cp[0])
                         if not func:
                             log.error(
                                 "Internal error: couldn't find corresponding"
@@ -887,8 +907,7 @@ class Validator(object):
                         node = service.vnf_id(func)
 
                     else:
-                        node = interface
-
+                        node = cp
                         fpg.add_node(node)
 
                     if pair_complete:
@@ -913,7 +932,7 @@ class Validator(object):
 
                         fpg.add_edge(prev_node, node,
                                      attr_dict={'from': prev_iface,
-                                                'to': interface})
+                                                'to': cp})
                         pair_complete = False
 
                     else:
@@ -924,7 +943,7 @@ class Validator(object):
                                        "connection point: '{2}'"
                                        .format(fw_graph['fg_id'],
                                                fw_path['fp_id'],
-                                               interface),
+                                               cp),
                                        source_id,
                                        'evt_nsd_top_fwpath_disrupted',
                                        event_id=func.id)
@@ -932,7 +951,7 @@ class Validator(object):
                         pair_complete = True
 
                     prev_node = node
-                    prev_iface = interface
+                    prev_iface = cp
 
                 # remove 'path' from fw_path (not needed anymore)
                 fw_path.pop('path')
@@ -946,7 +965,7 @@ class Validator(object):
                 if len(cycle) > 2:
                     cycles.append(cycle)
 
-            # build cycles representative interface structure
+            # build cycles representative connection point structure
             cycles_list = []
             for cycle in cycles:
                 cycle_dict = {'cycle_id': str(uuid.uuid4()), 'cycle_path': []}
@@ -1075,6 +1094,7 @@ class Validator(object):
 
             vnf_id = function['vnf_id']
             new_func = self._storage.create_function(path_vnfs[fid])
+
             service.associate_function(new_func, vnf_id)
 
         return True
@@ -1110,8 +1130,6 @@ class Validator(object):
 
     @staticmethod
     def _find_graph_cycles(graph, node, prev_node=None, backtrace=None):
-
-        print(". {} <-- {}".format(node, backtrace))
 
         if not backtrace:
             backtrace = []

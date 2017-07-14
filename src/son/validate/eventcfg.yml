@@ -34,6 +34,9 @@ evt_pd_itg_invalid_reference: error
 # PD [integrity] - bad MD5 checksum
 evt_pd_itg_invalid_md5: warning
 
+# PD [integrity] - missing entry service template
+evt_pd_itg_missing_entry_service: error
+
 
 ### SERVICE
 
@@ -135,6 +138,18 @@ evt_vnfd_top_topgraph_failed: error
 
 # Duplicate declaration of connection point
 evt_duplicate_cpoint: error
+
+# Invalid format of connection point
+evt_invalid_cpoint: error
+
+# Invalid virtual link (bad ID or number of cp references)
+evt_invalid_vlink: error
+
+# Duplicate virtual link
+evt_duplicate_vlink: error
+
+# Invalid connection point reference format
+evt_invalid_cpoint_ref: error
 
 # Not a SONATA descriptor
 evt_invalid_descriptor: error

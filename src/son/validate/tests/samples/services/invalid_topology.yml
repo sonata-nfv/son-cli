@@ -52,13 +52,13 @@ service_specific_managers:
 ## outside world.
 ##
 connection_points:
-  - id: "ns:mgmt"
+  - id: "mgmt"
     interface: "ipv4"
     type: "management"
-  - id: "ns:input"
+  - id: "input"
     interface: "ipv4"
     type: "external"
-  - id: "ns:output"
+  - id: "output"
     interface: "ipv4"
     type: "external"
 
@@ -73,11 +73,11 @@ virtual_links:
       - "vnf_iperf:mgmt"
       - "vnf_firewall:mgmt"
       - "vnf_tcpdump:mgmt"
-      - "ns:mgmt"
+      - "mgmt"
   - id: "input-2-iperf"
     connectivity_type: "E-Line"
     connection_points_reference:
-      - "ns:input"
+      - "input"
       - "vnf_iperf:input"
   - id: "iperf-2-firewall"
     connectivity_type: "E-Line"
@@ -100,6 +100,6 @@ virtual_links:
     connectivity_type: "E-Line"
     connection_points_reference:
       - "vnf_tcpdump:output"
-      - "ns:output"
+      - "output"
 
 # modified here - removed forwarding graphs
