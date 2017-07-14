@@ -185,11 +185,23 @@ class Node:
         """
         if cp in self.connection_points:
             evtlog.log("Duplicate connection point",
-                       "The cp id='{0}' is already stored in node "
+                       "The CP id='{0}' is already stored in node "
                        "id='{1}'".format(cp, self.id),
                        self.id,
                        'evt_duplicate_cpoint')
             return
+
+        # check if connection point has the correct format
+        s_cp = cp.split(':')
+        if len(s_cp) != 1:
+            evtlog.log("Invalid_connection_point",
+                       "The CP id='{0}' is invalid. The separator ':' is "
+                       "reserved to reference connection points"
+                       .format(cp),
+                       self.id,
+                       'evt_invalid_cpoint')
+            return
+
         log.debug("Node id='{0}': adding connection point '{1}'"
                   .format(self.id, cp))
 
@@ -409,21 +421,79 @@ class Descriptor(Node):
         """
         Add vbridge to the descriptor.
         """
-        assert vb_id
-        assert len(cp_refs) > 0
-        assert vb_id not in self.vbridges.keys()
+        # check number of connection point references
+        if len(cp_refs) < 1:
+            evtlog.log("Bad number of connection points",
+                       "The vlink id='{0}' must have at lease 1 connection "
+                       "point reference"
+                       .format(vb_id),
+                       self.id,
+                       'evt_invalid_vlink')
+            return
+
+        # check for duplicate virtual links
+        if vb_id in self.vlinks.keys() or vb_id in self.vbridges.keys():
+            evtlog.log("Duplicate virtual link",
+                       "The vlink id='{0}' is already defined"
+                       .format(vb_id),
+                       self.id,
+                       'evt_duplicate_vlink')
+            return
+
+        # check connection point reference format
+        for cp in cp_refs:
+            s_cp = cp.split(':')
+            if len(s_cp) > 2:
+                evtlog.log("Invalid connection point reference",
+                           "The connection point reference '{0}' of vlink"
+                           " id='{1}' has an incorrect format: found multiple "
+                           "separators ':'"
+                           .format(cp, vb_id),
+                           self.id,
+                           'evt_invalid_cpoint_ref')
+                return
 
         self._vbridges[vb_id] = VBridge(vb_id, cp_refs)
+        return True
 
     def add_vlink(self, vl_id, cp_refs):
         """
         Add vlink to the descriptor.
         """
-        assert vl_id
-        assert len(cp_refs) == 2
-        assert vl_id not in self.vlinks.keys()
+        # check number of connection point references
+        if len(cp_refs) != 2:
+            evtlog.log("Bad number of connection points",
+                       "The vlink id='{0}' must have exactly 2 connection "
+                       "point references"
+                       .format(vl_id),
+                       self.id,
+                       'evt_invalid_vlink')
+            return
+
+        # check for duplicate virtual links
+        if vl_id in self.vlinks.keys() or vl_id in self.vbridges.keys():
+            evtlog.log("Duplicate virtual link",
+                       "The vlink id='{0}' is already defined"
+                       .format(vl_id),
+                       self.id,
+                       'evt_duplicate_vlink')
+            return
+
+        # check connection point reference format
+        for cp in cp_refs:
+            s_cp = cp.split(':')
+            if len(s_cp) > 2:
+                evtlog.log("Invalid connection point reference",
+                           "The connection point reference '{0}' of vlink"
+                           " id='{1}' has an incorrect format: found multiple "
+                           "separators ':'"
+                           .format(cp, vl_id),
+                           self.id,
+                           'evt_invalid_cpoint_ref')
+                return
 
         self._vlinks[vl_id] = VLink(vl_id, cp_refs[0], cp_refs[1])
+        return True
 
     def load_virtual_links(self):
         """
@@ -435,14 +505,24 @@ class Descriptor(Node):
             return
 
         for vl in self.content['virtual_links']:
+            if not vl['id']:
+                evtlog.log("Missing virtual link ID",
+                           "A virtual link is missing its ID",
+                           self.id,
+                           'evt_invalid_vlink')
+                return
+
             vl_type = vl['connectivity_type'].lower()
             if vl_type == 'e-line':
-                self.add_vlink(vl['id'],
-                               vl['connection_points_reference'])
+                if not self.add_vlink(vl['id'],
+                                      vl['connection_points_reference']):
+                    return
 
-            elif vl_type == 'e-lan':
-                self.add_vbridge(vl['id'],
-                                 vl['connection_points_reference'])
+            if vl_type == 'e-lan':
+                if not self.add_vbridge(vl['id'],
+                                        vl['connection_points_reference']):
+                    return
+
         return True
 
     def unused_connection_points(self):

@@ -631,7 +631,7 @@ class Validator(object):
 
         # load service connection points
         if not service.load_connection_points():
-            evtlog.log("Missing 'connection_points'",
+            evtlog.log("Bad section 'connection_points'",
                        "Couldn't load the connection points of service id='{0}'"
                        .format(service.id),
                        service.id,
@@ -640,7 +640,7 @@ class Validator(object):
 
         # load service links
         if not service.load_virtual_links():
-            evtlog.log("Missing 'virtual_links'",
+            evtlog.log("Bad section 'virtual_links'",
                        "Couldn't load virtual links of service id='{0}'"
                        .format(service.id),
                        service.id,
@@ -725,7 +725,7 @@ class Validator(object):
 
         # load connection points of units
         if not function.load_unit_connection_points():
-            evtlog.log("Missing 'connection_points'",
+            evtlog.log("Bad section 'connection_points'",
                        "Couldn't load VDU connection points of "
                        "function id='{0}'"
                        .format(function.id),
@@ -735,7 +735,7 @@ class Validator(object):
 
         # load function links
         if not function.load_virtual_links():
-            evtlog.log("Missing 'virtual_links'",
+            evtlog.log("Bad section 'virtual_links'",
                        "Couldn't load the links of function id='{0}'"
                        .format(function.id),
                        function.id,
