@@ -293,7 +293,6 @@ class Workspace:
 
     def get_service_platform(self, sp_id):
         if sp_id not in self.service_platforms.keys():
-            print("nah")
             return
         return self.service_platforms[sp_id]
 
