@@ -6,11 +6,11 @@ SONATA SDK command line interface tools
 
 This set of command line tools are meant to aid the SONATA service developers on their tasks. The tools are briefly described as follows.
 - `son-workspace` creates, configures and manages development workspaces and projects.
-- `son-publish` allows the publication of projects, services and functions to private catalogues (in process to be integrated to `son-access`).
 - `son-package` packages a project, containing services and functions, to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
-- `son-push` is used to upload the service package to the Service Platform Gatekeeper (in process to be integrated to `son-access`).
+- `son-validate` can be used to validate the syntax, integrity and topology of SONATA service packages, projects, services and functions. Son-validate can be used through the CLI or as a micro-service running inside a docker container.
+- `son-access` enables authenticating users to the Service Platform and integrates features to push and pull resources from the Service Platform Catalogues. It is used to upload the service package to the SDK emulator or the Service Platform Gatekeeper, so the service can be deployed in the respective environment.
 - `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
-- `son-access` enables authenticating users to the Service Platform and integrates features to push and pull resources from the Service Platform Catalogues.
+- `son-profile` supports network service developers to automatically profile their network services and network functions.
     
 
 ## Building
@@ -59,6 +59,15 @@ The son-cli tools have the following dependencies:
 * [scipy](https://pypi.python.org/pypi/scipy) >= 0.18.1 (BSD)
 * [matplotlib](https://matplotlib.org/) >= 2.0.1 (PSF)
 
+All dependencies can be installed via a provided Ansible script:
+```
+sudo apt-get install ansible git aptitude
+sudo vim /etc/ansible/hosts
+Add: localhost ansible_connection=local
+
+cd son-cli/ansible
+sudo ansible-playbook install.yml
+```
 
 ## Contributing
 
@@ -97,7 +106,13 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
     sudo apt-get install sonata-cli
     ```
 
-4. Test if its working by invoking:
+The SONATA CLI toolset can also be installed via the Python setup script:
+```
+cd son-cli
+python3 setup.py install
+```
+
+Test if its working by invoking:
     ```sh
     $ son-workspace -h
     $ son-package -h
