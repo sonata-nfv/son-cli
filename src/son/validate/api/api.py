@@ -376,7 +376,7 @@ def _validate_object_from_request(object_type):
                             pkg_pubkey=pkg_pubkey)
 
 
-def _config_events():
+def _events_config():
 
     if not request.form:
         return 'No events to configure', 400
@@ -405,6 +405,17 @@ def _config_events():
 
     EventLogger.dump_eventcfg(eventdict)
     return 'OK', 200
+
+
+def _events_list():
+
+    if os.path.isfile('.eventcfg.yml'):
+        eventdict = EventLogger.load_eventcfg('.eventcfg.yml')
+    else:
+        eventdict = EventLogger.load_eventcfg()
+
+    return json.dumps(eventdict, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
 
 
 def str2bool(v):
@@ -509,11 +520,13 @@ def validate_service():
 def validate_function():
     return _validate_object_from_request('function')
 
-@app.route('/config/events', methods=['POST'])
-def config_events():
-    return _config_events()
+@app.route('/events/config', methods=['POST'])
+def events_config():
+    return _events_config()
 
-
+@app.route('/events/list', methods=['GET'])
+def events_list():
+    return _events_list()
 
 @app.route('/validations', methods=['GET'])
 def validations():
