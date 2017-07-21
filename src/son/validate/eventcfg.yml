@@ -118,6 +118,9 @@ evt_vnfd_itg_badsection_vdus: error
 # VNFD [integrity] - bad section 'connection_points' in vdu
 evt_vnfd_itg_vdu_badsection_cpoints: error
 
+# VNFD [integrity] - VDU image not found/accessible
+evt_vnfd_itg_vdu_image_not_found: warning
+
 # VNFD [integrity] - bad section 'virtual_links'
 evt_vnfd_itg_badsection_vlinks: error
 
