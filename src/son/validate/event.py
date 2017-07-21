@@ -3,8 +3,8 @@ import logging
 import os
 import pkg_resources
 import uuid
-from copy import deepcopy
 
+log = logging.getLogger(__name__)
 
 class EventLogger(object):
 
@@ -14,10 +14,10 @@ class EventLogger(object):
         self._events = dict()
 
         # load events config
-        configpath = pkg_resources.resource_filename(
-            __name__, os.path.join('eventcfg.yml'))
-        with open(configpath, 'r') as _f:
-            self._eventdict = yaml.load(_f)
+        if os.path.isfile('.eventcfg.yml'):
+            self._eventdict = self.load_eventcfg(filename='.eventcfg.yml')
+        else:
+            self._eventdict = self.load_eventcfg()
 
     @property
     def errors(self):
@@ -73,6 +73,44 @@ class EventLogger(object):
         msg_dict['detail_event_id'] = detail_event_id \
             if detail_event_id else event['event_id']
         event['detail'].append(msg_dict)
+
+    @staticmethod
+    def load_eventcfg(filename='eventcfg.yml'):
+
+        configpath = pkg_resources.resource_filename(
+            __name__, os.path.join('eventcfg.yml'))
+        with open(configpath, 'r') as _f:
+            eventdict = yaml.load(_f)
+
+        # if existent, load custom eventcfg.yml
+        configpath = filename
+        if os.path.isfile(configpath):
+            with open(configpath, 'r') as _f:
+                custom_eventdict = yaml.load(_f)
+
+            # check if all events of custom config are valid
+            for cevent, cvalue in custom_eventdict.items():
+                cvalue = str(cvalue).lower()
+                if cevent not in eventdict.keys() or not \
+                        (cvalue == 'error' or cvalue == 'warning' or
+                         cvalue == 'none'):
+                    log.warning("Failed parsing custom event config file "
+                                "'{0}': '{1}: {2}' is not a valid event or "
+                                "has an invalid value. Assuming defaults."
+                                .format(configpath, cevent, cvalue))
+                    return eventdict
+
+            # overlap default values
+            for cevent, cvalue in custom_eventdict.items():
+                eventdict[cevent] = cvalue
+
+        return eventdict
+
+    @staticmethod
+    def dump_eventcfg(eventdict):
+        filename = ".eventcfg.yml"
+        with open(filename, 'w') as _f:
+            yaml.dump(eventdict, _f, default_flow_style=False)
 
     @staticmethod
     def get_key(source_id, event_code, level):

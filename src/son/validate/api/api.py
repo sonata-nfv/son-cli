@@ -18,6 +18,7 @@ from son.validate.validate import Validator, print_result
 from son.workspace.workspace import Workspace
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from son.validate.event import EventLogger
 
 log = logging.getLogger(__name__)
 
@@ -375,6 +376,37 @@ def _validate_object_from_request(object_type):
                             pkg_pubkey=pkg_pubkey)
 
 
+def _config_events():
+
+    if not request.form:
+        return 'No events to configure', 400
+
+    if os.path.isfile('.eventcfg.yml'):
+        eventdict = EventLogger.load_eventcfg('.eventcfg.yml')
+    else:
+        eventdict = EventLogger.load_eventcfg()
+
+    for event in request.form.keys():
+        if event not in eventdict:
+            req_errors.append("Invalid event '{0}'".format(event))
+            continue
+
+        event_value = str(request.form[event]).lower()
+        if not (event_value == 'error' or event_value == 'warning' or
+                event_value == 'none'):
+            req_errors.append("Invalid value for event '{0}': '{1}'"
+                              .format(event, event_value))
+            continue
+
+        eventdict[event] = event_value
+
+    if req_errors:
+        return render_errors(), 400
+
+    EventLogger.dump_eventcfg(eventdict)
+    return 'OK', 200
+
+
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -477,6 +509,11 @@ def validate_service():
 def validate_function():
     return _validate_object_from_request('function')
 
+@app.route('/config/events', methods=['POST'])
+def config_events():
+    return _config_events()
+
+
 
 @app.route('/validations', methods=['GET'])
 def validations():
@@ -522,6 +559,7 @@ def report_fwgraph(resource_id):
                     'net_fwgraph' not in get_validation(vid).keys():
         return '', 404
     return get_validation(vid)['net_fwgraph']
+
 
 
 def gen_watches():
