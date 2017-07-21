@@ -40,7 +40,7 @@ function_specific_managers:
 ##
 virtual_deployment_units:
   - id: "vdu01"
-    vm_image: "http://registry.sonata-nfv.eu/html/files/VM_images/sonata-VM-2ports.qcow"
+    vm_image: "image"
     vm_image_format: "qcow2"
     resource_requirements:
       cpu:

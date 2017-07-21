@@ -21,7 +21,7 @@ description: >
 ##
 virtual_deployment_units:
   - id: "vdu01"
-    vm_image: "file:///docker_files/tcpdump/Dockerfile"
+    vm_image: "image"
     vm_image_format: "docker"
     resource_requirements:
       cpu:
