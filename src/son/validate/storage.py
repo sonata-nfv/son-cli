@@ -27,6 +27,8 @@
 import os
 import logging
 import networkx as nx
+import validators
+import requests
 from collections import OrderedDict
 from son.validate.util import descriptor_id, read_descriptor_file
 from son.validate import event
@@ -1126,6 +1128,23 @@ class Function(Descriptor):
             unit = Unit(vdu['id'])
             self.associate_unit(unit)
 
+            # Check vm image URLs
+            # only perform a check if vm_image is a URL
+            vdu_image_path = vdu['vm_image']
+            if validators.url(vdu_image_path):  # Check if is URL/URI.
+                try:
+                    # Check if the image URL is accessible
+                    # within a short time interval
+                    requests.head(vdu_image_path, timeout=1)
+
+                except (requests.Timeout, requests.ConnectionError):
+
+                    evtlog.log("VDU image not found",
+                               "Failed to verify the existence of VDU image at"
+                               " the address '{0}'. VDU id='{1}'"
+                               .format(vdu_image_path, vdu['id']),
+                               self.id,
+                               'evt_vnfd_itg_vdu_image_not_found')
         return True
 
     def load_unit_connection_points(self):
