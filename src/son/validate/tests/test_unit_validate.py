@@ -33,6 +33,11 @@ from son.validate.event import EventLogger
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from Crypto.Hash import SHA256
+import subprocess
+import time
+import signal
+import requests
+from requests_toolbelt import MultipartEncoder
 
 SAMPLES_DIR = os.path.join('src', 'son', 'validate', 'tests', 'samples')
 
@@ -331,7 +336,7 @@ class UnitValidateTests(unittest.TestCase):
         # write eventdict
         EventLogger.dump_eventcfg(eventdict)
 
-        # perform an MD5 validation test
+        # perform validation test
         pkg_path = os.path.join(SAMPLES_DIR, 'packages',
                                 'sonata-demo-invalid-md5.son')
         validator = Validator(workspace=self._workspace)
@@ -349,7 +354,7 @@ class UnitValidateTests(unittest.TestCase):
         # write eventdict
         EventLogger.dump_eventcfg(eventdict)
 
-        # perform an MD5 validation test
+        # perform validation test
         pkg_path = os.path.join(SAMPLES_DIR, 'packages',
                                 'sonata-demo-invalid-md5.son')
         validator = Validator(workspace=self._workspace)
@@ -363,3 +368,81 @@ class UnitValidateTests(unittest.TestCase):
         if os.path.isfile('eventcfg.yml.original'):
             os.remove('eventcfg.yml')
             shutil.move('eventcfg.yml.original', 'eventcfg.yml')
+
+    def test_event_config_api(self):
+        """
+        Tests the dynamic event configuration to be used with the API
+        """
+        # start validate service and wait for it to start
+        proc = subprocess.Popen(["bin/son-validate-api",
+                                 "--mode", "stateless", "--debug"])
+        print(proc.pid)
+
+        time.sleep(3)
+
+        # test '/events/list' endpoint
+        url = "http://127.0.0.1:5050/events/list"
+        r = requests.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+
+        # post an event configuration
+        # - report unmatched file hashes as an error
+        # - report vdu image not found as error
+        url = "http://127.0.0.1:5050/events/config"
+        data = {'evt_pd_itg_invalid_md5': 'error',
+                'evt_vnfd_itg_vdu_image_not_found': 'error'}
+        r = requests.post(url, data=data)
+        self.assertEqual(r.status_code, 200)
+
+        # perform validation test
+        url = "http://127.0.0.1:5050/validate/package"
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        file = open(pkg_path, 'rb')
+        data = {'source': "embedded",
+                'syntax': 'true',
+                'integrity': 'true',
+                'topology': 'true',
+                'file': (file.name, file, 'application/octet-stream')
+                }
+        multi = MultipartEncoder(data)
+        headers = {'Content-Type': multi.content_type}
+        r = requests.post(url, headers=headers, data=multi)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+        result = r.json()
+        self.assertEqual(result['error_count'], 2)
+        self.assertEqual(result['warning_count'], 0)
+
+        # post an event configuration
+        # - report unmatched file hashes as an warning
+        # - do not report vdu image not found
+        url = "http://127.0.0.1:5050/events/config"
+        data = {'evt_pd_itg_invalid_md5': 'warning',
+                'evt_vnfd_itg_vdu_image_not_found': 'none'}
+        r = requests.post(url, data=data)
+        self.assertEqual(r.status_code, 200)
+
+        # perform validation test
+        url = "http://127.0.0.1:5050/validate/package"
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        file = open(pkg_path, 'rb')
+        data = {'source': "embedded",
+                'syntax': 'true',
+                'integrity': 'true',
+                'topology': 'true',
+                'file': (file.name, file, 'application/octet-stream')
+                }
+        multi = MultipartEncoder(data)
+        headers = {'Content-Type': multi.content_type}
+        r = requests.post(url, headers=headers, data=multi)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+        result = r.json()
+        self.assertEqual(result['error_count'], 0)
+        self.assertEqual(result['warning_count'], 1)
+
+        # stop validate service
+        proc.send_signal(signal.SIGINT)
