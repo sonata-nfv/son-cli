@@ -26,8 +26,10 @@
 
 import unittest
 import os
+import shutil
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
+from son.validate.event import EventLogger
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from Crypto.Hash import SHA256
@@ -308,3 +310,36 @@ class UnitValidateTests(unittest.TestCase):
         validator.configure(integrity=True)
         validator.validate_function(functions_path)
         self.assertGreater(validator.error_count, 0)
+
+
+    def test_event_config_cli(self):
+        """
+        Tests the custom event configuration meant to be used with the CLI  
+        """
+
+        # backup current user eventcfg (if exists), just in case
+        if os.path.isfile('eventcfg.yml'):
+            shutil.move('eventcfg.yml', 'eventcfg.yml.original')
+
+        # load eventdict
+        eventdict = EventLogger.load_eventcfg()
+
+        # report unmatched file hashes as error
+        eventdict['evt_pd_itg_invalid_md5'] = 'error'
+
+        # write eventdict
+        EventLogger.dump_eventcfg(eventdict)
+
+
+        # perform an MD5 validation test
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        self.assertEqual(validator.error_count, 0)
+
+        validator = Validator()
+        validator.configure(syntax=True, integrity=True, topology=True)
+
+
