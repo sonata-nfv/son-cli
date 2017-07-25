@@ -142,7 +142,7 @@ class ProfileManager(object):
 
             # start the experiment series
             profiler = Active_Emu_Profiler(remote_hosts)
-            profiler.do_experiment_series(gen_conf_list, self.ped)
+            profiler.do_experiment_series(gen_conf_list)
 
 
     @staticmethod

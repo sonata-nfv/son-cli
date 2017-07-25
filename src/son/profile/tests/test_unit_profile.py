@@ -304,7 +304,7 @@ class UnitSonataGeneratorTests(unittest.TestCase):
         # test if *.son files are generated
         for k, v in res.items():
             self.assertTrue(os.path.exists(v.get("sonfile")), msg="No generated package found.")
-            self.assertIn("time_limit", v)
+            self.assertIn("experiment_configuration", v)
 
 
 class UnitHelperTests(unittest.TestCase):

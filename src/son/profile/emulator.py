@@ -93,12 +93,12 @@ class Emulator:
      All experiments are started in a separate thread
      The order in which the experiments are run is not fixed!
      :experiments: a dictionary mapping from run_id to a dictionary containing information about the experiment
-     :ped: dict with contents of PED file for this experiment
     """
-    def do_experiment_series(self, experiments, ped):
+    def do_experiment_series(self, experiments):
         # start the experiments in separate threads
-        LOG.info("%r experiments will be run."%len(experiments.keys()))
-        LOG.debug("Base PED file content:\n%r" % ped)
+        LOG.info("%r experiments will be run." % len(experiments.keys()))
+        for ex in experiments.items():
+            LOG.debug("Experiment information:\n%r" % str(ex))
         for i in experiments.keys():
             t = threading.Thread(target=self.do_experiment, kwargs={"run_id":i, "exp_dict":experiments[i]})
             t.start()
