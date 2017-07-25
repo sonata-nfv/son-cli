@@ -45,6 +45,8 @@ class Experiment(object):
         self.pre_configuration = dict()
         self.configuration_space_list = list()
         self.overload_vnf_list = list()
+        # store original experiment definition for late use
+        self.original_definition = definition.copy()
 
 
     def populate(self):
