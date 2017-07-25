@@ -311,13 +311,12 @@ class UnitValidateTests(unittest.TestCase):
         validator.validate_function(functions_path)
         self.assertGreater(validator.error_count, 0)
 
-
     def test_event_config_cli(self):
         """
         Tests the custom event configuration meant to be used with the CLI  
         """
 
-        # backup current user eventcfg (if exists), just in case
+        # backup current user eventcfg (if exists)
         if os.path.isfile('eventcfg.yml'):
             shutil.move('eventcfg.yml', 'eventcfg.yml.original')
 
@@ -326,10 +325,11 @@ class UnitValidateTests(unittest.TestCase):
 
         # report unmatched file hashes as error
         eventdict['evt_pd_itg_invalid_md5'] = 'error'
+        # report vdu image not found as error
+        eventdict['evt_vnfd_itg_vdu_image_not_found'] = 'error'
 
         # write eventdict
         EventLogger.dump_eventcfg(eventdict)
-
 
         # perform an MD5 validation test
         pkg_path = os.path.join(SAMPLES_DIR, 'packages',
@@ -337,9 +337,29 @@ class UnitValidateTests(unittest.TestCase):
         validator = Validator(workspace=self._workspace)
         validator.validate_package(pkg_path)
 
+        # should return 1 error
+        self.assertEqual(validator.error_count, 2)
+        self.assertEqual(validator.warning_count, 0)
+
+        # report unmatched file hashes as warning
+        eventdict['evt_pd_itg_invalid_md5'] = 'warning'
+        # do not report vdu image not found
+        eventdict['evt_vnfd_itg_vdu_image_not_found'] = 'none'
+
+        # write eventdict
+        EventLogger.dump_eventcfg(eventdict)
+
+        # perform an MD5 validation test
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        # should return 1 warning
         self.assertEqual(validator.error_count, 0)
+        self.assertEqual(validator.warning_count, 1)
 
-        validator = Validator()
-        validator.configure(syntax=True, integrity=True, topology=True)
-
-
+        # restore user eventcfg
+        if os.path.isfile('eventcfg.yml.original'):
+            os.remove('eventcfg.yml')
+            shutil.move('eventcfg.yml.original', 'eventcfg.yml')

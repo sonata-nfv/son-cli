@@ -75,7 +75,6 @@ class EventLogger(object):
 
     @staticmethod
     def load_eventcfg():
-
         filename = 'eventcfg.yml'
         configpath = pkg_resources.resource_filename(
             __name__, os.path.join('eventcfg.yml'))
