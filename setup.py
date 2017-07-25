@@ -63,7 +63,8 @@ setup(
                           'termcolor', 'tabulate', 'networkx', 'PyJWT>=1.4.2',
                           'Flask', 'docker==2.0.2', 'scipy', 'numpy',
                           'watchdog', 'Flask-Cors', 'flask_cache', 'redis',
-                          'pycrypto', 'matplotlib', 'prometheus_client'],
+                          'pycrypto', 'matplotlib', 'prometheus_client',
+                          'requests-toolbelt==0.8.0'],
         zip_safe=False,
         entry_points={
             'console_scripts': [

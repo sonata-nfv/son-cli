@@ -323,7 +323,7 @@ class UnitValidateTests(unittest.TestCase):
 
         # backup current user eventcfg (if exists)
         if os.path.isfile('eventcfg.yml'):
-            shutil.move('eventcfg.yml', 'eventcfg.yml.original')
+            shutil.move('eventcfg.yml', '.eventcfg.yml.original')
 
         # load eventdict
         eventdict = EventLogger.load_eventcfg()
@@ -364,15 +364,21 @@ class UnitValidateTests(unittest.TestCase):
         self.assertEqual(validator.error_count, 0)
         self.assertEqual(validator.warning_count, 1)
 
+        # delete temporary eventcfg
+        os.remove('eventcfg.yml')
+
         # restore user eventcfg
-        if os.path.isfile('eventcfg.yml.original'):
-            os.remove('eventcfg.yml')
-            shutil.move('eventcfg.yml.original', 'eventcfg.yml')
+        if os.path.isfile('.eventcfg.yml.original'):
+            shutil.move('.eventcfg.yml.original', 'eventcfg.yml')
 
     def test_event_config_api(self):
         """
         Tests the dynamic event configuration to be used with the API
         """
+        # backup current user eventcfg (if exists)
+        if os.path.isfile('eventcfg.yml'):
+            shutil.move('eventcfg.yml', '.eventcfg.yml.original')
+
         # start validate service and wait for it to start
         proc = subprocess.Popen(["bin/son-validate-api",
                                  "--mode", "stateless", "--debug"])
@@ -446,3 +452,10 @@ class UnitValidateTests(unittest.TestCase):
 
         # stop validate service
         proc.send_signal(signal.SIGINT)
+
+        # delete temporary eventcfg
+        os.remove('eventcfg.yml')
+
+        # restore user eventcfg
+        if os.path.isfile('.eventcfg.yml.original'):
+            shutil.move('.eventcfg.yml.original', 'eventcfg.yml')
