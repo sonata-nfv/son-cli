@@ -21,7 +21,6 @@ aptly repo add $APTLY_REPO_NAME $DEB_PACKAGE_DIR
 
 aptly repo show $APTLY_REPO_NAME
 
-echo "t0"
 if [ ! -z "$GPG_PASSPHRASE" ]
 then
     passphrase="$GPG_PASSPHRASE"
@@ -30,13 +29,11 @@ then
     passphrase=$(<$GPG_PASSPHRASE_FILE)
 fi
 
-echo "t1"
 aptly publish repo \
     -architectures="$APTLY_ARCHITECTURES" \
     -passphrase="$passphrase" \
     $APTLY_REPO_NAME
 
-echo "t2"
 if [ ! -z "$KEYSERVER" ] && [ ! -z "$URI" ]
 then
     release_sig_path=$(find ~/.aptly/public/dists -name Release.gpg | head -1)

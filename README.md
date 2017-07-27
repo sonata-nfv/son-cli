@@ -97,7 +97,7 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
     
 - Ubuntu Xenial 16.04 (LTS)
     ```sh
-    echo "deb http://repo.sonata-nfv.eu:8080 ubuntu-xenial main" | sudo tee -a /etc/apt/sources.list
+    echo "deb http://repo.sonata-nfv.eu ubuntu-xenial main" | sudo tee -a /etc/apt/sources.list
     ```
     
 3. Update and install
@@ -113,13 +113,13 @@ python3 setup.py install
 ```
 
 Test if its working by invoking:
-    ```sh
-    $ son-workspace -h
-    $ son-package -h
-    $ son-publish -h
-    $ son-push -h
-    $ son-monitor -h
-    ```
+```sh
+$ son-workspace -h
+$ son-package -h
+$ son-publish -h
+$ son-push -h
+$ son-monitor -h
+```
 
 ## Usage
 The usage guidelines of the son-cli tools are described as follows.
