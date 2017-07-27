@@ -7,8 +7,6 @@ set -xe
 
 echo "==== Build packages and instantiate debian repository ===="
 
-#export DOCKER_HOST="tcp://sp.int3.sonata-nfv.eu:2375"
-
 # ====== Build packages for ubuntu 14.04 ======
 echo "--> Building packages for Ubuntu 14.04 LTS"
 
@@ -19,14 +17,6 @@ docker rm -f ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb
-
-## Patch to FIX conflicting versions of setuptools in Ubuntu 14.04
-#docker rm -f tmp_ubuntu16.04 || true
-#docker run -i --name tmp_ubuntu16.04 \
-#    -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
-#    ubuntu16.04.build-deb \
-#    /bin/bash -c "cd /son-cli/deb-packages; rm -f python3-setuptools*.deb; apt-get download python3-setuptools python3-pkg-resources"
-## End of patch
 
 # ====== Build packages for ubuntu 16.04 ======
 echo "--> Building packages for Ubuntu 16.04 LTS"
@@ -42,23 +32,11 @@ docker run -i --name ubuntu16.04.build-deb \
     -v $(pwd)/packages-ubuntu16.04:/son-cli/deb-packages \
     ubuntu16.04.build-deb
 
-# rm -f deb-packages/python3-setuptools*.deb;" # no longer necessary!
-# Patch to Fix conflicts in setuptools after packaging
-
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======
-#docker build -t  -f tools/dist/debrepo/Dockerfile tools/dist/debrepo
-
 docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo \
     -f tools/distribute/debrepo/Dockerfile \
     tools/distribute/debrepo
 
-#echo DOCKER_OPTS=\"--insecure-registry registry.sonata-nfv.eu:5000 -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\" | sudo tee /etc/default/docker
-#sudo service docker restart
-
-## for local tests only
-docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
-
-#export DOCKER_HOST="unix:///var/run/docker.sock"
 docker push registry.sonata-nfv.eu:5000/son-cli-debrepo
 
 # ====== Instantiate remote container for debian repository ======
@@ -85,12 +63,11 @@ else
 fi
 
 docker run --name=son-cli-debrepo -dit \
-    -e URI=http://registry.sonata-nfv.eu:8080 \
+    -e URI=http://repo.sonata-nfv.eu \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
     -v /home/sonata/son-cli-dist/.gnupg:/.gnupg \
     --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo
-
 
 # ====== Copy generated debs to container and create repositories for each distro ======
 ## ubuntu14.04
@@ -104,7 +81,6 @@ docker exec son-cli-debrepo sh /create_repo.sh ubuntu16.04 main ubuntu-xenial /p
 
 # ====== Start repository server ======
 docker exec -d son-cli-debrepo aptly serve
-
 
 # ====== Print 'add repository' scripts
 echo "______________________________________________________________"
