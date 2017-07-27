@@ -29,6 +29,7 @@ RUN pip3 install numpy scipy matplotlib
 WORKDIR /son-cli
 ENV PYTHONIOENCODING "UTF-8"
 ENV LC_ALL C
+ENV VAPI_CACHE_TYPE "simple"
 
 COPY . /son-cli
 

@@ -26,11 +26,18 @@
 
 import unittest
 import os
+import shutil
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
+from son.validate.event import EventLogger
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from Crypto.Hash import SHA256
+import subprocess
+import time
+import signal
+import requests
+from requests_toolbelt import MultipartEncoder
 
 SAMPLES_DIR = os.path.join('src', 'son', 'validate', 'tests', 'samples')
 
@@ -308,3 +315,147 @@ class UnitValidateTests(unittest.TestCase):
         validator.configure(integrity=True)
         validator.validate_function(functions_path)
         self.assertGreater(validator.error_count, 0)
+
+    def test_event_config_cli(self):
+        """
+        Tests the custom event configuration meant to be used with the CLI  
+        """
+
+        # backup current user eventcfg (if exists)
+        if os.path.isfile('eventcfg.yml'):
+            shutil.move('eventcfg.yml', '.eventcfg.yml.original')
+
+        # load eventdict
+        eventdict = EventLogger.load_eventcfg()
+
+        # report unmatched file hashes as error
+        eventdict['evt_pd_itg_invalid_md5'] = 'error'
+        # report vdu image not found as error
+        eventdict['evt_vnfd_itg_vdu_image_not_found'] = 'error'
+
+        # write eventdict
+        EventLogger.dump_eventcfg(eventdict)
+
+        # perform validation test
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        # should return 1 error
+        self.assertEqual(validator.error_count, 2)
+        self.assertEqual(validator.warning_count, 0)
+
+        # report unmatched file hashes as warning
+        eventdict['evt_pd_itg_invalid_md5'] = 'warning'
+        # do not report vdu image not found
+        eventdict['evt_vnfd_itg_vdu_image_not_found'] = 'none'
+
+        # write eventdict
+        EventLogger.dump_eventcfg(eventdict)
+
+        # perform validation test
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        validator = Validator(workspace=self._workspace)
+        validator.validate_package(pkg_path)
+
+        # should return 1 warning
+        self.assertEqual(validator.error_count, 0)
+        self.assertEqual(validator.warning_count, 1)
+
+        # delete temporary eventcfg
+        os.remove('eventcfg.yml')
+
+        # restore user eventcfg
+        if os.path.isfile('.eventcfg.yml.original'):
+            shutil.move('.eventcfg.yml.original', 'eventcfg.yml')
+
+    def test_event_config_api(self):
+        """
+        Tests the dynamic event configuration to be used with the API
+        """
+        # backup current user eventcfg (if exists)
+        if os.path.isfile('eventcfg.yml'):
+            shutil.move('eventcfg.yml', '.eventcfg.yml.original')
+
+        # start validate service and wait for it to start
+        proc = subprocess.Popen(["bin/son-validate-api",
+                                 "--host", "127.0.0.1",
+                                 "--port", "7777",
+                                 "--mode", "stateless", "--debug"])
+        time.sleep(3)
+
+        # test '/events/list' endpoint
+        url = "http://127.0.0.1:7777/events/list"
+        r = requests.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+
+        # post an event configuration
+        # - report unmatched file hashes as an error
+        # - report vdu image not found as error
+        url = "http://127.0.0.1:7777/events/config"
+        data = {'evt_pd_itg_invalid_md5': 'error',
+                'evt_vnfd_itg_vdu_image_not_found': 'error'}
+        r = requests.post(url, data=data)
+        self.assertEqual(r.status_code, 200)
+
+        # perform validation test
+        url = "http://127.0.0.1:7777/validate/package"
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        file = open(pkg_path, 'rb')
+        data = {'source': "embedded",
+                'syntax': 'true',
+                'integrity': 'true',
+                'topology': 'true',
+                'file': (file.name, file, 'application/octet-stream')
+                }
+        multi = MultipartEncoder(data)
+        headers = {'Content-Type': multi.content_type}
+        r = requests.post(url, headers=headers, data=multi)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+        result = r.json()
+        self.assertEqual(result['error_count'], 2)
+        self.assertEqual(result['warning_count'], 0)
+
+        # post an event configuration
+        # - report unmatched file hashes as an warning
+        # - do not report vdu image not found
+        url = "http://127.0.0.1:7777/events/config"
+        data = {'evt_pd_itg_invalid_md5': 'warning',
+                'evt_vnfd_itg_vdu_image_not_found': 'none'}
+        r = requests.post(url, data=data)
+        self.assertEqual(r.status_code, 200)
+
+        # perform validation test
+        url = "http://127.0.0.1:7777/validate/package"
+        pkg_path = os.path.join(SAMPLES_DIR, 'packages',
+                                'sonata-demo-invalid-md5.son')
+        file = open(pkg_path, 'rb')
+        data = {'source': "embedded",
+                'syntax': 'true',
+                'integrity': 'true',
+                'topology': 'true',
+                'file': (file.name, file, 'application/octet-stream')
+                }
+        multi = MultipartEncoder(data)
+        headers = {'Content-Type': multi.content_type}
+        r = requests.post(url, headers=headers, data=multi)
+        self.assertEqual(r.status_code, 200)
+        self.assertIs(type(r.json()), dict)
+        result = r.json()
+        self.assertEqual(result['error_count'], 0)
+        self.assertEqual(result['warning_count'], 1)
+
+        # stop validate service
+        proc.send_signal(signal.SIGINT)
+
+        # delete temporary eventcfg
+        os.remove('eventcfg.yml')
+
+        # restore user eventcfg
+        if os.path.isfile('.eventcfg.yml.original'):
+            shutil.move('.eventcfg.yml.original', 'eventcfg.yml')

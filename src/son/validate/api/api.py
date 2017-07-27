@@ -39,7 +39,6 @@ if app.config['CACHE_TYPE'] == 'redis':
                                'CACHE_DEFAULT_TIMEOUT': 0,
                                'CACHE_REDIS_URL': redis_url})
 
-
 elif app.config['CACHE_TYPE'] == 'simple':
     cache = Cache(app, config={'CACHE_TYPE': 'simple',
                                'CACHE_DEFAULT_TIMEOUT': 0})
@@ -280,21 +279,31 @@ def get_validation(vid):
 def gen_resource_key(path, otype, s, i, t):
     assert (type(path) == str and type(otype) == str)
 
-    hash = hashlib.md5()
-    hash.update(path.encode('utf-8'))
-    hash.update(otype.encode('utf-8'))
+    res_hash = hashlib.md5()
+    res_hash.update(path.encode('utf-8'))
+    res_hash.update(otype.encode('utf-8'))
     if s:
-        hash.update('syntax'.encode('utf-8'))
+        res_hash.update('syntax'.encode('utf-8'))
     if i:
-        hash.update('integrity'.encode('utf-8'))
+        res_hash.update('integrity'.encode('utf-8'))
     if t:
-        hash.update('topology'.encode('utf-8'))
+        res_hash.update('topology'.encode('utf-8'))
 
-    return hash.hexdigest()
+    return res_hash.hexdigest()
 
 
 def gen_validation_key(path):
-    return generate_hash(os.path.abspath(path))
+    val_hash = hashlib.md5()
+
+    # generate path hash
+    val_hash.update(str(generate_hash(os.path.abspath(path)))
+                    .encode('utf-8'))
+
+    # validation event config must also be included
+    val_hash.update(repr(sorted(EventLogger.load_eventcfg().items()))
+                    .encode('utf-8'))
+
+    return val_hash.hexdigest()
 
 
 def process_request():
@@ -381,10 +390,7 @@ def _events_config():
     if not request.form:
         return 'No events to configure', 400
 
-    if os.path.isfile('.eventcfg.yml'):
-        eventdict = EventLogger.load_eventcfg('.eventcfg.yml')
-    else:
-        eventdict = EventLogger.load_eventcfg()
+    eventdict = EventLogger.load_eventcfg()
 
     for event in request.form.keys():
         if event not in eventdict:
@@ -408,12 +414,7 @@ def _events_config():
 
 
 def _events_list():
-
-    if os.path.isfile('.eventcfg.yml'):
-        eventdict = EventLogger.load_eventcfg('.eventcfg.yml')
-    else:
-        eventdict = EventLogger.load_eventcfg()
-
+    eventdict = EventLogger.load_eventcfg()
     return json.dumps(eventdict, sort_keys=True,
                       indent=4, separators=(',', ': ')).encode('utf-8')
 
@@ -438,7 +439,7 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology,
     if perrors:
         return perrors, 400
 
-    rid = gen_resource_key(path, obj_type, syntax, integrity, topology)
+    rid = gen_resource_key(keypath, obj_type, syntax, integrity, topology)
     vid = gen_validation_key(path)
 
     resource = get_resource(rid)

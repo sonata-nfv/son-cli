@@ -6,6 +6,7 @@ import uuid
 
 log = logging.getLogger(__name__)
 
+
 class EventLogger(object):
 
     def __init__(self, name):
@@ -14,10 +15,7 @@ class EventLogger(object):
         self._events = dict()
 
         # load events config
-        if os.path.isfile('.eventcfg.yml'):
-            self._eventdict = self.load_eventcfg(filename='.eventcfg.yml')
-        else:
-            self._eventdict = self.load_eventcfg()
+        self._eventdict = self.load_eventcfg()
 
     @property
     def errors(self):
@@ -31,6 +29,7 @@ class EventLogger(object):
 
     def reset(self):
         self._events.clear()
+        self._eventdict = self.load_eventcfg()
 
     def log(self, header, msg, source_id, event_code, event_id=None,
             detail_event_id=None):
@@ -75,8 +74,8 @@ class EventLogger(object):
         event['detail'].append(msg_dict)
 
     @staticmethod
-    def load_eventcfg(filename='eventcfg.yml'):
-
+    def load_eventcfg():
+        filename = 'eventcfg.yml'
         configpath = pkg_resources.resource_filename(
             __name__, os.path.join('eventcfg.yml'))
         with open(configpath, 'r') as _f:
@@ -108,7 +107,7 @@ class EventLogger(object):
 
     @staticmethod
     def dump_eventcfg(eventdict):
-        filename = ".eventcfg.yml"
+        filename = "eventcfg.yml"
         with open(filename, 'w') as _f:
             yaml.dump(eventdict, _f, default_flow_style=False)
 
@@ -125,6 +124,8 @@ class LoggerManager(object):
     def get_logger(self, name):
         if name not in self._loggers.keys():
             self._loggers[name] = EventLogger(name)
+        else:
+            self._loggers[name].reset()
 
         return self._loggers[name]
 
