@@ -97,7 +97,7 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
     
 - Ubuntu Xenial 16.04 (LTS)
     ```sh
-    echo "deb http://repo.sonata-nfv.eu:8080 ubuntu-xenial main" | sudo tee -a /etc/apt/sources.list
+    echo "deb http://repo.sonata-nfv.eu ubuntu-xenial main" | sudo tee -a /etc/apt/sources.list
     ```
     
 3. Update and install
