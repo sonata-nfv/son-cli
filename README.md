@@ -113,13 +113,13 @@ python3 setup.py install
 ```
 
 Test if its working by invoking:
-    ```sh
-    $ son-workspace -h
-    $ son-package -h
-    $ son-publish -h
-    $ son-push -h
-    $ son-monitor -h
-    ```
+```sh
+$ son-workspace -h
+$ son-package -h
+$ son-publish -h
+$ son-push -h
+$ son-monitor -h
+```
 
 ## Usage
 The usage guidelines of the son-cli tools are described as follows.
