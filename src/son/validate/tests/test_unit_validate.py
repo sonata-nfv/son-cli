@@ -138,7 +138,7 @@ class UnitValidateTests(unittest.TestCase):
         validator = Validator(workspace=self._workspace)
         validator.validate_package(pkg_path)
         eventdict = EventLogger.load_eventcfg()
-        invalid_md5_config = repr(eventdict['evt_pd_itg_invalid_md5']).lower()
+        invalid_md5_config = str(eventdict['evt_pd_itg_invalid_md5']).lower()
         if invalid_md5_config == 'error':
             error_count = 1
             warn_count = 1
