@@ -33,10 +33,9 @@ component when it tries to authenticate a user.
 """
 import time
 import traceback
-import os
 import json
 import jwt
-from flask import Flask, session, request, make_response, jsonify
+from flask import Flask, request, make_response, jsonify
 
 
 logins = {'tester': '1234'}
@@ -57,7 +56,8 @@ def payload(username):
 
     payload = {
             'user_id': user.id,
-            'exp': datetime.utcnow() + timedelta(seconds=self.JWT_EXP_DELTA_SECONDS)
+            'exp': datetime.utcnow() + 
+                   timedelta(seconds=self.JWT_EXP_DELTA_SECONDS)
     }
     jwt_token = jwt.encode(payload, self.JWT_SECRET, self.JWT_ALGORITHM)
     return json_response({'token': jwt_token.decode('utf-8')})
@@ -90,7 +90,8 @@ def internal_error(error):
     :param error:
     :return:
     """
-    message = dict(status=500, message='Internal Server Error: ' + str(traceback.format_exc()))
+    message = dict(status=500, message='Internal Server Error: ' +
+                                       str(traceback.format_exc()))
     resp = jsonify(message)
     resp.status_code = 500
 
@@ -121,7 +122,8 @@ def login():
         return resp
 
     else:
-        return make_response(jsonify({'error': 'Invalid username or password'}), 401)
+        return make_response(jsonify(
+            {'error': 'Invalid username or password'}), 401)
 
 
 @app.route('/api/v2/packages', methods=['POST'])
@@ -136,10 +138,6 @@ def requests():
     return make_response(jsonify({'OK': 'Instantiation initiated'}), 200)
 
 
-# request.args: the key/value pairs in the URL query string
-# request.form: the key/value pairs in the body, from a HTML post form, or JavaScript request that isn't JSON encoded
-# request.files: the files in the body, which Flask keeps separate from form. HTML forms must use enctype=multipart/form-data or files will not be uploaded.
-# request.values: combined args and form, preferring args if keys overlap
 @app.route('/api/v2/signature', methods=['PUT'])
 def signature():
     print('Signature update received')

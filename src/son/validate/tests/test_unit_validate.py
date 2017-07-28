@@ -137,9 +137,22 @@ class UnitValidateTests(unittest.TestCase):
                                 'sonata-demo-invalid-md5.son')
         validator = Validator(workspace=self._workspace)
         validator.validate_package(pkg_path)
+        eventdict = EventLogger.load_eventcfg()
+        invalid_md5_config = str(eventdict['evt_pd_itg_invalid_md5']).lower()
+        if invalid_md5_config == 'error':
+            error_count = 1
+            warn_count = 1
+        elif invalid_md5_config == 'warning':
+            error_count = 0
+            warn_count = 2
+        elif invalid_md5_config == 'none':
+            error_count = 0
+            warn_count = 1
+        else:
+            self.fail("Invalid value of event 'evt_pd_itg_invalid_md5'")
 
-        self.assertEqual(validator.error_count, 0)
-        #TODO: check eventcfg first!
+        self.assertEqual(validator.error_count, error_count)
+        self.assertEqual(validator.warning_count, warn_count)
 
     def test_validate_package_invalid_integrigy(self):
         """
@@ -318,7 +331,7 @@ class UnitValidateTests(unittest.TestCase):
 
     def test_event_config_cli(self):
         """
-        Tests the custom event configuration meant to be used with the CLI  
+        Tests the custom event configuration meant to be used with the CLI
         """
 
         # backup current user eventcfg (if exists)

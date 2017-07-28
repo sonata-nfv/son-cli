@@ -11,7 +11,7 @@ def signature():
 
     # package_path = 'son/access/samples/sonata-demo.son'
     package_path = '../samples/sonata-demo.son'
-    with open(package_path,'rb') as fhandle:
+    with open(package_path, 'rb') as fhandle:
         package_content = fhandle.read()
 
     package_hash = SHA256.new(package_content).digest()

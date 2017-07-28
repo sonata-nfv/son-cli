@@ -122,7 +122,6 @@ class Validator(object):
     def storage(self):
         """
         Provides access to the stored resources during validation process.
-        :return: 
         """
         return self._storage
 
@@ -390,21 +389,21 @@ class Validator(object):
         log.info("... syntax: {0}, integrity: {1}, topology: {2}"
                  .format(self._syntax, self._integrity, self._topology))
 
-        function = self._storage.create_function(vnfd_path)
-        if not function:
+        func = self._storage.create_function(vnfd_path)
+        if not func:
             evtlog.log("Invalid function descriptor",
                        "Couldn't store VNF of file '{0}'".format(vnfd_path),
                        vnfd_path,
                        'evt_function_invalid_descriptor')
             return
 
-        if self._syntax and not self._validate_function_syntax(function):
+        if self._syntax and not self._validate_function_syntax(func):
             return
 
-        if self._integrity and not self._validate_function_integrity(function):
+        if self._integrity and not self._validate_function_integrity(func):
             return
 
-        if self._topology and not self._validate_function_topology(function):
+        if self._topology and not self._validate_function_topology(func):
             return
 
         return True
@@ -468,15 +467,14 @@ class Validator(object):
     @staticmethod
     def validate_package_signature(package, signature, pubkey):
         """
-        Verifies with the public key from whom the package file came that is 
+        Verifies with the public key from whom the package file came that is
         indeed signed by their private key
         :param package: path to package file
         :param signature: String signature to be verified
         :param pubkey: String public key
-        :return: Boolean. True if valid signature, False otherwise. 
+        :return: Boolean. True if valid signature, False otherwise.
         """
         log.info("Validating signature of package '{0}'".format(package))
-        file_data = None
         try:
             with open(package, 'rb') as _file:
                 file_data = _file.read()
@@ -532,19 +530,19 @@ class Validator(object):
             return
         return True
 
-    def _validate_function_syntax(self, function):
+    def _validate_function_syntax(self, func):
         """
         Validate the syntax of a function (VNF) against its schema.
-        :param function: function to validate
+        :param func: function to validate
         :return: True if syntax is correct, None otherwise
         """
-        log.info("Validating syntax of function '{0}'".format(function.id))
+        log.info("Validating syntax of function '{0}'".format(func.id))
         if not self._schema_validator.validate(
-              function.content, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
+                func.content, SchemaValidator.SCHEMA_FUNCTION_DESCRIPTOR):
             evtlog.log("Invalid VNFD syntax",
                        "Invalid syntax in function '{0}': {1}"
-                       .format(function.id, self._schema_validator.error_msg),
-                       function.id,
+                       .format(func.id, self._schema_validator.error_msg),
+                       func.id,
                        'evt_vnfd_stx_invalid')
             return
         return True
@@ -632,7 +630,8 @@ class Validator(object):
         # load service connection points
         if not service.load_connection_points():
             evtlog.log("Bad section 'connection_points'",
-                       "Couldn't load the connection points of service id='{0}'"
+                       "Couldn't load the connection points of "
+                       "service id='{0}'"
                        .format(service.id),
                        service.id,
                        'evt_nsd_itg_badsection_cpoints')
@@ -694,91 +693,92 @@ class Validator(object):
                         return
         return True
 
-    def _validate_function_integrity(self, function):
+    def _validate_function_integrity(self, func):
         """
         Validate the integrity of a function (VNF).
         It checks for inconsistencies in the identifiers of connection
         points, virtual deployment units (VDUs), ...
-        :param function: function to validate
+        :param func: function to validate
         :return: True if integrity is correct
         """
         log.info("Validating integrity of function descriptor '{0}'"
-                 .format(function.id))
+                 .format(func.id))
 
         # load function connection points
-        if not function.load_connection_points():
+        if not func.load_connection_points():
             evtlog.log("Missing 'connection_points'",
-                       "Couldn't load the connection points of function id='{0}'"
-                       .format(function.id),
-                       function.id,
+                       "Couldn't load the connection points of "
+                       "function id='{0}'"
+                       .format(func.id),
+                       func.id,
                        'evt_vnfd_itg_badsection_cpoints')
             return
 
         # load units
-        if not function.load_units():
+        if not func.load_units():
             evtlog.log("Missing 'virtual_deployment_units'",
                        "Couldn't load the units of function id='{0}'"
-                       .format(function.id),
-                       function.id,
+                       .format(func.id),
+                       func.id,
                        'evt_vnfd_itg_badsection_vdus')
             return
 
         # load connection points of units
-        if not function.load_unit_connection_points():
+        if not func.load_unit_connection_points():
             evtlog.log("Bad section 'connection_points'",
                        "Couldn't load VDU connection points of "
                        "function id='{0}'"
-                       .format(function.id),
-                       function.id,
+                       .format(func.id),
+                       func.id,
                        'evt_vnfd_itg_vdu_badsection_cpoints')
             return
 
         # load function links
-        if not function.load_virtual_links():
+        if not func.load_virtual_links():
             evtlog.log("Bad section 'virtual_links'",
                        "Couldn't load the links of function id='{0}'"
-                       .format(function.id),
-                       function.id,
+                       .format(func.id),
+                       func.id,
                        'evt_vnfd_itg_badsection_vlinks')
             return
 
         # check for undeclared connection points
-        undeclared = function.undeclared_connection_points()
+        undeclared = func.undeclared_connection_points()
         if undeclared:
             for cxpoint in undeclared:
                 evtlog.log("{0} Undeclared connection point(s)"
                            .format(len(undeclared)),
                            "Virtual links section has undeclared connection "
                            "points: {0}".format(cxpoint),
-                           function.id,
+                           func.id,
                            'evt_vnfd_itg_undeclared_cpoint')
             return
 
         # check for unused connection points
-        unused_ifaces = function.unused_connection_points()
+        unused_ifaces = func.unused_connection_points()
         if unused_ifaces:
             for cxpoint in unused_ifaces:
                 evtlog.log("{0} Unused connection point(s)"
                            .format(len(unused_ifaces)),
                            "Function has unused connection points: {0}"
                            .format(cxpoint),
-                           function.id,
+                           func.id,
                            'evt_vnfd_itg_unused_cpoint')
 
         # verify integrity between unit connection points and units
-        for vl_id, vl in function.vlinks.items():
+        for vl_id, vl in func.vlinks.items():
             for cpr in vl.connection_point_refs:
                 s_cpr = cpr.split(':')
-                if len(s_cpr) == 1 and cpr not in function.connection_points:
+                if len(s_cpr) == 1 and cpr not in func.connection_points:
                     evtlog.log("Undefined connection point",
                                "Connection point '{0}' in virtual link "
                                "'{1}' is not defined"
                                .format(cpr, vl_id),
-                               function.id,
+                               func.id,
                                'evt_nsd_itg_undefined_cpoint')
                     return
                 elif len(s_cpr) == 2:
-                    unit = function.units[s_cpr[0]]
+                    unit = func.units[s_cpr[0]]
                     if not unit or s_cpr[1] not in unit.connection_points:
 
                         evtlog.log("Undefined connection point(s)",
@@ -786,10 +786,9 @@ class Validator(object):
                                    "of virtual link id='{1}': Unit id='{2}' "
                                    "is not defined"
                                    .format(s_cpr[1], vl_id, s_cpr[0]),
-                                   function.id,
+                                   func.id,
                                    'evt_vnfd_itg_undefined_cpoint')
                         return
-
         return True
 
     def _validate_service_topology(self, service):
@@ -862,7 +861,8 @@ class Validator(object):
                                "fp_id='{0}':\n{1}"
                                .format(fw_path['fp_id'],
                                        yaml.dump(
-                                           service.trace_path(fw_path['path']))),
+                                           service.trace_path(
+                                               fw_path['path']))),
                                source_id,
                                'evt_nsd_top_fwpath_invalid',
                                event_id=evtid,
@@ -1010,36 +1010,29 @@ class Validator(object):
 
         return True
 
-    def _validate_function_topology(self, function):
+    def _validate_function_topology(self, func):
         """
         Validate the network topology of a function.
         It builds the topology graph of the function, including VDU
         connections.
-        :param function: function to validate
+        :param func: function to validate
         :return: True if topology doesn't present issues
         """
         log.info("Validating topology of function '{0}'"
-                 .format(function.id))
+                 .format(func.id))
 
         # build function topology graph
-        function.graph = function.build_topology_graph(bridges=True)
-        if not function.graph:
+        func.graph = func.build_topology_graph(bridges=True)
+        if not func.graph:
             evtlog.log("Invalid topology graph",
                        "Couldn't build topology graph of function '{0}'"
-                       .format(function.id),
-                       function.id,
+                       .format(func.id),
+                       func.id,
                        'evt_vnfd_top_topgraph_failed')
             return
 
         log.debug("Built topology graph of function '{0}': {1}"
-                  .format(function.id, function.graph.edges()))
-
-        # check for path cycles
-        #cycles = Validator._find_graph_cycles(function.graph,
-        #                                      function.graph.nodes()[0])
-        #if cycles and len(cycles) > 0:
-        #    log.warning("Found cycles in network graph of function "
-        #                "'{0}':\n{0}".format(function.id, cycles))
+                  .format(func.id, func.graph.edges()))
 
         return True
 
@@ -1049,7 +1042,6 @@ class Validator(object):
         :param service: service
         :return: True if successful, None otherwise
         """
-
         log.debug("Loading functions of the service.")
 
         # get VNFD file list from provided dpath
@@ -1080,10 +1072,10 @@ class Validator(object):
             return
 
         # store function descriptors referenced in the service
-        for function in functions:
-            fid = build_descriptor_id(function['vnf_vendor'],
-                                      function['vnf_name'],
-                                      function['vnf_version'])
+        for func in functions:
+            fid = build_descriptor_id(func['vnf_vendor'],
+                                      func['vnf_name'],
+                                      func['vnf_version'])
             if fid not in path_vnfs.keys():
                 evtlog.log("VNF not found",
                            "Referenced function descriptor id='{0}' couldn't "
@@ -1092,7 +1084,7 @@ class Validator(object):
                            'evt_nsd_itg_function_unavailable')
                 return
 
-            vnf_id = function['vnf_id']
+            vnf_id = func['vnf_id']
             new_func = self._storage.create_function(path_vnfs[fid])
 
             service.associate_function(new_func, vnf_id)
@@ -1161,7 +1153,8 @@ class Validator(object):
                                                 backtrace=backtrace)
         return backtrace
 
-    def write_service_graphs(self, service):
+    @staticmethod
+    def write_service_graphs(service):
         graphsdir = 'graphs'
         try:
             os.makedirs(graphsdir)
@@ -1169,7 +1162,7 @@ class Validator(object):
             if exc.errno == errno.EEXIST and os.path.isdir(graphsdir):
                 pass
 
-        g = service.build_topology_graph(level=3, bridges=False)
+        service.build_topology_graph(level=3, bridges=False)
 
         for lvl in range(0, 4):
             g = service.build_topology_graph(level=lvl, bridges=False)

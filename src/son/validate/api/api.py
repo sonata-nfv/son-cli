@@ -130,14 +130,15 @@ def load_watch_dirs(workspace):
 
         log.debug("Loading validator watcher: {0}".format(watch_path))
 
-        assert watch['type'] == 'project' or watch['type'] == 'package' or \
-               watch['type'] == 'service' or watch['type'] == 'function'
+        assert (watch['type'] == 'project' or watch['type'] == 'package' or
+                watch['type'] == 'service' or watch['type'] == 'function')
 
         install_watcher(watch_path, watch['type'], watch['syntax'],
                         watch['integrity'], watch['topology'])
 
         _validate_object(watch_path, watch_path, watch['type'],
-                         watch['syntax'], watch['topology'], watch['integrity'])
+                         watch['syntax'], watch['topology'],
+                         watch['integrity'])
 
 
 def set_watch(path, obj_type, syntax, integrity, topology):
@@ -521,13 +522,16 @@ def validate_service():
 def validate_function():
     return _validate_object_from_request('function')
 
+
 @app.route('/events/config', methods=['POST'])
 def events_config():
     return _events_config()
 
+
 @app.route('/events/list', methods=['GET'])
 def events_list():
     return _events_list()
+
 
 @app.route('/validations', methods=['GET'])
 def validations():
@@ -550,8 +554,8 @@ def report():
 @app.route('/report/result/<string:resource_id>', methods=['GET'])
 def report_result(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'result' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'result' not in get_validation(vid).keys()):
         return '', 404
 
     return get_validation(vid)['result']
@@ -560,8 +564,8 @@ def report_result(resource_id):
 @app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'net_topology' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'net_topology' not in get_validation(vid).keys()):
         return '', 404
     return get_validation(vid)['net_topology']
 
@@ -569,11 +573,10 @@ def report_topology(resource_id):
 @app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'net_fwgraph' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'net_fwgraph' not in get_validation(vid).keys()):
         return '', 404
     return get_validation(vid)['net_fwgraph']
-
 
 
 def gen_watches():
@@ -808,7 +811,7 @@ def main():
              "Validation objects defined in the workspace configuration will "
              "be monitored and automatically validated. "
              "If not specified will assume '{}'"
-            .format(Workspace.DEFAULT_WORKSPACE_DIR),
+             .format(Workspace.DEFAULT_WORKSPACE_DIR),
         default=Workspace.DEFAULT_WORKSPACE_DIR,
         required=False
     )
