@@ -66,8 +66,6 @@ class UnitLoadSchemaTests(unittest.TestCase):
     def test_load_remote_schema(self, m_urlopen, m_yaml):
 
         sample_dict = {"key": "content"}
-        #m_decode.return_value = ""
-        #m_cs.return_value = ""
         m_yaml.load.return_value = sample_dict
 
         # Ensure that urlopen is accessing the same address of the argument

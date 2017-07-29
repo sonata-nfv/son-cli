@@ -78,4 +78,5 @@ bin/
 /src/son/validate/gui/dist
 src/son/validate/gui/node_modules
 
-
+# ignore user generated son-validate event configuration
+/eventcfg.yml

@@ -40,7 +40,8 @@ class UnitCreatePackageTests(unittest.TestCase):
     @patch('son.package.package.os.path.abspath')
     @patch('son.package.package.os.path.join')
     @patch('son.package.package.zipfile')
-    def test_generate_package(self, m_zipfile, m_join, m_abspath, m_validator, m_hash):
+    def test_generate_package(self, m_zipfile, m_join, m_abspath, m_validator,
+                              m_hash):
         """
         Ensures that a package file is created with correct name and location
         """

@@ -96,7 +96,9 @@ class Emulator:
     """
     def do_experiment_series(self, experiments):
         # start the experiments in separate threads
-        LOG.info("%r experiments will be run."%len(experiments.keys()))
+        LOG.info("%r experiments will be run." % len(experiments.keys()))
+        for ex in experiments.items():
+            LOG.debug("Experiment information:\n%r" % str(ex))
         for i in experiments.keys():
             t = threading.Thread(target=self.do_experiment, kwargs={"run_id":i, "exp_dict":experiments[i]})
             t.start()

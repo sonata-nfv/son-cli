@@ -152,19 +152,18 @@ class Workspace:
              }
         self.config['default_service_platform'] = 'sp1'
         self.config['validate_watchers'] = \
-            {os.path.join(self.workspace_root, self.config['projects_dir'])
-             : {'type': 'project',
-                'syntax': True,
-                'integrity': True,
-                'topology': True
-                }
+            {os.path.join(self.workspace_root, self.config['projects_dir']):
+                {'type': 'project',
+                 'syntax': True,
+                 'integrity': True,
+                 'topology': True
+                 }
              }
 
     def create_dirs(self):
         """
         Create the base directory structure for the workspace
         Invoked upon workspace creation.
-        :return:
         """
         log.info('Creating workspace at %s', self.workspace_root)
         os.makedirs(self.workspace_root, exist_ok=False)
@@ -185,7 +184,6 @@ class Workspace:
         """
         Creates a workspace configuration file descriptor.
         This is triggered by workspace creation and configuration changes.
-        :return:
         """
         cfg_d = self.config.copy()
         ws_file_path = os.path.join(self.workspace_root,
@@ -252,12 +250,12 @@ class Workspace:
         # 0.03
         if ws_config['version'] == "0.03":
             ws.config['validate_watchers'] = \
-                {os.path.join(ws.workspace_root, ws.config['projects_dir'])
-                 : {'type': 'project',
-                    'syntax': True,
-                    'integrity': True,
-                    'topology': True
-                    }
+                {os.path.join(ws.workspace_root, ws.config['projects_dir']):
+                    {'type': 'project',
+                     'syntax': True,
+                     'integrity': True,
+                     'topology': True
+                     }
                  }
 
         # 0.04
@@ -293,7 +291,6 @@ class Workspace:
 
     def get_service_platform(self, sp_id):
         if sp_id not in self.service_platforms.keys():
-            print("nah")
             return
         return self.service_platforms[sp_id]
 

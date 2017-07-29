@@ -27,6 +27,8 @@
 import os
 import logging
 import networkx as nx
+import validators
+import requests
 from collections import OrderedDict
 from son.validate.util import descriptor_id, read_descriptor_file
 from son.validate import event
@@ -235,7 +237,7 @@ class VLink:
     @property
     def connection_point_refs(self):
         """
-        The two connection points references composing the vlink 
+        The two connection points references composing the vlink
         in a list format [u, v]
         :return: list (size 2) of connection point references
         """
@@ -642,21 +644,6 @@ class Service(Descriptor):
 
         return func_cps
 
-    # @property
-    # def all_function_interfaces(self):
-    #     """
-    #     Provides a list of interfaces from all functions of this service.
-    #     """
-    #     all_interfaces = []
-    #     for fid, function in self.functions.items():
-    #         for iface in function.interfaces:
-    #             iface_tokens = iface.split(':')
-    #             if len(iface_tokens) > 1:
-    #                 all_interfaces.append(iface)
-    #             else:
-    #                 all_interfaces.append(self.vnf_id(function) + ':' + iface)
-    #     return all_interfaces
-
     def mapped_function(self, vnf_id):
         """
         Provides the function associated with a 'vnf_id' defined in the
@@ -666,55 +653,41 @@ class Service(Descriptor):
         """
         if vnf_id not in self._vnf_id_map or self._vnf_id_map[vnf_id] not in\
                 self._functions:
-            #log.error("Function of vnf_id='{}' is not mapped".format(vnf_id))
             return
         return self._functions[self._vnf_id_map[vnf_id]]
 
-    def vnf_id(self, function):
+    def vnf_id(self, func):
         """
         Provides the vnf id associated with the provided function.
-        :param function: function object
+        :param func: function object
         :return: vnf id
         """
         for vnf_id, fid in self._vnf_id_map.items():
-            if fid == function.id:
+            if fid == func.id:
                 return vnf_id
         return
 
-    # def function_of_interface(self, interface):
-    #     """
-    #     Provides the function associated with an interface.
-    #     :param interface: interface str
-    #     :return: function object
-    #     """
-    #     for fid, f in self.functions.items():
-    #         for iface in f.interfaces:
-    #             if iface == interface or \
-    #                             (self.vnf_id(f) + ':' + iface) == interface:
-    #                 return f
-
-    def associate_function(self, function, vnf_id):
+    def associate_function(self, func, vnf_id):
         """
         Associate a function to the service.
-        :param function: function object
+        :param func: function object
         :param vnf_id: vnf id, defined in the service descriptor content
         """
-        if type(function) is not Function:
+        if type(func) is not Function:
             log.error("The function (VNF) id='{0}' has an invalid type"
-                      .format(function.id))
+                      .format(func.id))
             return
 
-        if function.id in self.functions:
+        if func.id in self.functions:
             log.error("The function (VNF) id='{0}' is already associated with "
-                      "service id='{1}'".format(function.id, self.id))
+                      "service id='{1}'".format(func.id, self.id))
             return
 
         log.debug("Service '{0}': associating function id='{1}' with vnf_id="
-                  "'{2}'".format(self.id, function.id, vnf_id))
+                  "'{2}'".format(self.id, func.id, vnf_id))
 
-        self._functions[function.id] = function
-        self._vnf_id_map[vnf_id] = function.id
-
+        self._functions[func.id] = func
+        self._vnf_id_map[vnf_id] = func.id
 
     def build_topology_graph(self, level=1, bridges=False,
                              vdu_inner_connections=True):
@@ -727,6 +700,8 @@ class Service(Descriptor):
                     3: VDU level (with VDU interfaces)
         :param bridges: indicates whether bridges should be included in
                         the graph
+        :param vdu_inner_connections: indicates whether VDU connection points
+                                      should be internally connected
         """
         assert 0 <= level <= 3  # level must be 0, 1, 2, 3
 
@@ -777,25 +752,26 @@ class Service(Descriptor):
 
         prefixes = []
         # assign sub-graphs of functions
-        for fid, function in self.functions.items():
-            # TODO: temporarily apply vnf_id:interface prefix patch. must be
+        for fid, func in self.functions.items():
             # done to work with current descriptors of sonata demo
             prefix_map = {}
-            prefix = self.vnf_id(function)
+            prefix = self.vnf_id(func)
 
             if level <= 2:
-                function.graph = function.build_topology_graph(parent_id=self.id,
-                                                               bridges=bridges,
-                                                               level=0,
-                                                               vdu_inner_connections=vdu_inner_connections)
+                func.graph = func.build_topology_graph(
+                    parent_id=self.id,
+                    bridges=bridges,
+                    level=0,
+                    vdu_inner_connections=vdu_inner_connections)
             else:
-                function.graph = function.build_topology_graph(parent_id=self.id,
-                                                               bridges=bridges,
-                                                               level=1,
-                                                               vdu_inner_connections=vdu_inner_connections)
+                func.graph = func.build_topology_graph(
+                    parent_id=self.id,
+                    bridges=bridges,
+                    level=1,
+                    vdu_inner_connections=vdu_inner_connections)
 
             if level == 0:
-                for node in function.graph.nodes():
+                for node in func.graph.nodes():
                     node_tokens = node.split(':')
                     if len(node_tokens) > 1 and node in graph.nodes():
                         graph.remove_node(node)
@@ -809,27 +785,28 @@ class Service(Descriptor):
                 prefixes.append(prefix)
 
             elif level == 2:
-                for node in function.graph.nodes():
+                for node in func.graph.nodes():
                     s_node = node.split(':')
                     if len(s_node) > 1:
                         prefix_map[node] = prefix + ':' + s_node[0]
                     else:
                         prefix_map[node] = prefix + ':' + node
 
-                re_f_graph = nx.relabel_nodes(function.graph, prefix_map,
+                re_f_graph = nx.relabel_nodes(func.graph, prefix_map,
                                               copy=True)
                 graph.add_nodes_from(re_f_graph.nodes(data=True))
                 graph.add_edges_from(re_f_graph.edges(data=True))
 
             elif level == 3:
-                for node in function.graph.nodes():
+                for node in func.graph.nodes():
                     s_node = node.split(':')
-                    if node in function.connection_points and len(s_node) > 1:
+                    if node in func.connection_points and len(s_node) > 1:
                         prefix_map[node] = node
                     else:
                         prefix_map[node] = prefix + ':' + node
 
-                re_f_graph = nx.relabel_nodes(function.graph, prefix_map, copy=True)
+                re_f_graph = nx.relabel_nodes(func.graph, prefix_map,
+                                              copy=True)
                 graph.add_nodes_from(re_f_graph.nodes(data=True))
                 graph.add_edges_from(re_f_graph.edges(data=True))
 
@@ -908,29 +885,30 @@ class Service(Descriptor):
                         if len(node_v_tokens) > 1 and \
                                 node_v_tokens[0] == node_u_tokens[0]:
 
-                            # verify internally if these interfaces are connected
-                            function = self.mapped_function(node_v_tokens[0])
+                            # verify if these interfaces are connected
+                            func = self.mapped_function(node_v_tokens[0])
 
-                            if function.graph.has_node(node_u_tokens[1]):
+                            if func.graph.has_node(node_u_tokens[1]):
                                 node_u_c = node_u_tokens[1]
-                            elif function.graph.has_node(node_u):
+                            elif func.graph.has_node(node_u):
                                 node_u_c = node_u
                             else:
                                 continue
 
-                            if function.graph.has_node(node_v_tokens[1]):
+                            if func.graph.has_node(node_v_tokens[1]):
                                 node_v_c = node_v_tokens[1]
-                            elif function.graph.has_node(node_v):
+                            elif func.graph.has_node(node_v):
                                 node_v_c = node_v
                             else:
                                 continue
 
-                            if nx.has_path(function.graph, node_u_c, node_v_c):
+                            if nx.has_path(func.graph, node_u_c, node_v_c):
                                 link_attrs = def_link_attrs
                                 link_attrs['label'] = node_u + '-' + node_v
                                 link_attrs['level'] = 1
                                 link_attrs['type'] = 'iface'
-                                graph.add_edge(node_u, node_v, attr_dict=link_attrs)
+                                graph.add_edge(node_u, node_v,
+                                               attr_dict=link_attrs)
 
         return graph
 
@@ -973,7 +951,8 @@ class Service(Descriptor):
                     elif len(s_cpr) == 2:
                         # get corresponding function
                         func = self.mapped_function(s_cpr[0])
-                        if not func or (func and s_cpr[1] not in func.connection_points):
+                        if not func or (func and s_cpr[1]
+                                        not in func.connection_points):
                             evtlog.log("Undefined connection point",
                                        "Connection point '{0}' of forwarding "
                                        "path '{1}' is not defined"
@@ -1013,11 +992,11 @@ class Service(Descriptor):
         iface_tokens = iface.split(':')
         if len(iface_tokens) != 2:
             return False
-        function = self.mapped_function(iface_tokens[0])
-        if not function:
+        func = self.mapped_function(iface_tokens[0])
+        if not func:
             return False
-        if (iface_tokens[1] not in function.interfaces and
-                iface not in function.interfaces):
+        if (iface_tokens[1] not in func.interfaces and
+                iface not in func.interfaces):
             return False
 
         return True
@@ -1059,8 +1038,8 @@ class Service(Descriptor):
 
     def undeclared_connection_points(self):
         """
-        Provides a list of connection points that are referenced in 
-        'virtual_links' section but not declared in 'connection_points' 
+        Provides a list of connection points that are referenced in
+        'virtual_links' section but not declared in 'connection_points'
         of the Service or its Functions.
         """
         target_cp_refs = self.vlink_cp_refs + self.vbridge_cp_refs
@@ -1126,6 +1105,23 @@ class Function(Descriptor):
             unit = Unit(vdu['id'])
             self.associate_unit(unit)
 
+            # Check vm image URLs
+            # only perform a check if vm_image is a URL
+            vdu_image_path = vdu['vm_image']
+            if validators.url(vdu_image_path):  # Check if is URL/URI.
+                try:
+                    # Check if the image URL is accessible
+                    # within a short time interval
+                    requests.head(vdu_image_path, timeout=1)
+
+                except (requests.Timeout, requests.ConnectionError):
+
+                    evtlog.log("VDU image not found",
+                               "Failed to verify the existence of VDU image at"
+                               " the address '{0}'. VDU id='{1}'"
+                               .format(vdu_image_path, vdu['id']),
+                               self.id,
+                               'evt_vnfd_itg_vdu_image_not_found')
         return True
 
     def load_unit_connection_points(self):
@@ -1150,9 +1146,12 @@ class Function(Descriptor):
         """
         Build the network topology graph of the function.
         :param bridges: indicates if bridges should be included in the graph
+        :param parent_id: identify the parent service of this function
         :param level: indicates the granularity of the graph
                     0: VNF level (showing VDUs but not VDU connection points)
                     1: VDU level (with VDU connection points)
+        :param vdu_inner_connections: indicates whether VDU connection points
+                                      should be internally connected
         """
         graph = nx.Graph()
 
@@ -1208,7 +1207,6 @@ class Function(Descriptor):
 
             if level == 0:
                 # unit interfaces not considered as nodes, just the unit itself
-
                 if vl.cpr_u not in self.connection_points and len(cpr_u) > 1:
                     cpr_u = cpr_u[0]
                 else:
