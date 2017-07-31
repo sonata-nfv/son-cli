@@ -172,9 +172,7 @@ class Experiment:
         else:
             self._log_info("No PED data found. Running in single experiment mode.")
 
-        # get the port to upload the packages to, if not specified, default to 5000
-        package_port = node.get("package_port", 5000)
-        LOG.debug("Run %r: Port for packages is %r."%(run_id, package_port))
+        self.payload_done = False
 
 
     """
@@ -337,6 +335,8 @@ class Experiment:
         self._log_info("Stopping service")
         requests.delete("%s/instantiations"%(remote_url), data=json.dumps({"service_uuid":service_uuid, "service_instance_uuid":service_instance_uuid}))
 
+        # sometimes, the package upload fails, so we validate the execution of the payload
+        self.payload_done = True
 
         return service_uuid
 
