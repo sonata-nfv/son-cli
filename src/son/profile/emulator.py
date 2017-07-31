@@ -69,7 +69,7 @@ class Emulator:
             LOG.debug("Found target platforms in dictionary.")
 
         # save the emulator nodes
-        self.emulator_nodes = tpd
+        self.emulator_nodes = {tpd[i].get('name'):tpd[i] for i in range(len(tpd))}
 
         # check for empty emulator node lists
         if not len(self.emulator_nodes):
