@@ -34,6 +34,7 @@ from son.access.pull import Pull
 from son.access.push import Push
 # from son.access.config.config import GK_ADDRESS, GK_PORT
 
+
 def pull_tests():
     # platform_url = 'http://' + str(GK_ADDRESS) + ':' + str(GK_PORT)
     pull_client = Pull(base_url="http://sp.int.sonata-nfv.eu:32001")
@@ -57,8 +58,8 @@ def pull_tests():
     resource = pull_client.get_vnf("dce3cffd-4957-40fe-adcc-cdc41c97a805")
     print("VNF RESPONSE", resource)
 
-    #resource = pull_client.get_package("e84cf007-3e68-45a2-8f05-d1718c767220")
-    #print "Package RESPONSE", resource
+    # resource = pull_client.get_package("e84cf007-3e68-45a2-8f05-d1718c767220")
+    # print "Package RESPONSE", resource
 
 
 def push_tests():
@@ -85,14 +86,14 @@ def generate_keypair():
     public = key.publickey().exportKey('PEM').decode('ascii')
     private = key.exportKey('PEM').decode('ascii')
 
-    #simple_public = key.publickey().exportKey().splitlines()[1:-1]
+    # simple_public = key.publickey().exportKey().splitlines()[1:-1]
     simple_public = public.replace('-----BEGIN PUBLIC KEY-----', '')
     print('simple_public1=', simple_public)
     simple_public = simple_public.replace('-----END PUBLIC KEY-----', '')
 
     print('simple_public2=', simple_public)
-    #simple_public = (b'\n'.join(simple_public))
-    #print('simple_public2=', simple_public)
+    # simple_public = (b'\n'.join(simple_public))
+    # print('simple_public2=', simple_public)
 
     print("public=", public)
     print("private=", private)
@@ -102,15 +103,15 @@ def generate_keypair():
     with open("public_key", mode="w") as pb_file:
             pb_file.write(public)
 
-    # TODO: Save Public Key in Service Platform User Management database
+    # Save Public Key in Service Platform User Management database
     url = "http://127.0.0.1:5001/api/v2/signature"
-    # headers =
     body = json.dumps({'public_key': simple_public})
     print("body=", body)
 
     r = requests.put(url, headers={'Content-type': 'application/json'}, data=body)
     if r.status_code == 201:
         msg = "Upload succeeded"
+
 
 def user_login(username, password):
     import requests
@@ -133,6 +134,7 @@ def user_login(username, password):
         return response.text
     token = json.loads(response.text)['access_token']
     return token
+
 
 def get_platform_public_key():
     """
@@ -163,9 +165,9 @@ def check_token(key, access_token):
     Simple request to check if session has expired (TBD)
     :return: Token status
     """
-    # access_token = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJPelpfa1VoUzAwNlF0SFVKTWtPWUxtV2NRaFNyTlgwV0p1aFNVMTZHR1NFIn0.eyJqdGkiOiJjYTU0MjM0NC1hMTgxLTRkYmEtOWU5Yi1mOGM5ZjMwOWY2NDkiLCJleHAiOjE0OTIwMDc2NjIsIm5iZiI6MCwiaWF0IjoxNDkyMDA3MzYyLCJpc3MiOiJodHRwOi8vc29uLWtleWNsb2FrOjU2MDEvYXV0aC9yZWFsbXMvc29uYXRhIiwiYXVkIjoiYWRhcHRlciIsInN1YiI6IjllNzMwZWJlLTk3MzgtNGY1ZC05OTNiLTEzYjlmOGJjOTFlZiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFkYXB0ZXIiLCJhdXRoX3RpbWUiOjAsInNlc3Npb25fc3RhdGUiOiIwMzU3YmNiYS03ZjFiLTRjNzYtOTBjZi1hOTA2MjViNDIxZTMiLCJhY3IiOiIxIiwiY2xpZW50X3Nlc3Npb24iOiJkNGNmZWFhNS1iMDE3LTRlYmQtOTA3MS0xMGNhZTIxNzMxYzAiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdDo4MDgxIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZXZlbG9wZXIiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sIm5hbWUiOiJVc2VyIFNhbXBsZSIsInByZWZlcnJlZF91c2VybmFtZSI6InVzZXIwMSIsImdpdmVuX25hbWUiOiJVc2VyIiwiZmFtaWx5X25hbWUiOiJTYW1wbGUiLCJlbWFpbCI6InVzZXIuc2FtcGxlQGVtYWlsLmNvbSJ9.Q_vh4QenmJjf1MFPHSWsLQFsU6u0VB37YUMC8tN7prqFRSHe8EztYXhfixh1pxkqb8doaxTcR2DWC4orhzWc-3srFwbAHI5y_ZiZ54gFQBwUW3mAEhSsLkD-MJTqLJ9hexHYj0I2zpSGBsWdbMCeg0AVUnWt7BGTfJ8CUQo5GJWyWnusJ95WFr9XgZ5QR_bxJLqYzoh1QnLxN1kXEYGeTYuL36Miaf5KOzY2FiQyKnj4arSEScJFQQy2FVjxSD3yOXTBl6pcMPvdKOGIIdcPw1Maf0dATTcT1dprX-HEonaE0nduCXYquCedB_fJr21WHRMs62ZagL7cEgU7eXoowA'
     try:
-        contents = jwt.decode(access_token, key, True, algorithms='RS256', audience='adapter')  # options={'verify_aud': False})
+        contents = jwt.decode(access_token, key, True, algorithms='RS256', audience='adapter')
+        # options={'verify_aud': False})
         print('contents', contents)
         return True
     except jwt.ExpiredSignatureError:

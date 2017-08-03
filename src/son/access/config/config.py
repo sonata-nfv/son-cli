@@ -1,5 +1,4 @@
 # Configuration parameters
-
 # This file will contain different configuration values
 """[Service Platform API]"""
 GK_ADDRESS = 'sp.int3.sonata-nfv.eu'   # '127.0.0.1'
