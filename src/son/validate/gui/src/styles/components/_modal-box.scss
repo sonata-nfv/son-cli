@@ -1,0 +1,175 @@
+.sv-modal {
+    z-index: 20;
+    position: relative;
+
+    &__background {
+        position: fixed;
+        height: 100vh;
+        width: 100vw;
+        background-color: rgba($black, 0.3);
+        top: 0;
+        left: 0;
+    }
+
+    &__container {
+        width: 500px;
+        position: fixed;
+        top: 5vh;
+        left: calc(50vw - 250px);
+        background-color: $white;
+        border-radius: 4px;
+        box-shadow: 0 0 20px 0 rgba($black, 0.15);
+        box-sizing: border-box;
+
+        .container__header {
+            padding: 16px 15px;
+            border-bottom: 1px solid $grey3;
+            color: $blue-navy;
+            background-color: rgba($blue-navy, 0.1);
+            height: 48px;
+            box-sizing: border-box;
+
+            .header__title {
+                color: $blue-sky;
+                font-weight: 700;
+                margin: 20px 0 6px;
+                line-height: 20px;
+                font-family: OpenSans;
+                font-size: 18px;
+            }
+
+            .header__close {
+                background-image: url('./../assets/icons/ic-close.svg');
+                background-repeat: no-repeat;
+                width: 16px;
+                height: 16px;
+                float: right;
+                cursor: pointer;
+            }
+        }
+
+        .container__wrapper {
+            overflow-y: auto;
+        }
+
+        .container__content {
+            padding: 15px;
+
+            .content__title {
+                font-family: OpenSans;
+                color:  $blue-navy;
+                font-size: 12px;
+                font-weight: 700;
+                margin: 25px 0 20px 0;
+                text-transform: uppercase;
+            }
+
+            .content__validation-list {
+                font-family: OpenSans;
+                
+                .validation-list__header {
+                    color: $grey4;
+                    padding-bottom: 12px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    border-bottom: 1px solid rgba($blue-navy, 0.1);
+                }
+
+                .validation-list__item {
+                    color:  $black;
+                    font-size: 14px;
+                    font-weight: 400;
+                    line-height: 48px;
+                    border-bottom: 1px solid rgba($blue-navy, 0.1);
+
+                    .column {
+                        width: 100%;
+                        text-overflow: ellipsis;
+                        overflow: hidden;
+                        white-space: nowrap;
+                    }
+
+                    .column--invert-dir {
+                        direction: rtl;
+                    }
+                }
+            }
+
+            .content__list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                height: 200px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                max-height: 300px;
+
+                .list__report-item {
+                    line-height:  35px;
+                    font-size: 14px;
+                }
+            }
+
+            .content__new-validation {
+                .title {
+                    font-size: 14px;
+                    color: $black;
+                }
+            }
+        }
+
+        .container__content--error {
+            padding: 10px 15px 0;
+        }
+
+        .container__footer {
+            padding: 15px;
+        }
+
+        .container__error-box {
+            border: 1px solid $red;
+            background-color: rgba($red, 0.3);
+            height: 45px;
+            box-sizing: border-box;
+            padding: 10px 15px;
+            border-radius: 4px;
+
+            .error-box__text {
+                color: $red;
+                font-family: OpenSans;
+                font-size: 13px;
+                font-weight: 600;
+                line-height: 24px;
+            }
+
+            .error-box__icon {
+                width: 20px;
+                height: 20px;
+                text-align: center;
+                border-radius: 20px;
+                background-color: $red;
+                color: rgba($white, 0.7);
+                text-shadow: 0px 0px 1px rgba($white, 0.7);
+                font-family: serif;
+                float: right;
+            }
+        }
+    }
+}
+
+.sv-modal--hidden {
+  display: none;
+}
+
+@mixin modal--sm() {
+    .container__wrapper {
+        max-height: 73vh;
+    }
+}
+
+@mixin modal--lg() {
+    .container__wrapper {
+        max-height: 90vh;
+    }
+}

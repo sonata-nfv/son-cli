@@ -1,0 +1,13 @@
+<div class="container-fluid container-fluid--no-padding">
+    <div class="row">
+        <div class="col-xs-3 col--no-gutter">
+            <sv-control-menu fwgraphs="$ctrl.fwgraphs"></sv-control-menu>
+        </div>
+        <div  class="col-xs-9 col--no-gutter">
+            <h4 class="sv-viewer__title">{{$ctrl.path}}</h4>
+            <sv-viewer topology="$ctrl.topology" fwgraphs="$ctrl.fwgraphs" errors="$ctrl.errors" warnings="$ctrl.warnings"></sv-viewer>
+        </div>
+    </div>
+    <sv-results fwgraphs="$ctrl.fwgraphs" errors="$ctrl.errors" warnings="$ctrl.warnings" ></sv-results>
+    <sv-modal-box is-hidden="$ctrl.hideModal" on-close="$ctrl.hideModal = true" on-id-change="$ctrl.onValidationSelect($event)"></sv-modal-box>
+</div>

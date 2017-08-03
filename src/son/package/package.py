@@ -196,7 +196,7 @@ class Packager(object):
         if prj_descriptor:
             gds['entry_service_template'] = self._entry_service_template
 
-            if not 'package' in prj_descriptor.keys():
+            if 'package' not in prj_descriptor.keys():
                 log.error("Please define 'package' section in {}"
                           .format(Project.__descriptor_name__))
                 return
@@ -214,7 +214,7 @@ class Packager(object):
                                   Project.__descriptor_name__))
                 return
         else:
-            #TODO: what properties to set in a custom package? TBD...
+            # TODO: what properties to set in a custom package? TBD...
             gds['vendor'] = 'custom'
             gds['name'] = 'package'
             gds['version'] = '1.0'
@@ -495,7 +495,7 @@ class Packager(object):
 
             # >> First, check if this VNF is in the workspace catalogue
             catalogue_path = os.path.join(
-                self._workspace.ws_root,
+                self._workspace.workspace_root,
                 self._workspace.vnf_catalogue_dir,
                 vnf_id)
 

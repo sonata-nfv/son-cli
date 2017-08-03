@@ -27,6 +27,8 @@
 import os
 import logging
 import networkx as nx
+import validators
+import requests
 from collections import OrderedDict
 from son.validate.util import descriptor_id, read_descriptor_file
 from son.validate import event
@@ -152,11 +154,11 @@ class Node:
     def __init__(self, nid):
         """
         Initialize a node object.
-        Typically, a node holds multiple network interfaces.
+        A node holds multiple network connection points
         :param nid: node id
         """
         self._id = nid
-        self._interfaces = []
+        self._connection_points = []
 
     @property
     def id(self):
@@ -167,108 +169,120 @@ class Node:
         return self._id
 
     @property
-    def interfaces(self):
+    def connection_points(self):
         """
         Provides a list of interfaces associated with the node.
         :return: interface list
         """
-        return self._interfaces
+        return self._connection_points
 
-    @interfaces.setter
-    def interfaces(self, value):
-        self._interfaces = value
+    @connection_points.setter
+    def connection_points(self, value):
+        self._connection_points = value
 
-    def add_interface(self, interface):
+    def add_connection_point(self, cp):
         """
         Associate a new interface to the node.
-        :param interface: interface id
+        :param cp: connection point ID
         """
-        if interface in self.interfaces:
+        if cp in self.connection_points:
             evtlog.log("Duplicate connection point",
-                       "The interface id='{0}' is already stored in node "
-                       "id='{1}'".format(interface, self.id),
+                       "The CP id='{0}' is already stored in node "
+                       "id='{1}'".format(cp, self.id),
                        self.id,
                        'evt_duplicate_cpoint')
             return
+
+        # check if connection point has the correct format
+        s_cp = cp.split(':')
+        if len(s_cp) != 1:
+            evtlog.log("Invalid_connection_point",
+                       "The CP id='{0}' is invalid. The separator ':' is "
+                       "reserved to reference connection points"
+                       .format(cp),
+                       self.id,
+                       'evt_invalid_cpoint')
+            return
+
         log.debug("Node id='{0}': adding connection point '{1}'"
-                  .format(self.id, interface))
-        self._interfaces.append(interface)
+                  .format(self.id, cp))
+
+        self._connection_points.append(cp)
 
         return True
 
 
-class Link:
-    def __init__(self, link_id, iface_u, iface_v):
+class VLink:
+    def __init__(self, vl_id, cpr_u, cpr_v):
         """
-        Initialize a link object.
-        A link defines a connection between two interfaces.
-        :param link_id: link id
-        :param iface_u: interface u
-        :param iface_v: interface v
+        Initialize a vlink object.
+        A vlink defines a connection between two connection_points.
+        :param vl_id: link id
+        :param cpr_u: connection point reference u
+        :param cpr_v: connection point reference v
         """
-        self._id = link_id
-        self._iface_pair = [iface_u, iface_v]
+        self._id = vl_id
+        self._cpr_pair = [cpr_u, cpr_v]
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
-        return "{} -- {}".format(self.id, self.iface_u, self.iface_v)
+        return "{} -- {}".format(self.id, self.cpr_u, self.cpr_v)
 
     @property
     def id(self):
         return self._id
 
     @property
-    def interfaces(self):
+    def connection_point_refs(self):
         """
-        The two interfaces composing the link in a list format [u, v]
-        :return: interface list
+        The two connection points references composing the vlink
+        in a list format [u, v]
+        :return: list (size 2) of connection point references
         """
-        return self._iface_pair
+        return self._cpr_pair
 
     @property
-    def iface_u(self):
+    def cpr_u(self):
         """
-        Interface u
-        :return: interface u
+        Connection point reference u
         """
-        return self._iface_pair[0]
+        return self._cpr_pair[0]
 
     @property
-    def iface_v(self):
+    def cpr_v(self):
         """
-        Interface v
-        :return: interface v
+        Connection point reference v
         """
-        return self._iface_pair[1]
+        return self._cpr_pair[1]
 
 
-class Bridge:
-    def __init__(self, bridge_id, interfaces):
+class VBridge:
+    def __init__(self, vb_id, cp_refs):
         """
-        Initialize a bridge object.
-        A bridge contains a list of N associated interfaces.
+        Initialize a vbridge object.
+        A bridge contains a list of N associated connection point reference.
         """
-        assert bridge_id
-        assert interfaces
+        assert vb_id
+        assert cp_refs
 
-        self._id = bridge_id
-        self._interfaces = interfaces
+        self._id = vb_id
+        self._cp_refs = cp_refs
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
-        return "{}".format(self.interfaces)
+        return "{}".format(self.connection_point_refs)
 
     @property
     def id(self):
         return self._id
 
     @property
-    def interfaces(self):
-        return self._interfaces
+    def connection_point_refs(self):
+        return self._cp_refs
 
 
 class Descriptor(Node):
@@ -289,8 +303,8 @@ class Descriptor(Node):
         super().__init__(self.id)
         self._complete_graph = None
         self._graph = None
-        self._links = {}
-        self._bridges = {}
+        self._vlinks = {}
+        self._vbridges = {}
 
     @property
     def id(self):
@@ -339,36 +353,34 @@ class Descriptor(Node):
             self.content = content
 
     @property
-    def links(self):
+    def vlinks(self):
         """
         Provides the links associated with the descriptor.
         :return: dictionary of link objects
         """
-        return self._links
+        return self._vlinks
 
     @property
-    def bridges(self):
+    def vbridges(self):
         """
         Provides the bridges associated with the descriptor.
-        :return: dictionary of bridge objects
+        :return: dictionary of vbridge objects
         """
-        return self._bridges
+        return self._vbridges
 
     @property
-    def link_interfaces(self):
-
-        link_interfaces = []
-        for lid, link in self.links.items():
-            link_interfaces += link.interfaces
-
-        return link_interfaces
+    def vlink_cp_refs(self):
+        vlink_cps = []
+        for vl_id, vl in self.vlinks.items():
+            vlink_cps += vl.connection_point_refs
+        return vlink_cps
 
     @property
-    def bridge_interfaces(self):
-        bridge_interfaces = []
-        for bid, bridge in self.bridges.items():
-            bridge_interfaces += bridge.interfaces
-        return bridge_interfaces
+    def vbridge_cp_refs(self):
+        vbridge_cp_references = []
+        for vb_id, vb in self.vbridges.items():
+            vbridge_cp_references += vb.connection_point_refs
+        return vbridge_cp_references
 
     @property
     def graph(self):
@@ -395,42 +407,95 @@ class Descriptor(Node):
     def complete_graph(self, value):
         self._complete_graph = value
 
-    def load_interfaces(self):
+    def load_connection_points(self):
         """
-        Load interfaces of the descriptor.
+        Load connection points of the descriptor.
         It reads the section 'connection_points' of the descriptor contents.
         """
-        for cxpt in self.content['connection_points']:
-            if not self.add_interface(cxpt['id']):
+        if 'connection_points' not in self.content:
+            return
+        for cp in self.content['connection_points']:
+            if not self.add_connection_point(cp['id']):
                 return
         return True
 
-    def add_bridge(self, bid, interfaces):
+    def add_vbridge(self, vb_id, cp_refs):
         """
-        Add bridge to the descriptor.
-
-        :param bid:
-        :param interfaces:
-        :return:
+        Add vbridge to the descriptor.
         """
-        assert bid
-        assert len(interfaces) > 0
-        assert bid not in self.bridges.keys()
+        # check number of connection point references
+        if len(cp_refs) < 1:
+            evtlog.log("Bad number of connection points",
+                       "The vlink id='{0}' must have at lease 1 connection "
+                       "point reference"
+                       .format(vb_id),
+                       self.id,
+                       'evt_invalid_vlink')
+            return
 
-        self._bridges[bid] = Bridge(bid, interfaces)
+        # check for duplicate virtual links
+        if vb_id in self.vlinks.keys() or vb_id in self.vbridges.keys():
+            evtlog.log("Duplicate virtual link",
+                       "The vlink id='{0}' is already defined"
+                       .format(vb_id),
+                       self.id,
+                       'evt_duplicate_vlink')
+            return
 
-    def add_link(self, lid, interfaces):
+        # check connection point reference format
+        for cp in cp_refs:
+            s_cp = cp.split(':')
+            if len(s_cp) > 2:
+                evtlog.log("Invalid connection point reference",
+                           "The connection point reference '{0}' of vlink"
+                           " id='{1}' has an incorrect format: found multiple "
+                           "separators ':'"
+                           .format(cp, vb_id),
+                           self.id,
+                           'evt_invalid_cpoint_ref')
+                return
+
+        self._vbridges[vb_id] = VBridge(vb_id, cp_refs)
+        return True
+
+    def add_vlink(self, vl_id, cp_refs):
         """
-        Add link to the descriptor.
-        Associate a connection, between two interfaces.
-        :param lid: link id
-        :param interfaces: interface pair list
+        Add vlink to the descriptor.
         """
-        assert lid
-        assert len(interfaces) == 2
-        assert lid not in self.links.keys()
+        # check number of connection point references
+        if len(cp_refs) != 2:
+            evtlog.log("Bad number of connection points",
+                       "The vlink id='{0}' must have exactly 2 connection "
+                       "point references"
+                       .format(vl_id),
+                       self.id,
+                       'evt_invalid_vlink')
+            return
 
-        self._links[lid] = Link(lid, interfaces[0], interfaces[1])
+        # check for duplicate virtual links
+        if vl_id in self.vlinks.keys() or vl_id in self.vbridges.keys():
+            evtlog.log("Duplicate virtual link",
+                       "The vlink id='{0}' is already defined"
+                       .format(vl_id),
+                       self.id,
+                       'evt_duplicate_vlink')
+            return
+
+        # check connection point reference format
+        for cp in cp_refs:
+            s_cp = cp.split(':')
+            if len(s_cp) > 2:
+                evtlog.log("Invalid connection point reference",
+                           "The connection point reference '{0}' of vlink"
+                           " id='{1}' has an incorrect format: found multiple "
+                           "separators ':'"
+                           .format(cp, vl_id),
+                           self.id,
+                           'evt_invalid_cpoint_ref')
+                return
+
+        self._vlinks[vl_id] = VLink(vl_id, cp_refs[0], cp_refs[1])
+        return True
 
     def load_virtual_links(self):
         """
@@ -441,30 +506,39 @@ class Descriptor(Node):
         if 'virtual_links' not in self.content:
             return
 
-        for link in self.content['virtual_links']:
-            ltype = link['connectivity_type'].lower()
-            if ltype == 'e-line':
-                self.add_link(link['id'],
-                              link['connection_points_reference'])
+        for vl in self.content['virtual_links']:
+            if not vl['id']:
+                evtlog.log("Missing virtual link ID",
+                           "A virtual link is missing its ID",
+                           self.id,
+                           'evt_invalid_vlink')
+                return
 
-            elif ltype == 'e-lan':
-                self.add_bridge(link['id'],
-                                link['connection_points_reference'])
+            vl_type = vl['connectivity_type'].lower()
+            if vl_type == 'e-line':
+                if not self.add_vlink(vl['id'],
+                                      vl['connection_points_reference']):
+                    return
+
+            if vl_type == 'e-lan':
+                if not self.add_vbridge(vl['id'],
+                                        vl['connection_points_reference']):
+                    return
+
         return True
 
-    def find_unused_interfaces(self):
+    def unused_connection_points(self):
         """
-        Provides a list of interfaces that are not referenced by
-        'virtual_links'. Should only be invoked after links are loaded.
-        :return:
+        Provides a list of connection points that are not referenced by
+        'virtual_links'. Should only be invoked after connection points
+        are loaded.
         """
-        unused_ifaces = []
-        for iface in self.interfaces:
-            if iface not in self.link_interfaces and \
-                    iface not in self.bridge_interfaces:
-                unused_ifaces.append(iface)
-
-        return unused_ifaces
+        unused_cps = []
+        for cp in self.connection_points:
+            if cp not in self.vlink_cp_refs and \
+                    cp not in self.vbridge_cp_refs:
+                unused_cps.append(cp)
+        return unused_cps
 
 
 class Package(Descriptor):
@@ -482,7 +556,8 @@ class Package(Descriptor):
         Provides the entry point service of the package.
         :return: service id
         """
-        return self.content['entry_service_template']
+        return self.content['entry_service_template'] if \
+            'entry_service_template' in self.content else None
 
     @property
     def service_descriptors(self):
@@ -562,15 +637,12 @@ class Service(Descriptor):
         return self._fw_graphs
 
     @property
-    def all_function_interfaces(self):
-        """
-        Provides a list of interfaces from all functions of this service.
-        """
-        all_interfaces = []
-        for fid, function in self.functions.items():
-            for iface in function.interfaces:
-                all_interfaces.append(self.vnf_id(function) + ':' + iface)
-        return all_interfaces
+    def all_function_connection_points(self):
+        func_cps = []
+        for fid, f in self.functions.items():
+            func_cps += f.connection_points
+
+        return func_cps
 
     def mapped_function(self, vnf_id):
         """
@@ -581,56 +653,41 @@ class Service(Descriptor):
         """
         if vnf_id not in self._vnf_id_map or self._vnf_id_map[vnf_id] not in\
                 self._functions:
-            #log.error("Function of vnf_id='{}' is not mapped".format(vnf_id))
             return
         return self._functions[self._vnf_id_map[vnf_id]]
 
-    def vnf_id(self, function):
+    def vnf_id(self, func):
         """
         Provides the vnf id associated with the provided function.
-        :param function: function object
+        :param func: function object
         :return: vnf id
         """
         for vnf_id, fid in self._vnf_id_map.items():
-            if fid == function.id:
+            if fid == func.id:
                 return vnf_id
         return
 
-    def function_of_interface(self, interface):
-        """
-        Provides the function associated with an interface.
-        :param interface: interface str
-        :return: function object
-        """
-
-
-        for fid, f in self.functions.items():
-            for iface in f.interfaces:
-                if iface == interface or \
-                                (self.vnf_id(f) + ':' + iface) == interface:
-                    return f
-
-    def associate_function(self, function, vnf_id):
+    def associate_function(self, func, vnf_id):
         """
         Associate a function to the service.
-        :param function: function object
+        :param func: function object
         :param vnf_id: vnf id, defined in the service descriptor content
         """
-        if type(function) is not Function:
+        if type(func) is not Function:
             log.error("The function (VNF) id='{0}' has an invalid type"
-                      .format(function.id))
+                      .format(func.id))
             return
 
-        if function.id in self.functions:
+        if func.id in self.functions:
             log.error("The function (VNF) id='{0}' is already associated with "
-                      "service id='{1}'".format(function.id, self.id))
+                      "service id='{1}'".format(func.id, self.id))
             return
 
         log.debug("Service '{0}': associating function id='{1}' with vnf_id="
-                  "'{2}'".format(self.id, function.id, vnf_id))
+                  "'{2}'".format(self.id, func.id, vnf_id))
 
-        self._functions[function.id] = function
-        self._vnf_id_map[vnf_id] = function.id
+        self._functions[func.id] = func
+        self._vnf_id_map[vnf_id] = func.id
 
     def build_topology_graph(self, level=1, bridges=False,
                              vdu_inner_connections=True):
@@ -641,12 +698,10 @@ class Service(Descriptor):
                     1: service level (with VNF interfaces) - default
                     2: VNF level (showing VDUs but not VDU interfaces)
                     3: VDU level (with VDU interfaces)
-
-        :param deep: indicates the granularity of the graph
-                     True - graph will include topology graphs of functions
-                     False - graph will only include the service topology graph
         :param bridges: indicates whether bridges should be included in
                         the graph
+        :param vdu_inner_connections: indicates whether VDU connection points
+                                      should be internally connected
         """
         assert 0 <= level <= 3  # level must be 0, 1, 2, 3
 
@@ -663,22 +718,22 @@ class Service(Descriptor):
                           'type': ''  # 'iface' | 'br-iface' | 'vdu_in'
                           }
 
-        # assign nodes from service interfaces
-        interfaces = self.link_interfaces
+        # assign nodes from service connection points
+        connection_point_refs = self.vlink_cp_refs
         if bridges:
-            interfaces += self.bridge_interfaces
+            connection_point_refs += self.vbridge_cp_refs
 
-        for iface in interfaces:
+        for cpr in connection_point_refs:
             node_attrs = def_node_attrs.copy()
-            node_attrs['label'] = iface
-            s_iface = iface.split(':')
-            function = self.mapped_function(s_iface[0])
-            if len(s_iface) > 1 and function:
+            node_attrs['label'] = cpr
+            s_cpr = cpr.split(':')
+            func = self.mapped_function(s_cpr[0])
+            if len(s_cpr) > 1 and func:
 
                 node_attrs['parent_id'] = self.id
                 node_attrs['level'] = 1
-                node_attrs['node_id'] = function.id
-                node_attrs['node_label'] = function.content['name']
+                node_attrs['node_id'] = func.id
+                node_attrs['node_label'] = func.content['name']
 
             else:
                 node_attrs['parent_id'] = ""
@@ -686,89 +741,111 @@ class Service(Descriptor):
                 node_attrs['node_id'] = self.id
                 node_attrs['node_label'] = self.content['name']
 
-            node_attrs['label'] = s_iface[1] if len(s_iface) > 1 else iface
+            node_attrs['label'] = s_cpr[1] if len(s_cpr) > 1 else cpr
 
-            if iface in self.link_interfaces:
+            if cpr in self.vlink_cp_refs:
                 node_attrs['type'] = 'iface'
-            elif iface in self.bridge_interfaces:
+            elif cpr in self.vbridge_cp_refs:
                 node_attrs['type'] = 'br-iface'
 
-            graph.add_node(iface, attr_dict=node_attrs)
+            graph.add_node(cpr, attr_dict=node_attrs)
 
         prefixes = []
         # assign sub-graphs of functions
-        for fid, function in self.functions.items():
-            # TODO: temporarily apply vnf_id:interface prefix patch. must be
+        for fid, func in self.functions.items():
             # done to work with current descriptors of sonata demo
             prefix_map = {}
-            prefix = self.vnf_id(function)
+            prefix = self.vnf_id(func)
 
             if level <= 2:
-                function.graph = function.build_topology_graph(parent_id=self.id,
-                                                               bridges=bridges,
-                                                               level=0,
-                                                               vdu_inner_connections=vdu_inner_connections)
+                func.graph = func.build_topology_graph(
+                    parent_id=self.id,
+                    bridges=bridges,
+                    level=0,
+                    vdu_inner_connections=vdu_inner_connections)
             else:
-                function.graph = function.build_topology_graph(parent_id=self.id,
-                                                               bridges=bridges,
-                                                               level=1,
-                                                               vdu_inner_connections=vdu_inner_connections)
+                func.graph = func.build_topology_graph(
+                    parent_id=self.id,
+                    bridges=bridges,
+                    level=1,
+                    vdu_inner_connections=vdu_inner_connections)
+
             if level == 0:
-                for node in function.graph.nodes():
-                    pn = prefix + ':' + node
-                    if graph.has_node(pn):
-                        graph.remove_node(pn)
+                for node in func.graph.nodes():
+                    node_tokens = node.split(':')
+                    if len(node_tokens) > 1 and node in graph.nodes():
+                        graph.remove_node(node)
+                    else:
+                        pn = prefix + ':' + node
+                        if graph.has_node(pn):
+                            graph.remove_node(pn)
                 prefixes.append(prefix)
 
             elif level == 1:
                 prefixes.append(prefix)
 
-            elif level >= 2:
+            elif level == 2:
+                for node in func.graph.nodes():
+                    s_node = node.split(':')
+                    if len(s_node) > 1:
+                        prefix_map[node] = prefix + ':' + s_node[0]
+                    else:
+                        prefix_map[node] = prefix + ':' + node
 
-                for node in function.graph.nodes():
-                    prefix_map[node] = prefix + ':' + node
-
-                re_f_graph = nx.relabel_nodes(function.graph, prefix_map, copy=True)
+                re_f_graph = nx.relabel_nodes(func.graph, prefix_map,
+                                              copy=True)
                 graph.add_nodes_from(re_f_graph.nodes(data=True))
                 graph.add_edges_from(re_f_graph.edges(data=True))
 
-        # build links topology graph
-        if not self.links and not self.bridges:
+            elif level == 3:
+                for node in func.graph.nodes():
+                    s_node = node.split(':')
+                    if node in func.connection_points and len(s_node) > 1:
+                        prefix_map[node] = node
+                    else:
+                        prefix_map[node] = prefix + ':' + node
+
+                re_f_graph = nx.relabel_nodes(func.graph, prefix_map,
+                                              copy=True)
+                graph.add_nodes_from(re_f_graph.nodes(data=True))
+                graph.add_edges_from(re_f_graph.edges(data=True))
+
+        # build vlinks topology graph
+        if not self.vlinks and not self.vbridges:
             log.warning("No links were found")
 
-        for lid, link in self.links.items():
+        for vl_id, vl in self.vlinks.items():
 
             if level >= 1:
-                iface_u = link.iface_u
-                iface_v = link.iface_v
+                cpr_u = vl.cpr_u
+                cpr_v = vl.cpr_v
 
             elif level == 0:
-                iface_u = link.iface_u.split(':')
-                iface_v = link.iface_v.split(':')
+                cpr_u = vl.cpr_u.split(':')
+                cpr_v = vl.cpr_v.split(':')
 
-                if len(iface_u) > 1 and iface_u[0] in prefixes:
-                    iface_u = iface_u[0]
+                if len(cpr_u) > 1 and cpr_u[0] in prefixes:
+                    cpr_u = cpr_u[0]
                 else:
-                    iface_u = link.iface_u
+                    cpr_u = vl.cpr_u
 
-                if len(iface_v) > 1 and iface_v[0] in prefixes:
-                    iface_v = iface_v[0]
+                if len(cpr_v) > 1 and cpr_v[0] in prefixes:
+                    cpr_v = cpr_v[0]
                 else:
-                    iface_v = link.iface_v
+                    cpr_v = vl.cpr_v
             else:
                 return
 
             link_attrs = def_link_attrs.copy()
-            link_attrs['label'] = link.id
+            link_attrs['label'] = vl.id
             link_attrs['level'] = 0 if level == 0 else 1
             link_attrs['type'] = 'iface'
+            graph.add_edge(cpr_u, cpr_v, attr_dict=link_attrs)
 
-            graph.add_edge(iface_u, iface_v, attr_dict=link_attrs)
-
-        # build bridge topology graph
+        # build vbridges topology graph
         if bridges:
-            for bid, bridge in self.bridges.items():
-                brnode = 'br-' + bid
+            for vb_id, vb in self.vbridges.items():
+                brnode = 'br-' + vb_id
                 node_attrs = def_node_attrs.copy()
                 node_attrs['label'] = brnode
                 node_attrs['level'] = 1
@@ -776,29 +853,31 @@ class Service(Descriptor):
 
                 # add 'router' node for this bridge
                 graph.add_node(brnode, attr_dict=node_attrs)
-                for iface in bridge.interfaces:
+                for cp in vb.connection_point_refs:
                     if level >= 1:
-                        s_iface = iface
+                        s_cp = cp
                     elif level == 0:
-                        s_iface = iface.split(':')
-                        if len(s_iface) > 1 and s_iface[0] in prefixes:
-                            s_iface = s_iface[0]
+                        s_cp = cp.split(':')
+                        if len(s_cp) > 1 and s_cp[0] in prefixes:
+                            s_cp = s_cp[0]
                         else:
-                            s_iface = iface
+                            s_cp = cp
                     else:
                         return
 
                     link_attrs = def_link_attrs
-                    link_attrs['label'] = bid
+                    link_attrs['label'] = vb_id
                     link_attrs['level'] = 0 if level == 0 else 1
                     link_attrs['type'] = 'br-iface'
-                    graph.add_edge(brnode, s_iface, attr_dict=link_attrs)
+                    graph.add_edge(brnode, s_cp, attr_dict=link_attrs)
 
         # inter-connect VNF interfaces
         if level == 1:
             for node_u in graph.nodes():
                 node_u_tokens = node_u.split(':')
+
                 if len(node_u_tokens) > 1 and node_u_tokens[0] in prefixes:
+
                     for node_v in graph.nodes():
                         if node_u == node_v:
                             continue
@@ -806,18 +885,30 @@ class Service(Descriptor):
                         if len(node_v_tokens) > 1 and \
                                 node_v_tokens[0] == node_u_tokens[0]:
 
-                            # verify internally if these interfaces are connected
-                            function = self.mapped_function(node_v_tokens[0])
-                            if (function.graph.has_node(node_u_tokens[1]) and
-                                function.graph.has_node(node_v_tokens[1]) and
-                                nx.has_path(function.graph,
-                                            node_u_tokens[1],
-                                            node_v_tokens[1])):
+                            # verify if these interfaces are connected
+                            func = self.mapped_function(node_v_tokens[0])
+
+                            if func.graph.has_node(node_u_tokens[1]):
+                                node_u_c = node_u_tokens[1]
+                            elif func.graph.has_node(node_u):
+                                node_u_c = node_u
+                            else:
+                                continue
+
+                            if func.graph.has_node(node_v_tokens[1]):
+                                node_v_c = node_v_tokens[1]
+                            elif func.graph.has_node(node_v):
+                                node_v_c = node_v
+                            else:
+                                continue
+
+                            if nx.has_path(func.graph, node_u_c, node_v_c):
                                 link_attrs = def_link_attrs
                                 link_attrs['label'] = node_u + '-' + node_v
                                 link_attrs['level'] = 1
                                 link_attrs['type'] = 'iface'
-                                graph.add_edge(node_u, node_v, attr_dict=link_attrs)
+                                graph.add_edge(node_u, node_v,
+                                               attr_dict=link_attrs)
 
         return graph
 
@@ -844,18 +935,32 @@ class Service(Descriptor):
                 s_fwpath['fp_id'] = fpath['fp_id']
 
                 path_dict = {}
-                for cxpt in fpath['connection_points']:
-                    iface = cxpt['connection_point_ref']
-                    pos = cxpt['position']
-                    if iface not in self.interfaces and \
-                       not self._interface_in_functions(iface):
+                for cp in fpath['connection_points']:
+                    cpr = cp['connection_point_ref']
+                    s_cpr = cpr.split(':')
+                    pos = cp['position']
+
+                    if len(s_cpr) == 1 and cpr not in self.connection_points:
                         evtlog.log("Undefined connection point",
                                    "Connection point '{0}' of forwarding path "
                                    "'{1}' is not defined"
-                                   .format(iface, fpath['fp_id']),
+                                   .format(cpr, fpath['fp_id']),
                                    self.id,
                                    'evt_nsd_top_fwgraph_cpoint_undefined')
                         return
+                    elif len(s_cpr) == 2:
+                        # get corresponding function
+                        func = self.mapped_function(s_cpr[0])
+                        if not func or (func and s_cpr[1]
+                                        not in func.connection_points):
+                            evtlog.log("Undefined connection point",
+                                       "Connection point '{0}' of forwarding "
+                                       "path '{1}' is not defined"
+                                       .format(cpr, fpath['fp_id']),
+                                       self.id,
+                                       'evt_nsd_top_fwgraph_cpoint_undefined')
+                            return
+
                     if pos in path_dict:
                         evtlog.log("Duplicate reference in FG",
                                    "Duplicate referenced position '{0}' "
@@ -865,7 +970,7 @@ class Service(Descriptor):
                                            path_dict[pos]),
                                    self.id,
                                    'evt_nsd_top_fwgraph_position_duplicate')
-                    path_dict[pos] = iface
+                    path_dict[pos] = cpr
                 d = OrderedDict(sorted(path_dict.items(),
                                        key=lambda t: t[0]))
 
@@ -876,10 +981,10 @@ class Service(Descriptor):
 
         return True
 
-    def _interface_in_functions(self, iface):
+    def _cp_in_functions(self, iface):
         """
-        Indicates whether the provided interface is defined in the functions
-        of the service.
+        Indicates whether the provided connection point is defined in the 
+        functions of the service.
         :param iface: interface
         :return: True, if a functions contains the interface
                  False, otherwise.
@@ -887,10 +992,11 @@ class Service(Descriptor):
         iface_tokens = iface.split(':')
         if len(iface_tokens) != 2:
             return False
-        function = self.mapped_function(iface_tokens[0])
-        if not function:
+        func = self.mapped_function(iface_tokens[0])
+        if not func:
             return False
-        if iface_tokens[1] not in function.interfaces:
+        if (iface_tokens[1] not in func.interfaces and
+                iface not in func.interfaces):
             return False
 
         return True
@@ -923,34 +1029,32 @@ class Service(Descriptor):
                 node_pair = {'break': False, 'from': path[x], 'to': None}
             else:
                 node_pair = {'break': False, 'from': path[x], 'to': path[x+1]}
-                if path[x+1] not in self._graph.neighbors(path[x]):
+                
+                if path[x] not in self.graph.nodes() or \
+                        path[x+1] not in self._graph.neighbors(path[x]):
                     node_pair['break'] = True
             trace.append(node_pair)
         return trace
 
-    def find_undeclared_interfaces(self, interfaces=None):
+    def undeclared_connection_points(self):
         """
-        Provides a list of interfaces that are referenced in 'virtual_links'
-        section but not declared in 'connection_points' of the Service and its
-        Functions.
+        Provides a list of connection points that are referenced in
+        'virtual_links' section but not declared in 'connection_points'
+        of the Service or its Functions.
         """
-        if interfaces:
-            target_ifaces = interfaces
-        else:
-            target_ifaces = self.link_interfaces + self.bridge_interfaces
+        target_cp_refs = self.vlink_cp_refs + self.vbridge_cp_refs
 
-        function_ifaces = self.all_function_interfaces
-        all_interfaces = self.interfaces.copy()
-        all_interfaces += function_ifaces
+        undeclared_cps = []
+        for cpr in target_cp_refs:
+            cpr_split = cpr.split(':')
+            if len(cpr_split) == 1 and cpr not in self.connection_points:
+                undeclared_cps.append(cpr)
+            else:
+                f = self.mapped_function(cpr_split[0])
+                if f and cpr_split[1] not in f.connection_points:
+                    undeclared_cps.append(cpr)
 
-        undeclared = []
-        for iface in target_ifaces:
-            if iface not in all_interfaces:
-                undeclared.append(iface)
-
-        return undeclared
-
-
+        return undeclared_cps
 
 
 class Function(Descriptor):
@@ -1001,11 +1105,28 @@ class Function(Descriptor):
             unit = Unit(vdu['id'])
             self.associate_unit(unit)
 
+            # Check vm image URLs
+            # only perform a check if vm_image is a URL
+            vdu_image_path = vdu['vm_image']
+            if validators.url(vdu_image_path):  # Check if is URL/URI.
+                try:
+                    # Check if the image URL is accessible
+                    # within a short time interval
+                    requests.head(vdu_image_path, timeout=1)
+
+                except (requests.Timeout, requests.ConnectionError):
+
+                    evtlog.log("VDU image not found",
+                               "Failed to verify the existence of VDU image at"
+                               " the address '{0}'. VDU id='{1}'"
+                               .format(vdu_image_path, vdu['id']),
+                               self.id,
+                               'evt_vnfd_itg_vdu_image_not_found')
         return True
 
-    def load_unit_interfaces(self):
+    def load_unit_connection_points(self):
         """
-        Load interfaces of the units of the function.
+        Load connection points of the units of the function.
         """
         for vdu in self.content['virtual_deployment_units']:
             if vdu['id'] not in self.units.keys():
@@ -1015,9 +1136,8 @@ class Function(Descriptor):
 
             unit = self.units[vdu['id']]
 
-            for cxpt in vdu['connection_points']:
-                unit.add_interface(cxpt['id'])
-                self.add_interface(cxpt['id'])
+            for cp in vdu['connection_points']:
+                unit.add_connection_point(cp['id'])
 
         return True
 
@@ -1026,9 +1146,12 @@ class Function(Descriptor):
         """
         Build the network topology graph of the function.
         :param bridges: indicates if bridges should be included in the graph
+        :param parent_id: identify the parent service of this function
         :param level: indicates the granularity of the graph
-                    0: VNF level (showing VDUs but not VDU interfaces)
-                    1: VDU level (with VDU interfaces)
+                    0: VNF level (showing VDUs but not VDU connection points)
+                    1: VDU level (with VDU connection points)
+        :param vdu_inner_connections: indicates whether VDU connection points
+                                      should be internally connected
         """
         graph = nx.Graph()
 
@@ -1041,19 +1164,20 @@ class Function(Descriptor):
                           'level': '',
                           'type': ''}
 
-        # assign nodes from function interfaces
-        interfaces = self.link_interfaces
-        if bridges:
-            interfaces += self.bridge_interfaces
+        # assign nodes from function
 
-        for iface in interfaces:
+        cp_refs = self.vlink_cp_refs
+        if bridges:
+            cp_refs += self.vbridge_cp_refs
+
+        for cpr in cp_refs:
             node_attrs = def_node_attrs.copy()
-            s_iface = iface.split(':')
-            unit = self.units[s_iface[0]] if s_iface[0] in self.units else None
-            if len(s_iface) > 1 and unit:
+            s_cpr = cpr.split(':')
+            unit = self.units[s_cpr[0]] if s_cpr[0] in self.units else None
+            if len(s_cpr) > 1 and unit:
 
                 if level == 0:
-                    iface = s_iface[0]
+                    iface = s_cpr[0]
                 node_attrs['parent_id'] = self.id
                 node_attrs['level'] = 2
                 node_attrs['node_id'] = unit.id
@@ -1064,118 +1188,121 @@ class Function(Descriptor):
                 node_attrs['node_id'] = self.id
                 node_attrs['node_label'] = self.content['name']
 
-            node_attrs['label'] = s_iface[1] if len(s_iface) > 1 else iface
+            node_attrs['label'] = s_cpr[1] if len(s_cpr) > 1 else cpr
 
-            if iface in self.link_interfaces:
+            if cpr in self.vlink_cp_refs:
                 node_attrs['type'] = 'iface'
-            elif iface in self.bridge_interfaces:
+            elif cpr in self.vbridge_cp_refs:
                 node_attrs['type'] = 'br-iface'
 
-            graph.add_node(iface, attr_dict=node_attrs)
+            graph.add_node(cpr, attr_dict=node_attrs)
 
         # build link topology graph
-        for lid, link in self.links.items():
+        for vl_id, vl in self.vlinks.items():
 
             edge_attrs = def_edge_attrs.copy()
 
-            iface_u = link.iface_u.split(':')
-            iface_v = link.iface_v.split(':')
+            cpr_u = vl.cpr_u.split(':')
+            cpr_v = vl.cpr_v.split(':')
 
             if level == 0:
                 # unit interfaces not considered as nodes, just the unit itself
-                if len(iface_u) > 1:
-                    iface_u = iface_u[0]
+                if vl.cpr_u not in self.connection_points and len(cpr_u) > 1:
+                    cpr_u = cpr_u[0]
                 else:
-                    iface_u = link.iface_u
+                    cpr_u = vl.cpr_u
 
-                if len(iface_v) > 1:
-                    iface_v = iface_v[0]
+                if vl.cpr_v not in self.connection_points and len(cpr_v) > 1:
+                    cpr_v = cpr_v[0]
                 else:
-                    iface_v = link.iface_v
+                    cpr_v = vl.cpr_v
 
                 edge_attrs['level'] = 1
 
             elif level == 1:
                 # unit interfaces are nodes
-                iface_u = link.iface_u
-                iface_v = link.iface_v
+                cpr_u = vl.cpr_u
+                cpr_v = vl.cpr_v
                 edge_attrs['level'] = 2
 
             edge_attrs['type'] = 'iface'
-            edge_attrs['label'] = link.id
-            graph.add_edge(iface_u, iface_v, attr_dict=edge_attrs)
+            edge_attrs['label'] = vl.id
+
+            graph.add_edge(cpr_u, cpr_v, attr_dict=edge_attrs)
 
         if vdu_inner_connections:
             # link vdu interfaces if level 1
             if level == 1:
                 for uid, unit in self.units.items():
                     edge_attrs = def_edge_attrs.copy()
-                    join_ifaces = []
-                    for iface in unit.interfaces:
+                    join_cps = []
+                    for cp in unit.connection_points:
                         # patch for faulty descriptors regarding sep ':'
-                        s_iface = iface.split(':')
-                        if len(s_iface) > 1:
-                            join_ifaces.append(iface)
+                        s_cp = cp.split(':')
+                        if len(s_cp) > 1:
+                            join_cps.append(cp)
                         else:
-                            join_ifaces.append(uid + ':' + iface)
+                            join_cps.append(uid + ':' + cp)
 
-                    for u_iface in join_ifaces:
-                        for v_iface in join_ifaces:
-                            if u_iface == v_iface:
+                    for u_cp in join_cps:
+                        for v_cp in join_cps:
+                            if u_cp == v_cp:
                                 continue
-                            if graph.has_edge(u_iface, v_iface):
+                            if graph.has_edge(u_cp, v_cp):
                                 continue
                             if not bridges and (
-                                    u_iface in self.bridge_interfaces or
-                                    v_iface in self.bridge_interfaces):
+                                    u_cp in self.vbridge_cp_refs or
+                                    v_cp in self.vbridge_cp_refs):
                                 continue
                             edge_attrs['level'] = 2
                             edge_attrs['label'] = 'VDU_IN'
                             edge_attrs['type'] = 'vdu_in'
-
-                            graph.add_edge(u_iface, v_iface)
+                            graph.add_edge(u_cp, v_cp)
 
         # build bridge topology graph
         if bridges:
-            for bid, bridge in self.bridges.items():
+            for vb_id, vb in self.vbridges.items():
                 # add bridge router
-                brnode = "br-" + bid
+                brnode = "br-" + vb_id
                 node_attrs = def_node_attrs.copy()
                 node_attrs['label'] = brnode
                 node_attrs['level'] = 2
                 node_attrs['type'] = 'bridge'
                 graph.add_node(brnode, attr_dict=node_attrs)
 
-                for iface in bridge.interfaces:
-                    s_iface = iface.split(':')
-                    if level == 0 and len(s_iface) > 1:
-                        s_iface = s_iface[0]
+                for cpr in vb.connection_point_refs:
+                    s_cpr = cpr.split(':')
+                    if level == 0 and len(s_cpr) > 1:
+                        s_cpr = s_cpr[0]
                     else:
-                        s_iface = iface
+                        s_cpr = cpr
 
-                    graph.add_edge(brnode, s_iface, attr_dict={'label': bid})
+                    graph.add_edge(brnode, s_cpr, attr_dict={'label': vb_id})
 
         return graph
 
-    def find_undeclared_interfaces(self, interfaces=None):
+    def undeclared_connection_points(self):
         """
         Provides a list of interfaces that are referenced in 'virtual_links'
-        section but not declared in 'connection_points' of the Service and its
-        Functions.
+        section but not declared in 'connection_points' of the Function and its
+        Units.
         """
-        if interfaces:
-            target_ifaces = interfaces
-        else:
-            target_ifaces = self.link_interfaces + self.bridge_interfaces
+        target_cp_refs = self.vlink_cp_refs + self.vbridge_cp_refs
 
-        all_interfaces = self.interfaces.copy()
+        undeclared_cps = []
+        for cpr in target_cp_refs:
+            cpr_split = cpr.split(':')
+            if len(cpr_split) == 1 and cpr not in self.connection_points:
+                undeclared_cps.append(cpr)
+            elif len(cpr_split) == 2:
+                if not cpr_split[0] in self.units:
+                    undeclared_cps.append(cpr)
+                else:
+                    vdu = self.units[cpr_split[0]]
+                    if cpr_split[1] not in vdu.connection_points:
+                        undeclared_cps.append(cpr)
 
-        undeclared = []
-        for iface in target_ifaces:
-            if iface not in all_interfaces:
-                undeclared.append(iface)
-
-        return undeclared
+        return undeclared_cps
 
 
 class Unit(Node):

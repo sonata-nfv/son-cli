@@ -1,0 +1,10 @@
+$screen-small-desktop-height: 500px;
+$screen-desktop-height: 800px;
+
+@media (min-height: $screen-small-desktop-height) {
+  @include modal--sm();
+}
+
+@media (min-height: $screen-desktop-height) {
+  @include modal--lg();
+}

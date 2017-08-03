@@ -18,6 +18,7 @@ from son.validate.validate import Validator, print_result
 from son.workspace.workspace import Workspace
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from son.validate.event import EventLogger
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +38,6 @@ if app.config['CACHE_TYPE'] == 'redis':
     cache = Cache(app, config={'CACHE_TYPE': 'redis',
                                'CACHE_DEFAULT_TIMEOUT': 0,
                                'CACHE_REDIS_URL': redis_url})
-
 
 elif app.config['CACHE_TYPE'] == 'simple':
     cache = Cache(app, config={'CACHE_TYPE': 'simple',
@@ -130,14 +130,15 @@ def load_watch_dirs(workspace):
 
         log.debug("Loading validator watcher: {0}".format(watch_path))
 
-        assert watch['type'] == 'project' or watch['type'] == 'package' or \
-               watch['type'] == 'service' or watch['type'] == 'function'
+        assert (watch['type'] == 'project' or watch['type'] == 'package' or
+                watch['type'] == 'service' or watch['type'] == 'function')
 
         install_watcher(watch_path, watch['type'], watch['syntax'],
                         watch['integrity'], watch['topology'])
 
         _validate_object(watch_path, watch_path, watch['type'],
-                         watch['syntax'], watch['topology'], watch['integrity'])
+                         watch['syntax'], watch['topology'],
+                         watch['integrity'])
 
 
 def set_watch(path, obj_type, syntax, integrity, topology):
@@ -279,21 +280,31 @@ def get_validation(vid):
 def gen_resource_key(path, otype, s, i, t):
     assert (type(path) == str and type(otype) == str)
 
-    hash = hashlib.md5()
-    hash.update(path.encode('utf-8'))
-    hash.update(otype.encode('utf-8'))
+    res_hash = hashlib.md5()
+    res_hash.update(path.encode('utf-8'))
+    res_hash.update(otype.encode('utf-8'))
     if s:
-        hash.update('syntax'.encode('utf-8'))
+        res_hash.update('syntax'.encode('utf-8'))
     if i:
-        hash.update('integrity'.encode('utf-8'))
+        res_hash.update('integrity'.encode('utf-8'))
     if t:
-        hash.update('topology'.encode('utf-8'))
+        res_hash.update('topology'.encode('utf-8'))
 
-    return hash.hexdigest()
+    return res_hash.hexdigest()
 
 
 def gen_validation_key(path):
-    return generate_hash(os.path.abspath(path))
+    val_hash = hashlib.md5()
+
+    # generate path hash
+    val_hash.update(str(generate_hash(os.path.abspath(path)))
+                    .encode('utf-8'))
+
+    # validation event config must also be included
+    val_hash.update(repr(sorted(EventLogger.load_eventcfg().items()))
+                    .encode('utf-8'))
+
+    return val_hash.hexdigest()
 
 
 def process_request():
@@ -375,6 +386,40 @@ def _validate_object_from_request(object_type):
                             pkg_pubkey=pkg_pubkey)
 
 
+def _events_config():
+
+    if not request.form:
+        return 'No events to configure', 400
+
+    eventdict = EventLogger.load_eventcfg()
+
+    for event in request.form.keys():
+        if event not in eventdict:
+            req_errors.append("Invalid event '{0}'".format(event))
+            continue
+
+        event_value = str(request.form[event]).lower()
+        if not (event_value == 'error' or event_value == 'warning' or
+                event_value == 'none'):
+            req_errors.append("Invalid value for event '{0}': '{1}'"
+                              .format(event, event_value))
+            continue
+
+        eventdict[event] = event_value
+
+    if req_errors:
+        return render_errors(), 400
+
+    EventLogger.dump_eventcfg(eventdict)
+    return 'OK', 200
+
+
+def _events_list():
+    eventdict = EventLogger.load_eventcfg()
+    return json.dumps(eventdict, sort_keys=True,
+                      indent=4, separators=(',', ': ')).encode('utf-8')
+
+
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -395,7 +440,7 @@ def _validate_object(keypath, path, obj_type, syntax, integrity, topology,
     if perrors:
         return perrors, 400
 
-    rid = gen_resource_key(path, obj_type, syntax, integrity, topology)
+    rid = gen_resource_key(keypath, obj_type, syntax, integrity, topology)
     vid = gen_validation_key(path)
 
     resource = get_resource(rid)
@@ -478,6 +523,16 @@ def validate_function():
     return _validate_object_from_request('function')
 
 
+@app.route('/events/config', methods=['POST'])
+def events_config():
+    return _events_config()
+
+
+@app.route('/events/list', methods=['GET'])
+def events_list():
+    return _events_list()
+
+
 @app.route('/validations', methods=['GET'])
 def validations():
     """ retrieve list of available validations in cache """
@@ -499,8 +554,8 @@ def report():
 @app.route('/report/result/<string:resource_id>', methods=['GET'])
 def report_result(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'result' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'result' not in get_validation(vid).keys()):
         return '', 404
 
     return get_validation(vid)['result']
@@ -509,8 +564,8 @@ def report_result(resource_id):
 @app.route('/report/topology/<string:resource_id>', methods=['GET'])
 def report_topology(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'net_topology' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'net_topology' not in get_validation(vid).keys()):
         return '', 404
     return get_validation(vid)['net_topology']
 
@@ -518,8 +573,8 @@ def report_topology(resource_id):
 @app.route('/report/fwgraph/<string:resource_id>', methods=['GET'])
 def report_fwgraph(resource_id):
     vid = get_resource(resource_id)['latest_vid']
-    if not validation_exists(vid) or \
-                    'net_fwgraph' not in get_validation(vid).keys():
+    if (not validation_exists(vid) or
+            'net_fwgraph' not in get_validation(vid).keys()):
         return '', 404
     return get_validation(vid)['net_fwgraph']
 
@@ -756,7 +811,7 @@ def main():
              "Validation objects defined in the workspace configuration will "
              "be monitored and automatically validated. "
              "If not specified will assume '{}'"
-            .format(Workspace.DEFAULT_WORKSPACE_DIR),
+             .format(Workspace.DEFAULT_WORKSPACE_DIR),
         default=Workspace.DEFAULT_WORKSPACE_DIR,
         required=False
     )

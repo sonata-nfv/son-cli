@@ -1,0 +1,249 @@
+.sv-viewer__title {
+    margin: 20px 0 0 10px;
+    color: $grey4;
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.sv-viewer {
+    position: relative;
+
+    &__draw-area {
+        height: 90vh;
+    }
+
+    &__no-topo {
+        font-size: 24px;
+        fill: $grey4;
+        font-weight: 700;
+    }
+
+    &__popup {
+
+        .popup__frame {
+            stroke: $grey4;
+            stroke-width: 1px;
+            fill:  $white;
+            width: 260px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .popup__title {
+            font-family: OpenSans;
+            color:  $blue-sky;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 20px;
+            white-space: nowrap;
+            display: inline-block;
+            overflow: hidden;
+            max-width: 100%;
+            text-overflow: ellipsis;
+        }
+
+        .popup__text {
+            font-family: OpenSans;
+            color: $grey4;
+            font-size: 14px;
+            font-weight: 400;
+            line-height: 20px;
+        }
+
+        .popup__icon {
+            cursor: pointer;
+        }
+    }
+
+    &__popup--hidden {
+        visibility: hidden;
+    }
+
+    &__loader {
+        border: 1px solid $grey3;
+        width: 180px;
+        height: 65px;
+        background-color: $white;
+        font-family: OpenSans;
+        border-radius: 4px;
+        position: absolute;
+        top: calc(50% - 30px);
+        left: calc(50% - 180px);
+        padding: 5px;
+
+        .loader__animation {
+            background-image: url('./../assets/img/loading-crop.gif');
+            background-repeat: no-repeat;
+            width: 65px;
+            height: 65px;
+            display: inline-block;
+            line-height: 65px;
+        }
+
+        .loader__text {
+            display: inline-block;
+            top: -15px;
+            position: relative;
+        }
+
+        .loader__title {
+            font-size: 16px;
+            color: $blue-navy;
+            font-weight: 700;
+        }
+
+        .loader__message {
+            font-size: 12px;
+            color: $blue-sky;
+            font-weight: 600;
+        }
+    }
+
+    &__loader--hidden {
+        display: none !important;
+    }
+
+}
+
+.node {
+
+    & > &,  & >  .link__group, & > .fwpath, & > .fwpath__index {
+      visibility: hidden;
+    }
+
+    & > .link__group--hidden, .fwpath__index--hidden {
+        visibility: hidden !important;
+    }
+
+    &__shape, &__iface {
+        stroke:$grey4;
+        stroke-width: 2px;
+        fill: $white;
+    }
+
+    &__shape {
+        fill-opacity: 0.8;
+    }
+
+    &__shape--highlight, &__iface--highlight, .icon__shape--highlight {
+        stroke: $blue-sky !important;
+    }
+
+    &__text {
+        font-size: 12px;
+        font-family: OpenSans;
+        font-weight: 700;
+        fill: $grey4;
+        text-transform: none;
+        pointer-events: none;
+    }
+
+    &__text--l2 {
+        font-size: 8px;
+    }
+
+    &__text--type {
+         font-size: 14px;
+         text-transform: uppercase;
+        font-family: Arial, Helvetica, sans-serif;
+        fill: $grey4;
+        font-weight: bold;
+        pointer-events: none;
+    }
+
+    &__icon {
+        cursor: pointer;
+    }
+
+    .icon__shape {
+        fill: $grey4;
+        stroke: $grey4;
+        stroke-width: 2px;
+    }
+
+    .icon__shape--highlight {
+        fill: $blue-sky;
+    }
+
+    .icon__shape--hover {
+        fill: $blue-navy;
+    }
+}
+
+.node--open {
+
+  & > .node, & > .link__group, & > .spot, & > .fwpath, .fwpath__index {
+    visibility: visible;
+  }
+
+  & > .node__shape--level1 {
+      fill: $blue-light;
+  }
+
+  & > .node__shape--level2 {
+      fill: $blue-light2;
+  }
+}
+
+.link, .fwpath {
+    stroke-width: 2px;
+    stroke: $grey4;
+    fill: none;
+}
+
+.link--faded {
+    opacity: 0.25;
+}
+
+.link--hovered {
+    stroke: $blue-sky !important;
+    stroke-width: 4;
+    opacity: 1;
+}
+
+.fwpath__index {
+    fill: $grey4;
+    font-size: 13px;
+}
+
+.fwpath__index--hovered {
+    font-size: 16px;
+    fill: $blue-sky;
+    font-weight: 700;
+}
+
+.fwpath__marker {
+    stroke: $grey4;
+    stroke-width: 1px;
+    fill: none;
+}
+
+.fwpath__marker--error {
+    stroke: $red;
+    stroke-width: 1px;
+    fill: none;
+}
+
+.fwpath__marker--warn {
+    stroke: $yellow;
+    stroke-width: 1px;
+    fill: none;
+}
+
+.fwpath--error {
+    stroke: $red;
+    stroke-dasharray: 5;
+}
+
+.fwpath--warning {
+    stroke: $yellow;
+     stroke-dasharray: 2;
+}
+
+.icon--zoom-in, .icon--zoom-out {
+    cursor: pointer;
+}
+
+.icon__group--hide, .icon--hide, .node__text--hidden {
+    visibility: hidden;
+}

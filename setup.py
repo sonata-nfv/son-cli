@@ -63,7 +63,8 @@ setup(
                           'termcolor', 'tabulate', 'networkx', 'PyJWT>=1.4.2',
                           'Flask', 'docker==2.0.2', 'scipy', 'numpy',
                           'watchdog', 'Flask-Cors', 'flask_cache', 'redis',
-                          'pycrypto', 'matplotlib', 'prometheus_client'],
+                          'pycrypto', 'matplotlib', 'prometheus_client',
+                          'requests-toolbelt==0.8.0'],
         zip_safe=False,
         entry_points={
             'console_scripts': [
@@ -73,7 +74,6 @@ setup(
                 'son-profile=son.profile.profile:main',
                 'son-validate=son.validate.validate:main',
                 'son-validate-api=son.validate.api.api:main',
-                'son-validate-watchdog=son.validate.api.watchdog:main',
                 'son-access=son.access.access:main'
             ],
         },

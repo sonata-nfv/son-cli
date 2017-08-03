@@ -1,0 +1,52 @@
+.sv-menu {
+    background-color: $grey0;
+    height: 100vh;
+    box-shadow: 0px 1px 10px 0px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    padding-bottom: 12px;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 10;
+
+    &__topbar {
+        height: 50px;
+        background-color: $white;
+        padding: 10px 30px;
+        box-sizing: border-box;
+
+        .topbar__logo {
+            width: 100%;
+            max-width: 100px;
+            max-height: 30px;
+            margin-right: 14px;
+        }
+
+        .topbar__main-title {
+            color: $blue-navy;
+            font-weight: 400;
+            padding: 0 0 0 14px;
+            margin: 0;
+            line-height: 30px;
+            font-family: OpenSans;
+            font-size: 18px;
+            border-left: 2px solid  $grey4;
+            vertical-align: top;
+        }
+    }
+
+    &__section {
+        padding: 20px 30px;
+    }
+
+    &__section--bordered {
+        border-bottom: 1px solid $grey3;
+    }
+
+    &__title {
+        text-transform: uppercase;
+        color: $blue-navy;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+}
