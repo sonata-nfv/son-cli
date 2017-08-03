@@ -1,0 +1,15 @@
+<section class="sv-fwg-selector">
+  <ul class="sv-fwg-selector__list">
+    <li class="sv-fwg-selector__item" ng-repeat="graph in $ctrl.graphs" ng-class="{'sv-fwg-selector__item--selected': graph.isActive}"
+      ng-click="$ctrl.toggleGraph(graph, $index)">
+      <span class="item__title">{{::graph.id}}</span>
+      <span ng-if="graph.hasErrors" class="item__icon item__icon--error">!</span>
+      <span ng-if="graph.hasWarns" class="item__icon item__icon--warn">!</span>
+      <div class="item__text">
+        <ul class="sv-fwg-selector__path-list">
+          <li ng-repeat="path in graph.paths"><span>{{::path.index}} {{::path.id}}</span></li>
+        </ul>
+      </div>
+    </li>
+  </ul>
+</section>

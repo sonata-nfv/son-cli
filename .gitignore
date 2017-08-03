@@ -74,4 +74,9 @@ bin/
 # ignore graphml files
 *.graphml
 
+# ignore son-validate-gui build artifacts
+/src/son/validate/gui/dist
+src/son/validate/gui/node_modules
 
+# ignore user generated son-validate event configuration
+/eventcfg.yml

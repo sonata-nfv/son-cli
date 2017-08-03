@@ -30,17 +30,14 @@ import validators
 import os
 import yaml
 import jsonschema
-
-# using urllib sometimes results in connection reset errors when trying to download remote schema
-# using requests instead
 import requests
 from requests.exceptions import RequestException
 
 from jsonschema import SchemaError
 from jsonschema import ValidationError
-from son.workspace.workspace import Workspace
 
 log = logging.getLogger(__name__)
+
 
 class SchemaValidator(object):
 

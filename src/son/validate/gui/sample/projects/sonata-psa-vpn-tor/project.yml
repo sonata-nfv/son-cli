@@ -1,0 +1,8 @@
+descriptor_extension: yml
+package:
+  description: Project for the development of VPN + TOR service of the PSA pilot.
+  maintainer: Luis Conceicao, UBIWHERE, lconceicao@ubiwhere.com
+  name: sonata-psa-vpn-tor
+  vendor: ubiwhere
+  version: '0.1'
+version: '0.5'

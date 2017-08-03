@@ -1,0 +1,14 @@
+<section >
+  <div class="section__content">
+  <span class="sv-reslist__title sv-reslist__title--{{::$ctrl.type}}" ng-click="$ctrl.toggleListCollapse()">
+                                  {{::$ctrl.type}}s ({{$ctrl.filteredItems.length}})
+          <span class="title__icon"> {{$ctrl.isCollapsed ? '&#9660' : '&#9650'}}</span>
+  </span>
+  <span class="sv-reslist__title sv-reslist__title--count">({{$ctrl.items.length - $ctrl.filteredItems.length}} hidden)</span>
+</div>
+<div>
+  <span ng-if="!$ctrl.filteredItems.length" class="section__card-list--empty">No {{::$ctrl.type}} have been found</span>
+  <ul class="section__card-list" ng-class="{ 'section__card-list--collapsed': $ctrl.isCollapsed }">
+    <sv-menu-card item="item" ng-repeat="item in $ctrl.filteredItems"></sv-menu-card>
+  </ul>
+</section>

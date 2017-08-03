@@ -113,13 +113,11 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         #n.manifest["name"] += "-{}".format(ec.run_id)
         n.metadata["run_id"] = ec.run_id
         n.metadata["exname"] = ec.name
-        try:
-            n.metadata["time_limit"] = int(float(ec.experiment.time_limit))
-        except:
-            LOG.warning("Could not get time_limit for experiment {} using 60s".format(
-                n.metadata["exname"]
-            ))
-            n.metadata["time_limit"] = 60
+        # lets store the entire experiment configuration for later use in the execution
+        n.metadata["ec"] = {
+            "parameter" : ec.parameter.copy(),
+            "experiment" : ec.experiment.original_definition.copy()
+        }
         LOG.debug("Created service from base: '{}' for experiment '{}' with run ID: {}".format(
             n.manifest["name"],
             n.metadata["exname"],
@@ -334,7 +332,7 @@ class SonataServiceConfigurationGenerator(ServiceConfigurationGenerator):
         for i, s in service_objs.items():
             r[i] = dict()
             r[i]["sonfile"] = s.pack(output_path, self.args.verbose, workspace_dir=workspace_dir)
-            r[i]["time_limit"] = s.metadata.get("time_limit")
+            r[i]["experiment_configuration"] = s.metadata.get("ec")
             self.generated_services[i] = s  # keep a pointformat(len(r), output_path))
         return r
 

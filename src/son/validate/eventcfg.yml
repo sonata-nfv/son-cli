@@ -34,6 +34,9 @@ evt_pd_itg_invalid_reference: error
 # PD [integrity] - bad MD5 checksum
 evt_pd_itg_invalid_md5: warning
 
+# PD [integrity] - missing entry service template
+evt_pd_itg_missing_entry_service: error
+
 
 ### SERVICE
 
@@ -74,7 +77,7 @@ evt_nsd_top_topgraph_disconnected: warning
 evt_nsd_top_badsection_fwgraph: error
 
 # NSD [topology] - no 'forwarding_graphs' section
-evt_nsd_top_fwgraph_unavailable: none
+evt_nsd_top_fwgraph_unavailable: error
 
 # NSD [topology] - connection point in forwarding graph not defined
 evt_nsd_top_fwgraph_cpoint_undefined: error
@@ -115,6 +118,9 @@ evt_vnfd_itg_badsection_vdus: error
 # VNFD [integrity] - bad section 'connection_points' in vdu
 evt_vnfd_itg_vdu_badsection_cpoints: error
 
+# VNFD [integrity] - VDU image not found/accessible
+evt_vnfd_itg_vdu_image_not_found: warning
+
 # VNFD [integrity] - bad section 'virtual_links'
 evt_vnfd_itg_badsection_vlinks: error
 
@@ -135,6 +141,18 @@ evt_vnfd_top_topgraph_failed: error
 
 # Duplicate declaration of connection point
 evt_duplicate_cpoint: error
+
+# Invalid format of connection point
+evt_invalid_cpoint: error
+
+# Invalid virtual link (bad ID or number of cp references)
+evt_invalid_vlink: error
+
+# Duplicate virtual link
+evt_duplicate_vlink: error
+
+# Invalid connection point reference format
+evt_invalid_cpoint_ref: error
 
 # Not a SONATA descriptor
 evt_invalid_descriptor: error

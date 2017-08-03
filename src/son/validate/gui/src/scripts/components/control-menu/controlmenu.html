@@ -1,0 +1,58 @@
+<nav class="sv-menu">
+    <div class="sv-menu__topbar">
+        <img src="../../../assets/img/logo_sonata@2x.png" alt="" class="topbar__logo">
+        <span class="topbar__main-title">validator</span>
+    </div>
+    <div class="sv-menu__section sv-menu__section--bordered">
+        <button class="sv-button" ng-click="$ctrl.openModal()">New Validation</button>
+    </div>
+    <div class="sv-menu__section">
+        <div class="sv-menu__title">view level</div>
+        <div class="row">
+            <div class="col-xs-4">
+                <button class="sv-button sv-button--ucased" ng-click="$ctrl.toggleLevel(0)">NS</button>
+            </div>
+            <div class="col-xs-4">
+                <button class="sv-button" ng-click="$ctrl.toggleLevel(1)">VNF</button>
+            </div>
+            <div class="col-xs-4">
+                <button class="sv-button sv-button--ucased" ng-click="$ctrl.toggleLevel(2)">VDU</button>
+            </div>
+        </div>
+    </div>
+    <div class="sv-menu__section">
+        <div class="sv-menu__title">shortcuts</div>
+        <div class="row row--no-margin">
+            <div class="col-xs-12 col--no-gutter">
+                <div class="row">
+                    <div class="col-xs-6">
+                        <button class="sv-button" ng-click="$ctrl.toggleExpand(false)">Collapse all</button>
+                    </div>
+                    <div class="col-xs-6">
+                        <button class="sv-button" ng-click="$ctrl.toggleExpand(true)">Expand all</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="sv-menu__section">
+        <div class="sv-menu__title">management information</div>
+        <div class="row row--margined">
+            <div class="col-xs-12">
+                <div class="row row--no-margin">
+                    <div class="col-xs-6 col--no-gutter">
+                        <button class="sv-button sv-button--group-left"  ng-class="{'sv-button--focused' : $ctrl.mgmtToggled}" ng-click="$ctrl.toggleManagement(true)">Show</button>
+                    </div>
+                    <div class="col-xs-6 col--no-gutter">
+                        <button class="sv-button sv-button--group-right" ng-class="{'sv-button--focused' : !$ctrl.mgmtToggled}" ng-click="$ctrl.toggleManagement(false)">Hide</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="sv-menu__section sv-menu__section--lists">
+        <div class="sv-menu__title">Forwarding graph filter ({{$ctrl.fwgraphs.length}})</div>
+        <sv-graph-selector graphs="$ctrl.fwgraphs"></sv-graph-selector>
+    </div>
+    </div>
+</nav>

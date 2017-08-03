@@ -83,7 +83,8 @@ def read_descriptor_file(file):
         if 'vendor' not in descriptor or \
                 'name' not in descriptor or \
                 'version' not in descriptor:
-            log.warning("Invalid SONATA descriptor file: '{0}'. Ignoring."
+            log.warning("Invalid SONATA descriptor file: '{0}'. Missing "
+                        "'vendor', 'name' or 'version'. Ignoring."
                         .format(file))
             return
 

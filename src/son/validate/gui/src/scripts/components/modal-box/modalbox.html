@@ -1,0 +1,149 @@
+<div class="sv-modal" ng-class="{ 'sv-modal--hidden': $ctrl.isHidden }">
+    <div class="sv-modal__background" ng-click="$ctrl.closeModal()"></div>
+    <div class="sv-modal__container">
+        <header class="container__header">
+            <span class="header__title">New Validation</span>
+            <div class="header__close" ng-click="$ctrl.closeModal()"></div>
+        </header>
+        <div  class="container__content--error" ng-show="$ctrl.hasErrors">
+            <div class="container__error-box">
+                <span class="error-box__text">{{$ctrl.errorMessage}}</span>
+                <div class="error-box__icon">!</div>
+            </div>
+        </div>
+        <div class="container__wrapper">
+            <section class="container__content">
+                <div class="content__validation-list">
+                    <div class="row">
+                        <div class="col-xs-12">
+                            <h5 class="content__title">Existing validations</h5>
+                        </div>
+                        <div class="col-xs-12">
+                            <div class="row validation-list__header">
+                                <div class="col-xs-2">
+                                    <span>id</span>
+                                </div>
+                                <div class="col-xs-3">
+                                    <span>type</span>
+                                </div>
+                                <div class="col-xs-3">
+                                    <span>path</span>
+                                </div>
+                                <div class="col-xs-2">
+                                    <span>flags</span>
+                                </div>
+                            </div>
+                            <ul class="content__list">
+                                <li class="row validation-list__item" ng-repeat="report in $ctrl.prevReports">
+                                    <div class="col-xs-2">
+                                        <div class="column column--invert-dir">
+                                            <span title="{{report.id}}">{{::report.id}}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-3">
+                                        <div class="column">
+                                            <span>{{::report.type}}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-3">
+                                        <div class="column column--invert-dir">
+                                            <span title="{{report.path}}">{{::report.path}}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-2">
+                                        <div class="column">
+                                            <span>{{::report.flags}}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-2">
+                                        <button class="sv-button sv-button--compact" ng-click="$ctrl.getTopology(report.id, report.path)">View</button>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <form name="newValidation" ng-submit="$ctrl.validate(newValidation.$valid)">
+                <section class="container__content">
+                    <div class="content__new-validation">
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <h5 class="content__title">New validation</h5>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="sv-input">
+                                    <label class="sv-input__label" for="">
+                                    type
+                                    <select class="sv-input__input" name="" id="" ng-model="$ctrl.type">
+                                        <option value="{{option}}" ng-repeat="option in $ctrl.strings.options">{{::option}}</option>
+                                    </select>
+                                </label>
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="sv-input">
+                                    <label for="" class="sv-input__label">
+                                    source
+                                    <select name="" id="" class="sv-input__input" ng-model="$ctrl.validation.source">
+                                        <option value="{{source}}" ng-repeat="source in $ctrl.strings.sources">{{::source}}</option>
+                                    </select>
+                                </label>
+                                </div>
+                            </div>
+                            <div class="col-xs-12">
+                                <h5 class="content__title">validations</h5>
+                            </div>
+                            <div class="col-xs-12">
+                                <div class="row row--margined">
+                                    <div class="col-xs-4">
+                                        <div class="sv-check-input">
+                                            <input class="sv-check-input__input" type="checkbox" ng-model="$ctrl.validation.syntax" id="syntax" value="syntax">
+                                            <label class="sv-check-input__label" for="syntax">Syntax</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-4">
+                                        <div class="sv-check-input">
+                                            <input class="sv-check-input__input" type="checkbox" ng-model="$ctrl.validation.integrity" id="integrity" value="integrity">
+                                            <label class="sv-check-input__label" for="integrity">Integrity</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-xs-4">
+                                        <div class="sv-check-input">
+                                            <input class="sv-check-input__input" type="checkbox" ng-model="$ctrl.validation.topology" id="topology" value="topology">
+                                            <label class="sv-check-input__label" for="topology">Topology</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xs-12">
+                                <div class="sv-input">
+                                    <label for="" class="sv-input__label">path
+                                    <input class="sv-input__input" type="text" ng-model="$ctrl.validation.path">
+                                </label>
+                                </div>
+                            </div>
+                            <div class="col-xs-12">
+                                <div class="sv-input">
+                                    <span class="sv-input__label">file upload
+                                    <input class="sv-input__input" sv-file-upload type="file">
+                                </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <footer class="container__footer">
+                    <div class="row end-xs">
+                        <div class="col-xs-2">
+                            <button class="sv-button sv-button--flat" ng-click="$ctrl.closeModal()">Cancel</button>
+                        </div>
+                        <div class="col-xs-4">
+                            <button class="sv-button sv-button--confirm" type="submit">Validate</button>
+                        </div>
+                    </div>
+                </footer>
+            </form>
+        </div>
+    </div>
+</div>

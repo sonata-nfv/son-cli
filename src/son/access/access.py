@@ -139,7 +139,7 @@ class AccessClient:
         except:
             self.access_token = None
 
-        log.info("Loaded access_token='{}'".format(self.access_token))
+        #log.info("Loaded access_token='{}'".format(self.access_token))
 
         try:
             # retrieve keypair from workspace
@@ -717,12 +717,12 @@ class AccessArgParse(object):
             required=False
         )
         parser.add_argument(
-            "-p", "--platform",
+            "--platform",
             type=str,
             metavar="PLATFORM_ID",
             help="Specify the ID of the Service Platform to use from "
                  "workspace configuration. If not specified will assume the ID"
-                 "in 'default_service_platform'",
+                 " in 'default_service_platform'",
             required=False
         )
         parser.add_argument(
@@ -741,7 +741,7 @@ class AccessArgParse(object):
         for idx in range(1, len(sys.argv)):
             v = sys.argv[idx]
             if (v == "-w" or v == "--workspace" or
-                        v == '-p' or v == "--platform"):
+                    v == "--platform"):
                 command_idx += 2
             elif v == '--debug':
                 command_idx += 1
@@ -771,6 +771,8 @@ class AccessArgParse(object):
 
         self.ac = AccessClient(self.workspace, platform_id=args.platform,
                                log_level=log_level)
+
+
 
         # call sub-command
         getattr(self, args.command)()
@@ -932,6 +934,7 @@ class AccessArgParse(object):
                                   uuid=False)
 
     def config(self):
+
         parser = ArgumentParser(
             prog="son-access [..] config",
             description="Configure access parameters",
@@ -1006,8 +1009,7 @@ class AccessArgParse(object):
                              entries))
             exit(0)
 
-        if not (args.url or args.username or args.password or args.token or
-                    args.default):
+        if not (args.url or args.username or args.password or args.default):
             log.error("At least one of the following arguments must be "
                       "specified: (--url | --username | --password "
                       "| --default)")
@@ -1015,6 +1017,7 @@ class AccessArgParse(object):
 
         # new SP entry in workspace configuration
         if args.new:
+            print("new")
             if self.workspace.get_service_platform(args.platform_id):
                 log.error("Couldn't add entry. Service Platform ID='{}' "
                           "already exists.".format(args.platform_id))

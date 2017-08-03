@@ -1,0 +1,43 @@
+catalogues_dir: catalogues
+configuration_dir: configuration
+default_descriptor_extension: yml
+default_service_platform: sp1
+log_level: debug
+name: SONATA Workspace
+platforms_dir: platforms
+projects_dir: projects
+schemas_local_master: /root/.son-schema
+schemas_remote_master: https://raw.githubusercontent.com/sonata-nfv/son-schema/master/
+service_platforms:
+  sp_int3:
+    credentials:
+      password:
+      signature:
+        cert: ''
+        prv_key: ''
+        pub_key: ''
+      token_file:
+      username:
+    url: http://sp.int3.sonata-nfv.eu:32001
+validate_watchers:
+  /root/projects/p-valid:
+    integrity: true
+    syntax: true
+    topology: true
+    type: project
+  /root/projects/p-valid-complex:
+    integrity: true
+    syntax: true
+    topology: true
+    type: project
+  /root/projects/p-valid-complex-cycles:
+    integrity: true
+    syntax: true
+    topology: true
+    type: project
+  /root/projects/sonata-psa-vpn-tor:
+    integrity: true
+    syntax: true
+    topology: true
+    type: project
+version: '0.05'
