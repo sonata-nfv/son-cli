@@ -52,7 +52,6 @@ optional arguments:
   --debug               Set logging level to debug
 """
 
-# TODO: Remove!
 # import sys
 # sys.path.append('src/')
 
@@ -579,7 +578,7 @@ class AccessClient:
         :param service_id: unique identifier of the service to be instanced
         :return: HTTP code 20X or 40X
         """
-        print(self.default_push.instantiate_service(service_id))
+        print(self.default_push.instantiate_service(service_id, self.access_token))
 
     def pull_resource(self, resource_type, identifier=None, uuid=False,
                       platform_id=None):

@@ -282,7 +282,6 @@ class Push(object):
     #    # payload.update(dict(iat=datetime.utcnow()))
     #    # return jwt.encode(payload, key=self.keypair.private, algorithm=self.algorithm).decode('ascii')
 
-    # TODO: VERIFICATON WILL BE IMPLEMENTED IN A LATER VERSION
     def unsign_package(self, signed_package: str, **kwargs) -> dict:
         """
         Verifies a signed received package Hash
@@ -290,19 +289,24 @@ class Push(object):
         :param public_key: Path to the location where public key is stored in order to verify the signature
         :returns: Private key, Public Key
         """
+        # Package verification is performed by son-validator component
+        
         # try:
         #    return jwt.decode(token, self.keypair.public, algorithms=[self.algorithm], **kwargs)
         # except jwt.exceptions.InvalidTokenError as e:
         #    raise InvalidAuthenticationToken
 
-    # TODO: Enable instantiation
-    def instantiate_service(self, service_uuid=""):
+    def instantiate_service(self, service_uuid="", access_token=None):
         """
         Instantiate service on SONATA service platform
 
         :param service_uuid: uuid of the service package
                              (requires it to be available
                              on the platform)
+        :param access_token: authentication token that enables
+                             access to the SONATA service
+                             platform/gatekeeper or emulator
+                             to upload package to
 
         :returns: text response message of the server
         """
@@ -320,7 +324,12 @@ class Push(object):
 
             log.info("Deployment URL='{}'".format(url))
 
-            r = requests.post(url, json={"service_uuid": service_uuid})
+            if access_token:
+                headers = {'Authorization': "Bearer %s" % access_token}
+            else:
+                headers = {}
+
+            r = requests.post(url, headers=headers, json={"service_uuid": service_uuid})
             return r.text
 
         except Exception as e:
