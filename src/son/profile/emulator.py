@@ -163,6 +163,9 @@ class Experiment:
         self.key_loc = os.path.expanduser(node.get('ssh_key_loc'))
         self._log_debug("Location of ssh key is %r."%self.key_loc)
 
+        # import the RSA key
+        self.pkey = paramiko.RSAKey.from_private_key_file(self.key_loc)
+
         # a ped file is only given if an experiment series is run
         self.mp_commands = dict()
         self.mp_stop_command = dict()
@@ -231,18 +234,14 @@ class Experiment:
         # for now, we just add all new keys instead of adding certain ones
         ssh.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
 
-        # import the RSA key
-        pkey = paramiko.RSAKey.from_private_key_file(self.key_loc)
-
         # connect to the remote host via ssh
-        ssh.connect(self.address, port=self.ssh_port, username=self.username, pkey=pkey)
+        ssh.connect(self.address, port=self.ssh_port, username=self.username, pkey=self.pkey)
         self._log_info("Connected to remote host.")
 
         # start the profiling topology on the client
         # use a seperate thread to prevent blocking by the topology
         self._log_info("Starting remote topology.")
-        comm = threading.Thread(target=self._exec_command, args=(ssh, "%s;%s -p %s"%(PATH_COMMAND,EXEC_COMMAND, self.package_port)))
-        comm.start()
+        self._exec_command("%s;%s -p %s"%(PATH_COMMAND,EXEC_COMMAND, self.package_port))
 
         # wait a short while to let the topology start
         time.sleep(5)
@@ -252,7 +251,7 @@ class Experiment:
         finally:
             # stop the remote topology
             self._log_info("Stopping remote topology.")
-            self._exec_command(ssh, 'sudo pkill -f "%s -p %s"'%(EXEC_COMMAND, self.package_port))
+            self._exec_command('sudo pkill -f "%s -p %s"'%(EXEC_COMMAND, self.package_port))
 
             if self.payload_done:
                 # gather the results etc.
@@ -264,7 +263,7 @@ class Experiment:
 
                 # remove all temporary files and directories from the remote host
                 self._log_info("Removing results on remote host.")
-                self._exec_command(ssh, "sudo rm -r /tmp/results/%s"%service_uuid)
+                self._exec_command("sudo rm -r /tmp/results/%s"%service_uuid)
 
                 self._log_info("Closing connections.")
                 # close the sftp connection
@@ -314,8 +313,9 @@ class Experiment:
                 docker_name = 'mn.%s'%mp
                 commands = self.mp_commands.get(mp)
                 for c in commands:
-                    self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
-                    self._exec_command(ssh, 'sudo docker exec --privileged %s sh -c "%s"'%(docker_name, c))
+                    if c:
+                        self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
+                        self._exec_command('sudo docker exec --privileged %s sh -c %r'%(docker_name, c))
 
         # let the service run for a specified time
         self._log_info("Sleep for %r seconds."%self.time_limit)
@@ -331,7 +331,8 @@ class Experiment:
                 self._log_info("Stop Command in %r is %r."%(mp, stop_cmd))
                 if stop_cmd:
                     self._log_debug("Executing stop script %r in docker container %r on %r."%(stop_cmd, docker_name, self.node.get('name')))
-                    self._exec_command(ssh=ssh, command='sudo docker exec --privileged %s sh -c "%s"'%(docker_name, stop_cmd))
+                    t=self._exec_command(command='sudo docker exec --privileged %s sh -c %r'%(docker_name, stop_cmd))
+                    t.join()
 
         # stop the service
         self._log_info("Stopping service")
@@ -380,12 +381,25 @@ class Experiment:
                 self._log_debug("Skipping %s: Neither file nor directory"%file_path)
 
 
+    def _exec_command(self, command):
+        t = threading.Thread(target=self._exec_command_thread, kwargs={"command":command})
+        t.start()
+        return t
 
     """
     Helper method to be called in a thread
     A single command is executed on a remote server via ssh
     """
-    def _exec_command(self, ssh, command):
+    def _exec_command_thread(self, command):
+        # connect to the client per ssh
+        ssh = paramiko.client.SSHClient()
+
+        # set policy for unknown hosts or import the keys
+        # for now, we just add all new keys instead of adding certain ones
+        ssh.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
+
+        # connect to the remote host via ssh
+        ssh.connect(self.address, port=self.ssh_port, username=self.username, pkey=self.pkey)
         comm_in, comm_out, comm_err = ssh.exec_command(command)
         comm_in.close()
         while not (comm_out.channel.exit_status_ready() and comm_err.channel.exit_status_ready()):
@@ -395,6 +409,8 @@ class Experiment:
             for line in comm_err.read().splitlines():
                 if self.remote_logging:
                     self._log_error(line)
+
+        ssh.close()
 
 """
  Checks whether the given file path is an existing config file
