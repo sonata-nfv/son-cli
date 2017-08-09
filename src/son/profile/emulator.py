@@ -133,12 +133,13 @@ class Experiment:
     """
 
     """
-    def __init__(self, exp_dict, run_id, node, remote_logging=False):
+    def __init__(self, exp_dict, run_id, node, remote_logging=False, max_retries=3):
         # save the given information
         self.exp_dict = exp_dict
         self.run_id = run_id
         self.node = node
         self.remote_logging = remote_logging
+        self.retries_left = max_retries
 
         self.path_to_pkg = os.path.expanduser(exp_dict.get('sonfile'))
         self._log_debug("Path to package: %r."%self.path_to_pkg)
@@ -273,7 +274,8 @@ class Experiment:
             ssh.close()
 
             # if experiment failed, repeat. TODO: Find a way to do this without recursion
-            if not self.payload_done:
+            if not self.payload_done and self.retries_left>0:
+                self.retries_left-=1
                 self.exec_experiment()
 
     def _log_debug(self, log_message):
