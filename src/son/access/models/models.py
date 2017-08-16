@@ -26,7 +26,10 @@
 
 
 class User:
-
+    """
+    This model class is currently unused as the user registration feature is not
+    supported in the SDK son-access component.
+    """
     def __init__(self, id, email, password, is_admin):
         self.id = id
         self.email = email

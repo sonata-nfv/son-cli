@@ -40,7 +40,6 @@ class mcolors:
      FAIL = '\033[91m'
      ENDC = '\033[0m'
 
-
      def disable(self):
          self.OKGREEN = ''
          self.FAIL = ''
@@ -62,6 +61,7 @@ class Pull(object):
     of this module probably change continuously.
     """
 
+    # Gatekeeper API URLs configuration
     GK_API_VERSION = "/api/v2"
     CAT_URI_BASE = "/"
     CAT_URI_NS = "/services?"             # List all NS
@@ -75,11 +75,9 @@ class Pull(object):
     CAT_URI_PD_NAME = "/packages?name="  # Get Package list by name
     CAT_URI_SONP_ID = "/son-packages/"      # Get a specific SON-Package by ID
 
-    # def __init__(self, base_url, auth=('', '')):
     def __init__(self, base_url, auth_token=None):
         # Assign parameters
         self._base_url = base_url
-        # self._auth = auth
         self._headers = {'Content-Type': 'application/json'}
         if auth_token:
             self._headers["Authorization"] = "Bearer %s" % auth_token
@@ -103,7 +101,7 @@ class Pull(object):
         """
         url = self._base_url + self.CAT_URI_BASE
         try:
-            response = requests.get(url,    # auth=self._auth,
+            response = requests.get(url,
                                     headers=self._headers)
 
         except requests.exceptions.InvalidURL:
@@ -130,14 +128,8 @@ class Pull(object):
         :param obj_id: identifier of the resource
         :return: response of the SP
         """
-        # print("cat_uri", cat_uri, type(cat_uri))
-        # print("obj_id", obj_id, type(obj_id))
         url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
-        # print("url", url)
-        # print("headers", self._headers)
         response = requests.get(url, headers=self._headers)
-        # print("response_code", response.status_code)
-        # print("response_text", response.text)
         if not response.status_code == requests.codes.ok:
             return
         return response.text
@@ -184,7 +176,6 @@ class Pull(object):
         return nsd
 
     def get_ns_by_id(self, ns_id):
-        # TODO: Enable name.trio identifier
         """
         Obtains a specific network service (NS)
         :param ns_id: ID of NS in the form 'vendor.ns_name.version'
@@ -235,7 +226,6 @@ class Pull(object):
         return vnfd
 
     def get_vnf_by_id(self, vnf_id):
-        # TODO: Enable name.trio identifier
         """
         Obtains a specific VNF
         :param vnf_id: ID of VNF in the form 'vendor.name.version'
@@ -284,7 +274,6 @@ class Pull(object):
         return yaml.load(cat_obj)
 
     def get_package_by_id(self, package_id):
-        # TODO: Enable name.trio identifier
         """
         Obtains a specific package (PD)
         :param package_id: ID of PD in the form 'vendor.name.version'
@@ -306,25 +295,17 @@ class Pull(object):
         :return: SON file object containing NSDs, VNFDs, PD
         """
         cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_uuid)
-        # TODO: Convert binary data (text) to a file?
-        # with open('file_to_write', 'wb') as f:
-        #    f.write(cat_file)
 
         return cat_file
 
-    """
-    def get_instances(url):
-        return _get_from_url(url + "/instantiations")
-
-    """
+    # def get_instances(url):
+    #     return _get_from_url(url + "/instantiations")
 
     def package_list(self):
         return loads(self.get_all_packages()).get("service_uuid_list")
 
-    """
-    def instance_list(self, url):
-        return loads(get_instances(url)).get("service_instantiations_list")
-    """
+    # def instance_list(self, url):
+    #     return loads(get_instances(url)).get("service_instantiations_list")
 
 
 def main():
@@ -453,7 +434,6 @@ def main():
         pass
 
     pull_client = Pull(platform_url, auth_token=access_token)
-    # pull_client = Pull(base_url="http://sp.int3.sonata-nfv.eu:32001")
 
     if args.alive:
         print(mcolors.OKGREEN + "PULL - Checking Platform connectivity...\n", mcolors.ENDC)
@@ -498,7 +478,6 @@ def main():
     if args.get_son_package:
         print(mcolors.OKGREEN + "PULL - Getting SON-Package...\n", mcolors.ENDC)
         binary_data = pull_client.get_son_package_by_uuid(args.get_son_package)
-        # TODO: Where do we store the file?
 
     # if args.list_instances:
     #    print(pull_client.get_instances(platform_url))
