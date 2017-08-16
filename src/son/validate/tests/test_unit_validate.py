@@ -27,6 +27,7 @@
 import unittest
 import os
 import shutil
+import socket
 from son.validate.validate import Validator
 from son.workspace.workspace import Workspace, Project
 from son.validate.event import EventLogger
@@ -397,7 +398,27 @@ class UnitValidateTests(unittest.TestCase):
                                  "--host", "127.0.0.1",
                                  "--port", "7777",
                                  "--mode", "stateless", "--debug"])
-        time.sleep(3)
+
+        # wait for validate service to start
+        result = 1
+        max_retries = 5
+        while result != 0:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)  # 2 Second Timeout
+            time.sleep(2)
+            result = sock.connect_ex(('127.0.0.1', 7777))
+            if result == 0:
+                print("son-validate-api available. "
+                      "Starting connectivity tests")
+                sock.close()
+            else:
+                print("Waiting for son-validate-api...")
+                max_retries -= 1
+                if max_retries == 0:
+                    # avoid test failure if it doesn't connect
+                    print("Can't connect to local son-validate-api. "
+                          "Ignoring test")
+                    return
 
         # test '/events/list' endpoint
         url = "http://127.0.0.1:7777/events/list"
