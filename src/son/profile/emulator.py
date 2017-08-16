@@ -315,6 +315,7 @@ class Experiment:
                 for c in commands:
                     if c:
                         self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
+                        #TODO fix order of commands executed. Currently the commands are started in the right order but execution order is not fixed
                         self._exec_command('sudo docker exec --privileged %s sh -c %r'%(docker_name, c))
 
         # let the service run for a specified time
@@ -328,7 +329,6 @@ class Experiment:
             for mp in measurement_points:
                 docker_name = "mn.%s"%mp
                 stop_cmd = self.mp_stop_command.get(mp)
-                self._log_info("Stop Command in %r is %r."%(mp, stop_cmd))
                 if stop_cmd:
                     self._log_debug("Executing stop script %r in docker container %r on %r."%(stop_cmd, docker_name, self.node.get('name')))
                     t=self._exec_command(command='sudo docker exec --privileged %s sh -c %r'%(docker_name, stop_cmd))
