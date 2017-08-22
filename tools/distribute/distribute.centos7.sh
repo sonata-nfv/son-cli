@@ -8,7 +8,7 @@ mkdir -p packages-centos7
 docker run -it --name centos7.build-rpm -v $(pwd)/packages-centos7:/son-cli/rpm-packages centos7.build-rpm
 
 # ====== Create repository ======
-echo "--> Creating RPM repository_"
+echo "--> Creating RPM repository"
 
 docker build -t registry.sonata-nfv.eu:5000/son-cli-rpmrepo -f tools/distribute/rpmrepo/Dockerfile .
 docker push registry.sonata-nfv.eu:5000/son-cli-rpmrepo

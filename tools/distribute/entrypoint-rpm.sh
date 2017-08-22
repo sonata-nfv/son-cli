@@ -29,14 +29,19 @@ fpm -s python -t rpm --python-bin python3.4 --no-python-fix-name --python-packag
 # remove packages that exist in repository to avoid conflicts
 rm -f python34-setuptools* python34-paramiko* python34-six python34-cffi* python34-chardet* \
       python34-dateutil* python34-decorator* python34-idna* python34-jinja2* python34-jsonschema* \
-      python34-markupsafe* python34-numpy* python34-pycparser* python34-pytz* python34-requests* \
-     python34-scipy* python34-urllib3*
+      python34-markupsafe* python34-numpy* python34-pycparser* python34-pytz* python34-requests-2* \
+      python34-scipy* python34-urllib3*
 
 
 # fix incorrect package file names
 rpmrebuild -p -n -d . --change-spec-preamble='sed -e "s/^Name:.*/Name:python34-websocket-client/"' python34-websocket_client*
 rm -f python34-websocket_client*
 mv noarch/python34-websocket-client* .
+
+rpmrebuild -p -n -d . --change-spec-preamble='sed -e "s/^Name:.*/Name:python34-prometheus-client/"' python34-prometheus_client*
+rm -f python34-prometheus_client*
+mv noarch/python34-prometheus-client* .
+
 rm -fd noarch
 
 # rpm -qRp python-sonata-cli-0.9-1.noarch.rpm
