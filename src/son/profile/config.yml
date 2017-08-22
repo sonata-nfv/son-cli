@@ -20,9 +20,9 @@ description: "A config file for use in the son profile environment. Currently on
 ##   ssh_user: this username will be used in the ssh connection. The user needs passless sudo!
 ##   ssh_key_loc: path to the ssh key that should be used. This should has to work with the ssh_user specified!
 target_platforms:
-  localhost1:
-    address: "127.0.0.1"
-    package_port: 5000
-    ssh_port: 22
-    ssh_user: "ssh_user"
-    ssh_key_loc: "~/.ssh/id_rsa"
+- name: "localhost1"
+  address: "127.0.0.1"
+  package_port: 5000
+  ssh_port: 22
+  ssh_user: "root"
+  ssh_key_loc: "~/.ssh/id_rsa"
