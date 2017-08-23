@@ -79,7 +79,7 @@ To contribute to son-cli this simple process should be followed:
 4. Follow/answer related [issues](https://github.com/sonata-nfv/son-cli/issues) (see Feedback-Chanel, below).
 
 ## Installation
-
+### Ubuntu Trusty (14.04) and Xenial (16.04)
 To install the SONATA CLI toolset in Ubuntu follow these steps:
 
 1. Add the new GPG key
@@ -105,6 +105,27 @@ To install the SONATA CLI toolset in Ubuntu follow these steps:
     sudo apt-get update
     sudo apt-get install sonata-cli
     ```
+### CentOS 7
+To install the SONATA CLI toolset in CentOS 7 follow these steps:
+1. Install EPEL
+    ```sh
+    yum install epel-release
+    ```
+2. Create a repository entry file in `/etc/yum.repo.d/sonata.repo` with the following content:
+    ```sh
+    [sonata-repo]
+    name=SONATA Repository
+    baseurl=http://rpmrepo.sonata-nfv.eu/repo/
+    enabled=1
+    gpgcheck=0
+    ```
+    Note: currently the repository is not GPG signed (future work)
+3. Install CLI
+    ```sh
+    yum install sonata-cli
+    ```
+
+### All dists (using setuptools)
 
 The SONATA CLI toolset can also be installed via the Python setup script:
 ```
