@@ -60,8 +60,8 @@ setup(
         # in jenkins, the last package in the list is installed first
         install_requires=['setuptools', 'pyaml', 'jsonschema', 'validators',
                           'requests>2.4.2', 'coloredlogs<=5.1.1', 'paramiko',
-                          'termcolor', 'tabulate', 'networkx', 'PyJWT>=1.4.2',
-                          'Flask', 'docker==2.0.2', 'scipy', 'numpy',
+                          'termcolor', 'tabulate', 'networkx==1.11', 'Flask',
+                          'PyJWT>=1.4.2', 'docker==2.0.2', 'scipy', 'numpy',
                           'watchdog', 'Flask-Cors', 'flask_cache', 'redis',
                           'pycrypto', 'matplotlib', 'prometheus_client',
                           'requests-toolbelt==0.8.0'],
