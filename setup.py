@@ -43,7 +43,7 @@ name = 'sonata-cli'
 setup(
         name=name,
         license='Apache License, Version 2.0',
-        version='0.9',
+        version='3.0',
         url='https://github.com/sonata-nfv/son-cli',
         author_email='sonata-dev@sonata-nfv.eu',
         long_description=longdesc,
