@@ -28,7 +28,7 @@ service_experiments:
     measurement_points:
       - name: "mp.input"
         connection_point: "ns:servicein"
-        container: "edmaastest/sonata-apache-bench-vnf"
+        container: "sonata-nfv/sonata-apache-bench-vnf"
         cmd_start: "ab -n ${10 to 101 step 20} -X 20.0.0.2:3128 http://30.0.0.2:5202/ > /mnt/share/ab.txt 2>&1"
         cmd_stop: null
     # resource configurations to be tested during profiling run (defined per VNF)
