@@ -43,6 +43,7 @@ import argparse
 # will likely be removed as default values dont make sense past testing
 PATH_COMMAND = "cd ~/son-emu"
 EXEC_COMMAND = "sudo python src/emuvim/examples/profiling.py"
+REMOTE_LOGGING_DEFAULT = False
 
 # create a Logger
 logging.basicConfig()
@@ -61,7 +62,7 @@ class Emulator:
      :remote_logging: Set it to True if logs of the remote topology should be shown in the local log files.
         WARNING: They will be shown at the end of each experiment, will not neccessarily be complete and are output as logging error, probably because of mininet
     """
-    def __init__(self, tpd, remote_logging=False):
+    def __init__(self, tpd, remote_logging=REMOTE_LOGGING_DEFAULT):
         # if the whole config dictionary has been given, extract only the target platforms
         # a descriptor version should only be in the top level of the file
         if "descriptor_version" in tpd:
@@ -133,7 +134,7 @@ class Experiment:
     """
 
     """
-    def __init__(self, exp_dict, run_id, node, remote_logging=False, max_retries=3):
+    def __init__(self, exp_dict, run_id, node, remote_logging=REMOTE_LOGGING_DEFAULT, max_retries=3):
         # save the given information
         self.exp_dict = exp_dict
         self.run_id = run_id
