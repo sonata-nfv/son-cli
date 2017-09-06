@@ -18,7 +18,7 @@ usage: son-monitor init [-h] [{start,stop}]
 start(default)/stop the monitoring framework
 
 positional arguments:
-  {start,stop}  start: start the monitoring framework (cAdvisor, Prometheus DB + Pushgateway)
+  {start,stop}  start: start the monitoring framework (Grafana, Prometheus DB)
                 stop: stop the monitoring framework
 
 optional arguments:
