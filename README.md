@@ -352,7 +352,7 @@ Gathering metrics:
     son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_usage_seconds_total{id="/docker/<uuid>"}[10s]))'
 ```
 
-This command starts all the related docker files (cAdvisor, Prometheus DB, PushGateway and son-emu (experimental))
+This command starts all the related docker files for the monitoring framework (Grafana, Prometheus DB).
 ```
 son-monitor init
 ```
