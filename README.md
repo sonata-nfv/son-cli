@@ -144,6 +144,7 @@ $ son-monitor -h
 
 ## Usage
 The usage guidelines of the son-cli tools are described as follows.
+Detailed info is also provided through the [Wiki](https://github.com/sonata-nfv/son-cli/wiki).
 
 ### son-workspace
 
@@ -359,7 +360,7 @@ son-monitor init
 After a service has been deployed on the SDK emulator (son-emu), son-monitor can be used.
 Son-monitor calls the son-emu rest api ,the Prometheus API and the GateKeeper API of the SONATA Service Platform.
 
-*Example1*: All required metric are described in the [MSD file] (https://github.com/sonata-nfv/son-cli/wiki/son-monitor:-msd-file). This MSD file is parsed by the son-monitor tool and all described metrics are installed and exported to the Prometheus DB and a Grafana dashboard.
+*Example1*: All required metric are described in the [MSD file](https://github.com/sonata-nfv/son-cli/wiki/son-monitor:-msd-file). This MSD file is parsed by the son-monitor tool and all described metrics are installed and exported to the Prometheus DB and a Grafana dashboard.
 ```
 son-monitor msd -f msd.yml
 ```
@@ -373,6 +374,8 @@ son-monitor query --vim emu -d datacenter1 -vnf vnf1 -q 'sum(rate(container_cpu_
 ```
 son-monitor stream -sp sp1 -s demo_service -vnf vnf1 -me metric_name1
 ```
+
+More info can be found on our [Wiki](https://github.com/sonata-nfv/son-cli/wiki/SONATA-Monitor).
 
 ### son-profile
 
@@ -413,7 +416,7 @@ optional arguments:
 
 ```
 
-TODO: More detailed instructions for son-profile will be available soon (next major release is planned for end of June)!
+More detailed instructions for son-profile can be found on our [Wiki](https://github.com/sonata-nfv/son-cli/wiki/SONATA-Profiler).
 
 ## License
 The son-cli is published under Apache 2.0 license. Please see the LICENSE file for more details.
