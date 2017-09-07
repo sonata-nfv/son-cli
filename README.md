@@ -5,8 +5,8 @@
 SONATA SDK command line interface tools
 
 This set of command line tools are meant to aid the SONATA service developers on their tasks. The tools are briefly described as follows.
-- `son-workspace` creates, configures and manages development workspaces and projects.
-- `son-package` packages a project, containing services and functions, to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
+- `son-workspace` creates, configures *[José] in the Wiki page, configuration is not mentioned...* and manages development workspaces and projects.
+- `son-package` packages a project, containing services and functions *[José] not a word on SSMs/FSMs... on purpose?* , to be instantiated in the SONATA Service Platform. All project components are syntatically validated and external dependencies are retrieved to produce a complete service package.
 - `son-validate` can be used to validate the syntax, integrity and topology of SONATA service packages, projects, services and functions. Son-validate can be used through the CLI or as a micro-service running inside a docker container.
 - `son-access` enables authenticating users to the Service Platform and integrates features to push and pull resources from the Service Platform Catalogues. It is used to upload the service package to the SDK emulator or the Service Platform Gatekeeper, so the service can be deployed in the respective environment.
 - `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
@@ -37,8 +37,8 @@ python bootstrap.py
 bin/buildout
 ```
 
-If you are using pycharm, the IDE has support both for buildout and for virtualenvs,
-please read their fine documentation on the subject before proceeding.
+If you are using pycharm *[José] link?*, the IDE has support both for buildout and for virtualenvs,
+please read their fine documentation *[José] link?* on the subject before proceeding.
 
 ### Generated binaries
 The buildout generates the binaries for the tools `son-workspace`, `son-package`, `son-validate`, `son-validate-api`, `son-access`, `son-profile` and `son-monitor`. Information on how to use the tools is detailed in the [wiki documentation](https://github.com/sonata-nfv/son-cli/wiki). 
@@ -82,7 +82,7 @@ sudo ansible-playbook install.yml
 
 ## Contributing
 
-To contribute to son-cli this simple process should be followed:
+To contribute to son-cli the following sequence of steps should be followed:
 
 1. Fork [this repository](http://github.com/sonata-nfv/son-cli);
 2. Work on your proposed changes, preferably through submiting [issues](https://github.com/sonata-nfv/son-cli/issues);
@@ -90,6 +90,7 @@ To contribute to son-cli this simple process should be followed:
 4. Follow/answer related [issues](https://github.com/sonata-nfv/son-cli/issues) (see Feedback-Chanel, below).
 
 ## Installation
+*[José] this is repeated in one of the wiki pages, but maybe it is here the right place for it (i.e., delete from the wiki)*
 ### Ubuntu Trusty (14.04) and Xenial (16.04)
 To install the SONATA CLI toolset in Ubuntu follow these steps:
 
