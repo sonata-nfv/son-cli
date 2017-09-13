@@ -285,8 +285,8 @@ class AccessClient:
             with open(token_path, "r") as _file:
                 self.access_token = _file.read
 
-        headers = {'Authorization': 'Bearer %s' %
-                                    (self.access_token.decode('utf-8'))}
+        headers = {'Authorization': 'Bearer %s' % self.access_token}
+                                    # (self.access_token.decode('utf-8'))}
 
         response = requests.post(url, headers=headers, verify=False)
         if response.status_code not in (200, 204):
@@ -324,7 +324,9 @@ class AccessClient:
         # Some old PyJWT versions crash with public key binary string, instead add
         # self.platform_public_key.decode('utf-8')
         try:
-            decoded = jwt.decode(self.access_token, self.platform_public_key,
+            print('access_token=', self.access_token)
+            print('platform_public_key=', self.platform_public_key.decode('utf-8'))
+            decoded = jwt.decode(self.access_token, self.platform_public_key.decode('utf-8'),
                                  True, algorithms='RS256', audience='adapter')
             # options={'verify_aud': False})
             print('contents', decoded)
