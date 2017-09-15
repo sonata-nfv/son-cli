@@ -11,7 +11,6 @@ This set of command line tools are meant to aid the SONATA service developers on
 - `son-access` enables authenticating users to the Service Platform and integrates features to push and pull resources from the Service Platform Catalogues. It is used to upload the service package to the SDK emulator or the Service Platform Gatekeeper, so the service can be deployed in the respective environment.
 - `son-monitor` provides tools to easily monitor/generate metrics for debugging and analyzing service performance.
 - `son-profile` supports network service developers to automatically profile their network services and network functions.
-    
 
 ## Building
 To build the son-cli tools it is recommended the use of a virtual environment to avoid polluting your system and to offer isolation from the installed libraries on the host.
@@ -37,11 +36,11 @@ python bootstrap.py
 bin/buildout
 ```
 
-If you are using pycharm, the IDE has support both for buildout and for virtualenvs,
-please read their fine documentation on the subject before proceeding.
+If you are using [pycharm](https://www.jetbrains.com/pycharm/), the IDE has support both for buildout and for virtualenvs,
+please read their fine [documentation](https://www.jetbrains.com/help/pycharm/meet-pycharm.html) on the subject before proceeding.
 
 ### Generated binaries
-The buildout generates the binaries for the tools `son-workspace`, `son-package`, `son-validate`, `son-validate-api`, `son-access`, `son-profile` and `son-monitor`. Information on how to use the tools is detailed in the [wiki documentation](https://github.com/sonata-nfv/son-cli/wiki). 
+The buildout generates the binaries for the tools `son-workspace`, `son-package`, `son-validate`, `son-validate-api`, `son-access`, `son-profile` and `son-monitor`. Information on how to use the tools is detailed in the wiki [documentation](https://github.com/sonata-nfv/son-cli/wiki). 
 
 ## Dependencies
 
@@ -82,7 +81,7 @@ sudo ansible-playbook install.yml
 
 ## Contributing
 
-To contribute to son-cli this simple process should be followed:
+To contribute to son-cli the following sequence of steps should be followed:
 
 1. Fork [this repository](http://github.com/sonata-nfv/son-cli);
 2. Work on your proposed changes, preferably through submiting [issues](https://github.com/sonata-nfv/son-cli/issues);
@@ -90,6 +89,7 @@ To contribute to son-cli this simple process should be followed:
 4. Follow/answer related [issues](https://github.com/sonata-nfv/son-cli/issues) (see Feedback-Chanel, below).
 
 ## Installation
+
 ### Ubuntu Trusty (14.04) and Xenial (16.04)
 To install the SONATA CLI toolset in Ubuntu follow these steps:
 
