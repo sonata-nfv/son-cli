@@ -50,6 +50,8 @@ logging.basicConfig()
 LOG = logging.getLogger("SON-Profile Emulator")
 LOG.setLevel(logging.DEBUG)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
+paramiko_logger = logging.getLogger("paramiko")
+paramiko_logger.setLevel(logging.WARNING)
 
 """
  A class which provides methods to do experiments with service packages
