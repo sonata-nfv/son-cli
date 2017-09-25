@@ -30,6 +30,12 @@ service_experiments:
         connection_point: "ns:input"
         container: "sonatanfv/sonata-apache-bench-vnf"
         cmd_start: "ab -n ${10 to 101 step 20} -X 20.0.0.2:3128 http://30.0.0.2:5202/ > /mnt/share/ab.txt 2>&1"
+        commands:
+            - {
+               10: "echo 'test10' > /mnt/share/test.txt",
+               30: "echo 'test30' >> /mnt/share/test.txt",
+               40: "echo 'test40' >> /mnt/share/test.txt"
+           }
         cmd_stop: null
     # resource configurations to be tested during profiling run (defined per VNF)
     resource_limitations:
