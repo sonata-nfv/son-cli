@@ -122,7 +122,7 @@ To install the SONATA CLI toolset in CentOS 7 follow these steps:
     ```sh
     yum install epel-release
     ```
-2. Create a repository entry file in `/etc/yum.repo.d/sonata.repo` with the following content:
+2. Create a repository entry file in `/etc/yum.repos.d/sonata.repo` with the following content:
     ```sh
     [sonata-repo]
     name=SONATA Repository
