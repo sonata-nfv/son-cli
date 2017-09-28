@@ -315,9 +315,11 @@ class Experiment:
                 commands = self.mp_commands.get(mp)
                 for c in commands:
                     if c:
+                        time.sleep(3)
                         self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
                         #TODO fix order of commands executed. Currently the commands are started in the right order but execution order is not fixed
-                        self._exec_command('sudo docker exec --privileged %s sh -c %r'%(docker_name, c))
+                        cmd_string = 'sudo docker exec --privileged %s %s'%(docker_name, "sh -c %r"%c)
+                        self._exec_command(cmd_string)
 
         # let the service run for a specified time
         self._log_info("Sleep for %r seconds."%self.time_limit)
