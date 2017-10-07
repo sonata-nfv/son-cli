@@ -50,6 +50,8 @@ logging.basicConfig()
 LOG = logging.getLogger("SON-Profile Emulator")
 LOG.setLevel(logging.DEBUG)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
+paramiko_logger = logging.getLogger("paramiko")
+paramiko_logger.setLevel(logging.WARNING)
 
 """
  A class which provides methods to do experiments with service packages
@@ -168,6 +170,7 @@ class Experiment:
         self.pkey = paramiko.RSAKey.from_private_key_file(self.key_loc)
 
         # a ped file is only given if an experiment series is run
+        self.mp_start_command = dict()
         self.mp_commands = dict()
         self.mp_stop_command = dict()
 
@@ -205,11 +208,8 @@ class Experiment:
         mp_names = [exp_data.get("measurement_points")[i].get('name') for i in range(len(exp_data.get("measurement_points")))]
         for n in mp_names:
             cmd_start = exp_params.get("measurement_point:%s:cmd_start"%n)
-            cmds = exp_params.get("measurement_point:%s:commands"%n) or list()
-            self.mp_commands[n] = list()
-            self.mp_commands[n].append(cmd_start)
-            self.mp_commands[n].extend(cmds)
-
+            self.mp_start_command[n] = cmd_start
+            self.mp_commands[n] = exp_params.get("measurement_point:%s:commands"%n) or dict()
             cmd_stop = exp_params.get("measurement_point:%s:cmd_stop"%n)
             self.mp_stop_command[n] = cmd_stop
 
@@ -312,14 +312,12 @@ class Experiment:
                 raise Exception('A valid ssh connection is needed to execute commands in measurement points.')
             for mp in measurement_points:
                 docker_name = 'mn.%s'%mp
-                commands = self.mp_commands.get(mp)
-                for c in commands:
-                    if c:
-                        time.sleep(3)
-                        self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
-                        #TODO fix order of commands executed. Currently the commands are started in the right order but execution order is not fixed
-                        cmd_string = 'sudo docker exec --privileged %s %s'%(docker_name, "sh -c %r"%c)
-                        self._exec_command(cmd_string)
+
+                time.sleep(3)
+
+                commands_thread = threading.Thread(target=self._run_commands, kwargs={"mp":mp, "docker_name":docker_name})
+                self.comm_thread_stay_alive = True
+                commands_thread.start()
 
         # let the service run for a specified time
         self._log_info("Sleep for %r seconds."%self.time_limit)
@@ -331,6 +329,8 @@ class Experiment:
                 raise Exception('A valid ssh connection is needed to execute commands in measurement points.')
             for mp in measurement_points:
                 docker_name = "mn.%s"%mp
+                # stop the thread executing commands if it is not yet done
+                self.comm_thread_stay_alive = False
                 stop_cmd = self.mp_stop_command.get(mp)
                 if stop_cmd:
                     self._log_debug("Executing stop script %r in docker container %r on %r."%(stop_cmd, docker_name, self.node.get('name')))
@@ -345,6 +345,26 @@ class Experiment:
         self.payload_done = True
 
         return service_uuid
+
+    """
+
+    """
+    def _run_commands(self, mp, docker_name):
+        commands = self.mp_commands.get(mp)
+        commands[00] = self.mp_start_command.get(mp)
+        comm_keys = commands.keys()
+        for i in range(100):
+            if not self.comm_thread_stay_alive:
+                break
+            if i in comm_keys:
+                c = commands.get(i)
+                self._log_debug("Executing %r in docker container %r on %r."%(c, docker_name, self.node.get("name")))
+                cmd_string = 'sudo docker exec --privileged %s sh -c %r'%(docker_name, c)
+                t=self._exec_command(cmd_string)
+                t.join()
+        self.comm_thread_stay_alive = False
+
+
 
 
     """
