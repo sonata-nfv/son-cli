@@ -200,9 +200,52 @@ def verify(public_key, signature):
     public_key.verify(hash, signature)
 
 
+def check_token_status():
+    """
+    Simple request to check if session has expired (TBD)
+    :return: Token status
+    """
+    import jwt
+
+    access_token = ''
+    platform_public_key = b''
+    print('Public_key=', platform_public_key)
+
+    if platform_public_key is None:
+        return True
+
+    # Some old PyJWT versions crash with public key binary string, instead add
+    # self.platform_public_key.decode('utf-8')
+    try:
+        print('access_token=', access_token)
+        print('platform_public_key=', platform_public_key.decode('utf-8'))
+        decoded = jwt.decode(access_token, platform_public_key.decode('utf-8'),
+                             True, algorithms='RS256', audience='adapter')
+        # options={'verify_aud': False})
+        print('contents', decoded)
+        try:
+            username = decoded['preferred_username']
+            return True
+        except:
+            return True
+    except jwt.DecodeError:
+        print('Token cannot be decoded because it failed validation')
+        return False
+    except jwt.ExpiredSignatureError:
+        print('Signature has expired')
+        return False
+    except jwt.InvalidIssuerError:
+        return False
+    except jwt.InvalidIssuedAtError:
+        return False
+
+
 # generate_keypair()
 # token = user_login('user04', '1234')
 # print(token)
 # key = get_platform_public_key()
 # check_token(key, token)
 # sign()
+
+# result = check_token_status()
+# print("RESULT=", result)

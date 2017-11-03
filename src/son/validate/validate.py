@@ -1103,7 +1103,7 @@ class Validator(object):
         nsd_files = project.get_ns_descriptor()
         if not nsd_files:
             evtlog.log("NSD not found",
-                       "Couldn't find a service descriptor in project '[0}'"
+                       "Couldn't find a service descriptor in project '{0}'"
                        .format(project.project_root),
                        project.project_root,
                        'evt_project_service_invalid')

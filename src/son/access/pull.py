@@ -73,7 +73,7 @@ class Pull(object):
     CAT_URI_PD = "/packages?"             # List all Packages
     CAT_URI_PD_ID = "/packages/"      # Get a specific Package by ID
     CAT_URI_PD_NAME = "/packages?name="  # Get Package list by name
-    CAT_URI_SONP_ID = "/son-packages/"      # Get a specific SON-Package by ID
+    CAT_URI_SONP_ID = "/packages/"  # Get a specific SON-Package by ID
 
     def __init__(self, base_url, auth_token=None):
         # Assign parameters
@@ -121,14 +121,18 @@ class Pull(object):
 
         return response.status_code == requests.codes.ok
 
-    def __get_cat_object__(self, cat_uri, obj_query):
+    def __get_cat_object__(self, cat_uri, obj_query, extra_uri=None):
         """
         Generic GET function to request a SONATA SP resource.
         :param cat_uri: catalogue to be queried
-        :param obj_id: identifier of the resource
+        :param obj_query: identifier of the resource
+        :param extra_uri: additional path to catalogue endpoint
         :return: response of the SP
         """
-        url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
+        if extra_uri is None:
+            url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
+        else:
+            url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query + extra_uri
         response = requests.get(url, headers=self._headers)
         if not response.status_code == requests.codes.ok:
             return
@@ -294,8 +298,7 @@ class Pull(object):
         :param son_package_uuid: UUID of SON-PACKAGE in the form 'uuid-generated'
         :return: SON file object containing NSDs, VNFDs, PD
         """
-        cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_uuid)
-
+        cat_file = self.__get_cat_object__(self.CAT_URI_SONP_ID, son_package_uuid, '/download')
         return cat_file
 
     # def get_instances(url):

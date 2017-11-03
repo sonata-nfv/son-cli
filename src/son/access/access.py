@@ -286,7 +286,6 @@ class AccessClient:
                 self.access_token = _file.read
 
         headers = {'Authorization': 'Bearer %s' % self.access_token}
-                                    # (self.access_token.decode('utf-8'))}
 
         response = requests.post(url, headers=headers, verify=False)
         if response.status_code not in (200, 204):
@@ -553,6 +552,10 @@ class AccessClient:
                 log.debug("Retrieving package id='{}'".format(identifier))
                 print(pull.get_package_by_id(identifier))
 
+            elif resource_type == 'files':
+                log.debug("Retrieving package file id='{}'".format(identifier))
+                print("Package file requires UUID identifier option to download")
+
         # resources by uuid
         elif identifier and uuid is True:
             if resource_type == 'services':
@@ -570,6 +573,21 @@ class AccessClient:
             elif resource_type == 'packages':
                 log.debug("Retrieving package uuid='{}'".format(identifier))
                 print(pull.get_package_by_uuid(identifier))
+
+            elif resource_type == 'files':
+                log.debug("Retrieving package file uuid='{}'".format(identifier))
+                file_data = pull.get_son_package_by_uuid(identifier)
+
+                filename = str(identifier) + '.son'
+                filepath= os.path.join(
+                    self.workspace.workspace_root,
+                    self.workspace.platforms_dir,
+                    filename)
+
+                with open(filepath, mode="w") as son_file:
+                    son_file.write(file_data)
+                    # son_file.write(bytes(file_data, 'UTF-8'))
+                    son_file.close()
 
         # resources list
         else:
@@ -627,6 +645,7 @@ class AccessArgParse(object):
             access push --upload samples/sonata-demo.son --sign
             access list services
             access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+            access pull files --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             access pull services --id sonata.eu firewall-vnf 1.0
             access -p sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             """
@@ -819,7 +838,7 @@ class AccessArgParse(object):
         )
         parser.add_argument(
             "resource_type",
-            help="(services | functions | packages)"
+            help="(services | functions | packages | files)"
         )
 
         mutex_parser = parser.add_mutually_exclusive_group(
@@ -843,7 +862,7 @@ class AccessArgParse(object):
 
         args = parser.parse_args(sys.argv[self.subarg_idx:])
 
-        if args.resource_type not in ['services', 'functions', 'packages']:
+        if args.resource_type not in ['services', 'functions', 'packages', 'files']:
             log.error("Invalid resource type: ", args.resource_type)
             exit(1)
 
