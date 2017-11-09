@@ -640,6 +640,7 @@ class AccessArgParse(object):
         """
         examples = """Example usage:
             access auth -u tester -p 1234
+            access --platform sp1 auth -u tester -p 1234
             access auth --logout
             access push --upload samples/sonata-demo.son
             access push --upload samples/sonata-demo.son --sign
@@ -647,7 +648,7 @@ class AccessArgParse(object):
             access pull packages --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             access pull files --uuid 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             access pull services --id sonata.eu firewall-vnf 1.0
-            access -p sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
+            access --platform sp1 push --deploy 65b416a6-46c0-4596-a9e9-0a9b04ed34ea
             """
         parser = ArgumentParser(
             description="Authenticates users to submit and request resources "
