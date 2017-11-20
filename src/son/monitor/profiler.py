@@ -224,7 +224,7 @@ class Emu_Profiler():
 
             self.resource_configuration = resource_dict
             LOG.info("resource config: {0}".format(resource_dict))
-            LOG.info("vnf commands: {0}".format(cmd_dict))
+
 
             # create ordered list of vnf_names, so the commands are always executed in a defined order
             vnforder_dict = OrderedDict(sorted(vnf_name2order.items(), key=operator.itemgetter(1)))
@@ -241,9 +241,10 @@ class Emu_Profiler():
             for metric in self.input_metrics + self.output_metrics:
                 metric.reset()
 
+            LOG.info("vnf commands: {0}".format(cmd_dict))
             # start the load
             for vnf_name in vnforder_list:
-                cmd = cmd_dict[vnf_name]
+                cmd = cmd_dict.get(vnf_name)
                 self.emu.exec(vnf_name=vnf_name, cmd=cmd)
 
             # let the load stabilize
