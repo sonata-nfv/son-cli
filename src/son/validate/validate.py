@@ -824,6 +824,16 @@ class Validator(object):
                        service.id,
                        'evt_nsd_top_topgraph_disconnected')
 
+        # check if forwarding graphs section is available
+        if 'forwarding_graphs' not in service.content:
+            evtlog.log("Forwarding graphs not available",
+                       "No forwarding graphs available in service id='{0}'"
+                       .format(service.id),
+                       service.id,
+                       'evt_nsd_top_fwgraph_unavailable')
+            # don't enforce it (section not required)
+            return True
+
         # load forwarding graphs
         if not service.load_forwarding_graphs():
             evtlog.log("Bad section: 'forwarding_graphs'",
