@@ -917,14 +917,6 @@ class Service(Descriptor):
         Load all forwarding paths of all forwarding graphs, defined in the
         service content.
         """
-        if 'forwarding_graphs' not in self.content:
-            evtlog.log("Forwarding graphs not available",
-                       "No forwarding graphs available in service id='{0}'"
-                       .format(self.id),
-                       self.id,
-                       'evt_nsd_top_fwgraph_unavailable')
-            return
-
         for fgraph in self.content['forwarding_graphs']:
             s_fwgraph = dict()
             s_fwgraph['fg_id'] = fgraph['fg_id']
