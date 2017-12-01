@@ -74,7 +74,7 @@ evt_nsd_top_topgraph_failed: error
 evt_nsd_top_topgraph_disconnected: warning
 
 # NSD [topology] - bad section 'forwarding graphs'
-evt_nsd_top_badsection_fwgraph: error
+evt_nsd_top_badsection_fwgraph: none
 
 # NSD [topology] - no 'forwarding_graphs' section
 evt_nsd_top_fwgraph_unavailable: error
