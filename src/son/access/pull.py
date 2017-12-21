@@ -131,12 +131,17 @@ class Pull(object):
         """
         if extra_uri is None:
             url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query
+            response = requests.get(url, headers=self._headers)
+            if not response.status_code == requests.codes.ok:
+                return
+            return response.text
         else:
             url = self._base_url + self.GK_API_VERSION + cat_uri + obj_query + extra_uri
-        response = requests.get(url, headers=self._headers)
-        if not response.status_code == requests.codes.ok:
-            return
-        return response.text
+
+            response = requests.get(url, headers=self._headers)
+            if not response.status_code == requests.codes.ok:
+                return
+            return response.content
 
     def _get_from_url(self, url):
         """

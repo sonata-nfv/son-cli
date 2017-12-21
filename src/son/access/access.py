@@ -584,7 +584,7 @@ class AccessClient:
                     self.workspace.platforms_dir,
                     filename)
 
-                with open(filepath, mode="w") as son_file:
+                with open(filepath, mode="wb") as son_file:
                     son_file.write(file_data)
                     # son_file.write(bytes(file_data, 'UTF-8'))
                     son_file.close()
