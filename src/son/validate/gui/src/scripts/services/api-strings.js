@@ -2,7 +2,7 @@
  * API Strings to be used for communication.
  */
 
-const HOST_URL = 'http://0.0.0.0';
+const HOST_URL = 'http://127.0.0.1';
 const HOST_PORT = '5050';
 const HOST_ADDRESS = `${HOST_URL}:${HOST_PORT}`;
 

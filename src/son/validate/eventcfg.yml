@@ -77,7 +77,7 @@ evt_nsd_top_topgraph_disconnected: warning
 evt_nsd_top_badsection_fwgraph: error
 
 # NSD [topology] - no 'forwarding_graphs' section
-evt_nsd_top_fwgraph_unavailable: error
+evt_nsd_top_fwgraph_unavailable: none
 
 # NSD [topology] - connection point in forwarding graph not defined
 evt_nsd_top_fwgraph_cpoint_undefined: error

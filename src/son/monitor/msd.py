@@ -219,10 +219,10 @@ class msd():
         metric_type2 = vnf_id['direction'] + "_" + metric_type
         vnf_name = parse_vnf_name(vnf_id['vnf'])
         vnf_interface = parse_vnf_interface(vnf_id['vnf'])
-        flow_metric = metric2flow_metric[metric_type2]
 
-        # metrics of cadvisor al already exported by default
+        # metrics of cadvisor are already exported by default
         if not '_cadv' in metric_type:
+            flow_metric = metric2flow_metric[metric_type2]
             r = self.vim.monitor_interface(action='start', vnf_name=vnf_name + ':' + vnf_interface, metric=flow_metric)
             LOG.info('start metric ret:{0}'.format(r))
         query = network2vnfquery[metric_type2].query_template.format(vnf_name, vnf_interface)
@@ -240,9 +240,10 @@ class msd():
         metric_type2 = vnf_id['direction'] + "_" + metric_type
         vnf_name = parse_vnf_name(vnf_id['vnf'])
         vnf_interface = parse_vnf_interface(vnf_id['vnf'])
-        flow_metric = metric2flow_metric[metric_type2]
-        # metrics of cadvisor al already exported by default
+
+        # metrics of cadvisor are already exported by default
         if not '_cadv' in metric_type:
+            flow_metric = metric2flow_metric[metric_type2]
             r = self.vim.monitor_interface('stop', vnf_name + ':' + vnf_interface, flow_metric)
             LOG.info('stop metric ret:{0}'.format(r))
         return
