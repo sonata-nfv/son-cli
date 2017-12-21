@@ -8,7 +8,7 @@ The created set of service packages can be automatically deployed on the SONATA 
 
 * **Passive mode**:
 Dynamically update a service which is deployed in the emulator. Resource allocation can be dynamically adjusted. Functional tests can be generated and the set of monitored metrics can be specified. During the tests, the monitored metrics will be statistically analyzed and a summary of the measured results will be generated, giving an indication of the VNF's performance and used resources.
-Further info on this mode can be found on the [Wiki](https://github.com/sonata-nfv/son-cli/wiki/son-profile:-passive-mode).
+Further info on this mode can be found on the [Wiki](https://github.com/sonata-nfv/son-cli/wiki/SONATA-Profiler).
 
 ## Examples
 

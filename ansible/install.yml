@@ -7,7 +7,7 @@
     - name: install son-cli dependencies
       apt: pkg={{item}} state=installed
       with_items:
-        - python3.4
+        - python3
         - python3-pycparser
         - build-essential
         - python3-dev
@@ -32,6 +32,12 @@
         - python3-scipy
         - python3-matplotlib
 
+    - name: install Flask 
+      pip: name=Flask state=latest executable=pip3
+
+    - name: install flask-cache 
+      pip: name=flask-cache state=latest executable=pip3
+
     - name: ensure docker repo key (son-monitor dependency)
       shell: curl -fsSL https://get.docker.com/gpg | apt-key add -
 
@@ -45,6 +51,9 @@
       shell: "{{ item }}"
       with_items:
         - chmod +x /usr/local/bin/docker-compose
+
+    - name: install numpy (son-monitor dependency)
+      pip: name=numpy state=latest executable=pip3
 
     - name: install numpy (son-monitor dependency)
       pip: name=numpy state=latest executable=pip3
