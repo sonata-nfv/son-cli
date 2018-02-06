@@ -10,9 +10,9 @@ docker run --name centos7.build-rpm -v $(pwd)/packages-centos7:/son-cli/rpm-pack
 # ====== Create repository ======
 echo "--> Creating RPM repository"
 
-docker build -t registry.sonata-nfv.eu:5000/son-cli-rpmrepo -f tools/distribute/rpmrepo/Dockerfile .
+docker build -t registry.sonata-nfv.eu:5000/son-cli-rpmrepo:v3.1 -f tools/distribute/rpmrepo/Dockerfile .
 
-docker push registry.sonata-nfv.eu:5000/son-cli-rpmrepo
+docker push registry.sonata-nfv.eu:5000/son-cli-rpmrepo:v3.1
 
 # set docker host to point to where the repo will be deployed
 export RESTORE_DOCKER_HOST=$DOCKER_HOST
@@ -20,10 +20,10 @@ export DOCKER_HOST="tcp://registry.sonata-nfv.eu:2375"
 
 docker login -u sonata-nfv -p s0n@t@ registry.sonata-nfv.eu:5000
 
-docker pull registry.sonata-nfv.eu:5000/son-cli-rpmrepo
+docker pull registry.sonata-nfv.eu:5000/son-cli-rpmrepo:v3.1
 
 docker rm -f son-cli-rpmrepo || true
-docker run -dit --name son-cli-rpmrepo --entrypoint=/bin/bash -p 8081:80 registry.sonata-nfv.eu:5000/son-cli-rpmrepo
+docker run -dit --name son-cli-rpmrepo --entrypoint=/bin/bash -p 8081:80 registry.sonata-nfv.eu:5000/son-cli-rpmrepo:v3.1
 
 docker exec -d son-cli-rpmrepo sh /create_repo.sh
 

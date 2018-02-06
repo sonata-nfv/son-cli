@@ -13,7 +13,7 @@ echo "--> Building packages for Ubuntu 14.04 LTS"
 docker build -t ubuntu14.04.build-deb -f tools/distribute/ubuntu14.04.build-deb.Dockerfile .
 mkdir -p packages-ubuntu14.04
 
-docker rm -f ubuntu14.04.build-deb || true
+docker rm -fv ubuntu14.04.build-deb || true
 docker run -i --name ubuntu14.04.build-deb \
     -v $(pwd)/packages-ubuntu14.04:/son-cli/deb-packages \
     ubuntu14.04.build-deb
@@ -24,7 +24,7 @@ echo "--> Building packages for Ubuntu 16.04 LTS"
 docker build -t ubuntu16.04.build-deb -f tools/distribute/ubuntu16.04.build-deb.Dockerfile .
 mkdir -p packages-ubuntu16.04
 
-docker rm -f ubuntu16.04.build-deb || true
+docker rm -fv ubuntu16.04.build-deb || true
 
 ## run container to build deb packages
 ## some packages don't support bdist, use debian package instead
@@ -33,11 +33,11 @@ docker run -i --name ubuntu16.04.build-deb \
     ubuntu16.04.build-deb
 
 # ====== Build docker image for debian repository and publish it to registry.sonata-nfv.eu ======
-docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo \
+docker build -t registry.sonata-nfv.eu:5000/son-cli-debrepo:v3.1 \
     -f tools/distribute/debrepo/Dockerfile \
     tools/distribute/debrepo
 
-docker push registry.sonata-nfv.eu:5000/son-cli-debrepo
+docker push registry.sonata-nfv.eu:5000/son-cli-debrepo:v3.1
 
 # ====== Instantiate remote container for debian repository ======
 echo "--> Creating debian repository container"
@@ -67,7 +67,7 @@ docker run --name=son-cli-debrepo -dit \
     -e KEYSERVER=keyserver.ubuntu.com \
     -e APTLY_ARCHITECTURES="i386,amd64" \
     -v /home/sonata/son-cli-dist/.gnupg:/.gnupg \
-    --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo
+    --entrypoint=/bin/bash -p 8080:8080 registry.sonata-nfv.eu:5000/son-cli-debrepo:v3.1
 
 # ====== Copy generated debs to container and create repositories for each distro ======
 ## ubuntu14.04
