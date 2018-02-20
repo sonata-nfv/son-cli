@@ -956,7 +956,7 @@ class Validator(object):
                                                cp),
                                        source_id,
                                        'evt_nsd_top_fwpath_disrupted',
-                                       event_id=func.id)
+                                       event_id=source_id)
 
                         pair_complete = True
 
